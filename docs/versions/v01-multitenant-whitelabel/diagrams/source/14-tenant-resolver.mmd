@@ -1,0 +1,8 @@
+%% Tenant Resolver
+flowchart LR
+  N1["URL /clinica-x"] --> N2["slug"]
+  N2["slug"] --> N3["tenantSlugs"]
+  N3["tenantSlugs"] --> N4["tenantId"]
+  N4["tenantId"] --> N5["Tenant Config"]
+  N4["tenantId"] --> N6["Membership"]
+  N4["tenantId"] --> N7["Data Scope"]

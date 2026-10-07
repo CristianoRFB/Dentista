@@ -1,0 +1,11 @@
+%% Atores e permissões
+flowchart LR
+  N1["Platform Owner"] --> N2["Tenant Mgmt"]
+  N3["Tenant Owner"] --> N4["Administração"]
+  N5["Tenant Admin"] --> N4["Administração"]
+  N6["Dentist"] --> N7["Clinical Read/Write"]
+  N6["Dentist"] --> N8["Appointments"]
+  N9["Receptionist"] --> N8["Appointments"]
+  N9["Receptionist"] --> N10["Patient Admin"]
+  N11["Assistant"] --> N12["Limited Access"]
+  N13["Patient"] --> N14["Own Portal"]

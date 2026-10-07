@@ -1,0 +1,11 @@
+name = "odontoflow-clinical-media"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+FIREBASE_PROJECT_ID = "dentista-ee9db"
+
+[[r2_buckets]]
+binding = "CLINICAL_MEDIA"
+bucket_name = "odontoflow-clinical-media"
+preview_bucket_name = "odontoflow-clinical-media-preview"

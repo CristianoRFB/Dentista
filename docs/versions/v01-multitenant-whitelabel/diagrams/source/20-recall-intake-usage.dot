@@ -1,0 +1,4 @@
+digraph G { rankdir=LR; graph [bgcolor="transparent", pad="0.3"]; node [shape=box, style="rounded,filled", fillcolor="#f7fbfa", color="#86a9a2", fontname="Arial"]; edge [color="#5c7c76"];
+Patient [label="Paciente"]; Intake [label="IntakeSubmission\npending_review", fillcolor="#f5ead8"]; Reception [label="Recepção\nrevisa"]; PatientRecord [label="Patient\noficial", fillcolor="#dff1ed"]; Visit [label="Consulta"]; Recall [label="Recall\nplanned/due"]; Schedule [label="Novo appointment"]; Usage [label="UsageCounter\nserviços variáveis"];
+Patient -> Intake -> Reception -> PatientRecord -> Visit -> Recall -> Schedule; Schedule -> Usage [style=dashed,label=" se integração cobrada"];
+}

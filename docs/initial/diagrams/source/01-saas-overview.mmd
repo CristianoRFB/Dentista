@@ -1,0 +1,14 @@
+%% Visão geral do SaaS
+flowchart LR
+  N1["Platform Owner"] --> N2["Platform Admin"]
+  N2["Platform Admin"] --> N3["Tenant Resolver"]
+  N3["Tenant Resolver"] --> N4["Clínica A"]
+  N3["Tenant Resolver"] --> N5["Clínica B"]
+  N4["Clínica A"] --> N6["Gestão"]
+  N4["Clínica A"] --> N7["Clínico"]
+  N6["Gestão"] --> N8["Agenda"]
+  N6["Gestão"] --> N9["Pacientes"]
+  N7["Clínico"] --> N10["Prontuário"]
+  N7["Clínico"] --> N11["Odontograma"]
+  N7["Clínico"] --> N12["Tratamento"]
+  N7["Clínico"] --> N13["Fotos"]

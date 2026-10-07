@@ -1,0 +1,13 @@
+{
+  "source_package": "Dentista_OdontoFlow_V2_SaaS_Foundation_PRICING_PROTOCOL_v01.zip",
+  "new_audit_performed": false,
+  "commercial_names": [
+    "Essencial",
+    "Pro",
+    "Premium"
+  ],
+  "recommended_plan": "Pro",
+  "runtime_entitlements_implemented": false,
+  "billing_implemented": false,
+  "goal_status": "NEXT"
+}

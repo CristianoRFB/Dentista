@@ -1,0 +1,7 @@
+%% Ciclo do prontuário
+flowchart LR
+  N1["Draft Note"] --> N2["Clinical Record"]
+  N2["Clinical Record"] --> N3["Consolidated"]
+  N3["Consolidated"] --> N4["Amendment Request"]
+  N4["Amendment Request"] --> N5["Amendment"]
+  N5["Amendment"] --> N6["Historical View"]

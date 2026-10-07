@@ -1,0 +1,8 @@
+%% C4 Containers
+flowchart LR
+  N1["Browser React"] --> N2["Firebase Auth"]
+  N1["Browser React"] --> N3["Firestore"]
+  N1["Browser React"] --> N4["Media Worker"]
+  N4["Media Worker"] --> N5["Firebase Auth/JWKS"]
+  N4["Media Worker"] --> N6["Firestore Membership"]
+  N4["Media Worker"] --> N7["R2 Private"]

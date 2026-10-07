@@ -1,0 +1,6 @@
+import { demoAppointments, demoPatients, demoResources } from '../../sample/demoData';
+export function AgendaPage() {
+  const patientName = (id:string) => demoPatients.find(p => p.id===id)?.name ?? id;
+  const resourceName = (id?:string) => demoResources.find(r=>r.id===id)?.name ?? '—';
+  return <><div className="page-head"><div><span className="eyebrow">Operação do dia</span><h1>Agenda</h1><p className="muted">Conflitos devem ser validados na camada confiável por profissional e, quando ativado, também por cadeira/sala.</p></div><button className="btn primary">+ Agendamento</button></div><div className="agenda-toolbar"><button className="btn secondary">←</button><b>Hoje</b><button className="btn secondary">→</button><span className="toolbar-spacer"/><span className="status-pill">Cadeira 01</span><span className="status-pill">Cadeira 02</span></div><div className="card table-card"><table className="table"><thead><tr><th>Horário</th><th>Paciente</th><th>Recurso</th><th>Status</th></tr></thead><tbody>{demoAppointments.map(a => <tr key={a.id}><td><b>{new Date(a.startsAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</b></td><td>{patientName(a.patientId)}</td><td>{resourceName(a.resourceId)}</td><td><span className={`status-pill ${a.status}`}>{a.status}</span></td></tr>)}</tbody></table></div></>;
+}

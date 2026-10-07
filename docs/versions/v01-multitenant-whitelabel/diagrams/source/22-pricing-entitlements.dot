@@ -1,0 +1,24 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad="0.35", nodesep="0.55", ranksep="0.8", label="Planos e entitlements — arquitetura alvo", labelloc=t, fontsize=20, fontname="Arial"];
+  node [shape=box, style="rounded,filled", fontname="Arial", fontsize=11, color="#9ab3ad", fillcolor="#f7fbfa", fontcolor="#173b37", margin="0.16,0.10"];
+  edge [color="#7b9690", arrowsize=0.75, fontname="Arial", fontsize=9, fontcolor="#546b66"];
+
+  "Pricing proposal\n(PROPOSTA)" [fillcolor="#fff7df", color="#d8b85f"];
+  "Plan catalog\n(NEXT)" [fillcolor="#eef3fb", color="#7f9bc5"];
+  "Tenant subscription\nplanId + status + overrides" [fillcolor="#eef3fb", color="#7f9bc5"];
+  "Effective entitlements\ncanUse / getLimit" [fillcolor="#eef3fb", color="#7f9bc5"];
+  "UI gates";
+  "Backend / Worker gates";
+  "Limit enforcement";
+  "Usage counters";
+  "Demo tenant\npremium_demo" [fillcolor="#e9f6ef", color="#67a884"];
+
+  "Pricing proposal\n(PROPOSTA)" -> "Plan catalog\n(NEXT)" [label="validar antes"];
+  "Plan catalog\n(NEXT)" -> "Tenant subscription\nplanId + status + overrides";
+  "Tenant subscription\nplanId + status + overrides" -> "Effective entitlements\ncanUse / getLimit";
+  "Effective entitlements\ncanUse / getLimit" -> "UI gates";
+  "Effective entitlements\ncanUse / getLimit" -> "Backend / Worker gates";
+  "Effective entitlements\ncanUse / getLimit" -> "Limit enforcement";
+  "Limit enforcement" -> "Usage counters" [style=dashed, label="quando aplicável"];
+  "Demo tenant\npremium_demo" -> "Effective entitlements\ncanUse / getLimit" [style=dashed, label="futuro"];
+}

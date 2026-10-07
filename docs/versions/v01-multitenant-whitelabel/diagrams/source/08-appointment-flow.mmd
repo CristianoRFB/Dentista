@@ -1,0 +1,9 @@
+%% Fluxo de agendamento
+flowchart LR
+  N1["Request Slot"] --> N2["Resolve Tenant"]
+  N2["Resolve Tenant"] --> N3["Check Professional"]
+  N3["Check Professional"] --> N4["Check Business Hours"]
+  N4["Check Business Hours"] --> N5["Check Blocks"]
+  N5["Check Blocks"] --> N6["Check Appointments"]
+  N6["Check Appointments"] --> N7["Reserve Slot"]
+  N7["Reserve Slot"] --> N8["Confirmed"]

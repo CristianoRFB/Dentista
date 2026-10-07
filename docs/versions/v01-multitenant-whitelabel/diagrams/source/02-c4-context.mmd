@@ -1,0 +1,9 @@
+%% C4 Context
+flowchart LR
+  N1["Platform Owner"] --> N2["OdontoFlow"]
+  N3["Dono da clínica"] --> N2["OdontoFlow"]
+  N4["Dentista"] --> N2["OdontoFlow"]
+  N5["Recepção"] --> N2["OdontoFlow"]
+  N6["Paciente"] --> N2["OdontoFlow"]
+  N2["OdontoFlow"] --> N7["Firebase"]
+  N2["OdontoFlow"] --> N8["Cloudflare"]

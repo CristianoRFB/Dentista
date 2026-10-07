@@ -1,0 +1,4 @@
+digraph G { rankdir=LR; graph [bgcolor="transparent", pad="0.3", nodesep="0.45", ranksep="0.65"]; node [shape=box, style="rounded,filled", fillcolor="#f7fbfa", color="#86a9a2", fontname="Arial"]; edge [color="#5c7c76"];
+Visitor [label="Visitante"]; Landing [label="Landing\nbenefício + produto", fillcolor="#dff1ed"]; Feature [label="Página de recurso"]; Pricing [label="Planos\nfeatures + limits"]; Demo [label="Demo do tenant", fillcolor="#e8f0ee"]; Lead [label="Teste / contato\n(futuro)"];
+Visitor -> Landing; Landing -> Feature; Landing -> Pricing; Landing -> Demo; Feature -> Demo; Pricing -> Demo; Demo -> Lead;
+}

@@ -1,0 +1,9 @@
+%% Domínio clínico
+flowchart LR
+  N1["Patient"] --> N2["Clinical Records"]
+  N1["Patient"] --> N3["Odontogram Events"]
+  N1["Patient"] --> N4["Treatment Plan"]
+  N1["Patient"] --> N5["Clinical Photos"]
+  N2["Clinical Records"] --> N6["Amendments"]
+  N4["Treatment Plan"] --> N7["Procedures"]
+  N5["Clinical Photos"] --> N8["Timeline/Compare"]

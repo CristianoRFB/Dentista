@@ -1,0 +1,10 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // OdontoFlow V2 usa R2 privado para mídia clínica nesta fundação.
+    // Firebase Storage fica bloqueado por padrão para evitar dois modelos de acesso concorrentes.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,12 @@
+%% Isolamento Multi-Tenant
+flowchart LR
+  N1["User"] --> N2["Membership A"]
+  N2["Membership A"] --> N3["Tenant A"]
+  N3["Tenant A"] --> N4["Patients A"]
+  N3["Tenant A"] --> N5["Appointments A"]
+  N3["Tenant A"] --> N6["Clinical A"]
+  N1["User"] --> N7["Membership B"]
+  N7["Membership B"] --> N8["Tenant B"]
+  N8["Tenant B"] --> N9["Patients B"]
+  N8["Tenant B"] --> N10["Appointments B"]
+  N8["Tenant B"] --> N11["Clinical B"]

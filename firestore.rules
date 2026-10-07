@@ -1,0 +1,150 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isPlatformOwner() {
+      return signedIn() && exists(/databases/$(database)/documents/platformOwners/$(request.auth.uid));
+    }
+    function membershipPath(tenantId) {
+      return /databases/$(database)/documents/tenants/$(tenantId)/memberships/$(request.auth.uid);
+    }
+    function isMember(tenantId) {
+      return signedIn() && exists(membershipPath(tenantId)) && get(membershipPath(tenantId)).data.status == 'active';
+    }
+    function hasPermission(tenantId, permission) {
+      return isMember(tenantId) && permission in get(membershipPath(tenantId)).data.permissions;
+    }
+    function hasActiveClinicalSupport(tenantId) {
+      return isPlatformOwner()
+        && exists(/databases/$(database)/documents/platformSupportAccess/$(tenantId))
+        && get(/databases/$(database)/documents/platformSupportAccess/$(tenantId)).data.actorId == request.auth.uid
+        && get(/databases/$(database)/documents/platformSupportAccess/$(tenantId)).data.expiresAt > request.time;
+    }
+
+    match /platformOwners/{uid} {
+      allow read: if isPlatformOwner() || (signedIn() && request.auth.uid == uid);
+      allow write: if isPlatformOwner();
+    }
+
+    match /platformSupportAccess/{tenantId} {
+      allow read, create, update, delete: if isPlatformOwner();
+    }
+
+    match /tenantSlugs/{slug} {
+      allow read: if true;
+      allow write: if isPlatformOwner();
+    }
+
+    match /tenants/{tenantId} {
+      allow read: if isPlatformOwner() || isMember(tenantId);
+      allow create, delete: if isPlatformOwner();
+      allow update: if isPlatformOwner() || hasPermission(tenantId, 'tenant.manage');
+
+      match /publicProfile/{docId} {
+        allow read: if true;
+        allow write: if isPlatformOwner() || hasPermission(tenantId, 'tenant.manage');
+      }
+
+      match /memberships/{uid} {
+        allow read: if isPlatformOwner()
+          || (signedIn() && request.auth.uid == uid)
+          || hasPermission(tenantId, 'memberships.read');
+        allow create, update, delete: if isPlatformOwner() || hasPermission(tenantId, 'memberships.manage');
+      }
+
+      match /professionals/{professionalId} {
+        allow read: if isPlatformOwner() || hasPermission(tenantId, 'professionals.read');
+        allow write: if isPlatformOwner() || hasPermission(tenantId, 'professionals.manage');
+      }
+
+      match /procedures/{procedureId} {
+        allow read: if isPlatformOwner() || hasPermission(tenantId, 'procedures.read');
+        allow write: if isPlatformOwner() || hasPermission(tenantId, 'procedures.manage');
+      }
+
+      match /patients/{patientId} {
+        allow read: if hasPermission(tenantId, 'patients.read') || hasActiveClinicalSupport(tenantId);
+        allow create, update: if hasPermission(tenantId, 'patients.manage') || hasActiveClinicalSupport(tenantId);
+        allow delete: if false;
+
+        match /clinicalRecords/{recordId} {
+          allow read: if hasPermission(tenantId, 'clinical.read') || hasActiveClinicalSupport(tenantId);
+          allow create: if hasPermission(tenantId, 'clinical.write') || hasActiveClinicalSupport(tenantId);
+          allow update, delete: if false;
+        }
+
+        match /clinicalRecordAmendments/{amendmentId} {
+          allow read: if hasPermission(tenantId, 'clinical.read') || hasActiveClinicalSupport(tenantId);
+          allow create: if hasPermission(tenantId, 'clinical.write') || hasActiveClinicalSupport(tenantId);
+          allow update, delete: if false;
+        }
+
+        match /odontogramEvents/{eventId} {
+          allow read: if hasPermission(tenantId, 'clinical.read') || hasActiveClinicalSupport(tenantId);
+          allow create: if hasPermission(tenantId, 'clinical.write') || hasActiveClinicalSupport(tenantId);
+          allow update, delete: if false;
+        }
+
+        match /clinicalPhotos/{photoId} {
+          allow read: if hasPermission(tenantId, 'clinical.read') || hasActiveClinicalSupport(tenantId);
+          allow create, update: if hasPermission(tenantId, 'clinical.write') || hasActiveClinicalSupport(tenantId);
+          allow delete: if false;
+        }
+      }
+
+      match /appointments/{appointmentId} {
+        allow read: if hasPermission(tenantId, 'appointments.read') || hasActiveClinicalSupport(tenantId);
+        allow create, update: if hasPermission(tenantId, 'appointments.manage') || hasActiveClinicalSupport(tenantId);
+        allow delete: if false;
+      }
+
+      match /scheduleBlocks/{blockId} {
+        allow read: if hasPermission(tenantId, 'appointments.read');
+        allow write: if hasPermission(tenantId, 'appointments.manage');
+      }
+
+      match /scheduleResources/{resourceId} {
+        allow read: if isPlatformOwner() || hasPermission(tenantId, 'resources.read');
+        allow write: if isPlatformOwner() || hasPermission(tenantId, 'resources.manage');
+      }
+
+      match /recalls/{recallId} {
+        allow read: if hasPermission(tenantId, 'recalls.read') || hasActiveClinicalSupport(tenantId);
+        allow create, update: if hasPermission(tenantId, 'recalls.manage') || hasActiveClinicalSupport(tenantId);
+        allow delete: if false;
+      }
+
+      // Formulário público NÃO grava direto no Firestore. Em produção a submissão
+      // deve entrar por endpoint confiável/rate-limited e chegar aqui via backend.
+      match /patientIntakeSubmissions/{submissionId} {
+        allow read: if hasPermission(tenantId, 'intake.read') || hasActiveClinicalSupport(tenantId);
+        allow create: if false;
+        allow update: if hasPermission(tenantId, 'intake.manage') || hasActiveClinicalSupport(tenantId);
+        allow delete: if false;
+      }
+
+      match /usageCounters/{counterId} {
+        allow read: if isPlatformOwner() || hasPermission(tenantId, 'usage.read');
+        allow write: if false;
+      }
+
+      match /treatmentPlans/{planId} {
+        allow read: if hasPermission(tenantId, 'treatment.read') || hasActiveClinicalSupport(tenantId);
+        allow create, update: if hasPermission(tenantId, 'treatment.write') || hasActiveClinicalSupport(tenantId);
+        allow delete: if false;
+      }
+
+      match /quotes/{quoteId} {
+        allow read: if hasPermission(tenantId, 'billing.read');
+        allow create, update: if hasPermission(tenantId, 'billing.write');
+        allow delete: if false;
+      }
+
+      match /auditLogs/{logId} {
+        allow read: if isPlatformOwner() || hasPermission(tenantId, 'audit.read');
+        allow create: if signedIn() && request.resource.data.actorId == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+  }
+}

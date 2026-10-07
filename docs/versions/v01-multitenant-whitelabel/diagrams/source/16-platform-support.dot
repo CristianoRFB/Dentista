@@ -1,0 +1,18 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad="0.3", nodesep="0.45", ranksep="0.7", label="Suporte clínico da plataforma", labelloc=t, fontsize=20, fontname="Arial"];
+  node [shape=box, style="rounded,filled", fillcolor="#f8fafc", color="#94a3b8", fontname="Arial", fontsize=11, margin="0.16,0.10"];
+  edge [color="#64748b", arrowsize=0.7, fontname="Arial"];
+  "Platform Owner";
+  "Open Support";
+  "Reason + Expiry";
+  "Support Access Doc";
+  "Clinical Read";
+  "Audit";
+  "Expires";
+  "Platform Owner" -> "Open Support";
+  "Open Support" -> "Reason + Expiry";
+  "Reason + Expiry" -> "Support Access Doc";
+  "Support Access Doc" -> "Clinical Read";
+  "Clinical Read" -> "Audit";
+  "Support Access Doc" -> "Expires";
+}

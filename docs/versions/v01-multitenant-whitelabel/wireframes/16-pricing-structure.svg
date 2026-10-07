@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+<rect width="1400" height="900" fill="#f5f8f7"/>
+<rect x="0" y="0" width="1400" height="82" fill="#163d3a"/>
+<text x="58" y="52" font-family="Arial" font-size="26" font-weight="700" fill="white">OdontoFlow</text>
+<text x="60" y="132" font-family="Arial" font-size="15" font-weight="700" fill="#6e8a84">PROPOSTA EM VALIDAÇÃO · NÃO É CHECKOUT</text>
+<text x="60" y="180" font-family="Arial" font-size="38" font-weight="700" fill="#183b37">Planos para crescer com a clínica</text>
+<text x="60" y="214" font-family="Arial" font-size="17" fill="#647a75">Valores e recursos ainda dependem de validação comercial e entitlement real.</text>
+
+<g transform="translate(60,270)">
+  <rect width="390" height="500" rx="24" fill="white" stroke="#d7e2df"/>
+  <text x="28" y="48" font-family="Arial" font-size="24" font-weight="700" fill="#183b37">Essencial</text>
+  <text x="28" y="80" font-family="Arial" font-size="15" fill="#6b7f7b">Dentista solo / consultório enxuto</text>
+  <text x="28" y="135" font-family="Arial" font-size="38" font-weight="700" fill="#183b37">R$ 79,90</text>
+  <text x="218" y="135" font-family="Arial" font-size="14" fill="#6b7f7b">/mês</text>
+  <text x="28" y="170" font-family="Arial" font-size="13" fill="#6b7f7b">1 profissional · 1 recurso · 10 GB</text>
+  <text x="28" y="222" font-family="Arial" font-size="15" font-weight="700" fill="#183b37">Alvo comercial</text>
+  <text x="28" y="256" font-family="Arial" font-size="14" fill="#526a65">• Agenda e pacientes</text>
+  <text x="28" y="286" font-family="Arial" font-size="14" fill="#526a65">• Prontuário e odontograma</text>
+  <text x="28" y="316" font-family="Arial" font-size="14" fill="#526a65">• Fotos clínicas</text>
+  <text x="28" y="346" font-family="Arial" font-size="14" fill="#526a65">• Tratamento básico</text>
+  <text x="28" y="376" font-family="Arial" font-size="14" fill="#526a65">• Site + agendamento online</text>
+  <rect x="28" y="424" width="334" height="48" rx="12" fill="#edf4f2"/>
+  <text x="98" y="454" font-family="Arial" font-size="14" font-weight="700" fill="#183b37">Explorar demo Premium</text>
+</g>
+
+<g transform="translate(505,248)">
+  <rect width="390" height="544" rx="24" fill="white" stroke="#163d3a" stroke-width="3"/>
+  <rect x="235" y="18" width="128" height="28" rx="14" fill="#dff1ed"/>
+  <text x="250" y="37" font-family="Arial" font-size="11" font-weight="700" fill="#2d655c">RECOMENDADO</text>
+  <text x="28" y="68" font-family="Arial" font-size="24" font-weight="700" fill="#183b37">Pro</text>
+  <text x="28" y="100" font-family="Arial" font-size="15" fill="#6b7f7b">Clínica pequena ou média</text>
+  <text x="28" y="155" font-family="Arial" font-size="38" font-weight="700" fill="#183b37">R$ 129,90</text>
+  <text x="238" y="155" font-family="Arial" font-size="14" fill="#6b7f7b">/mês</text>
+  <text x="28" y="190" font-family="Arial" font-size="13" fill="#6b7f7b">3 profissionais · 5 recursos · 50 GB</text>
+  <text x="28" y="242" font-family="Arial" font-size="15" font-weight="700" fill="#183b37">Tudo do Essencial +</text>
+  <text x="28" y="276" font-family="Arial" font-size="14" fill="#526a65">• Cadeiras e salas</text>
+  <text x="28" y="306" font-family="Arial" font-size="14" fill="#526a65">• Central de retorno</text>
+  <text x="28" y="336" font-family="Arial" font-size="14" fill="#526a65">• Pré-cadastro por link</text>
+  <text x="28" y="366" font-family="Arial" font-size="14" fill="#526a65">• Orçamentos e gestão básica</text>
+  <text x="28" y="396" font-family="Arial" font-size="14" fill="#526a65">• Relatórios básicos</text>
+  <rect x="28" y="468" width="334" height="48" rx="12" fill="#163d3a"/>
+  <text x="98" y="498" font-family="Arial" font-size="14" font-weight="700" fill="white">Explorar demo Premium</text>
+</g>
+
+<g transform="translate(950,270)">
+  <rect width="390" height="500" rx="24" fill="white" stroke="#d7e2df"/>
+  <text x="28" y="48" font-family="Arial" font-size="24" font-weight="700" fill="#183b37">Premium</text>
+  <text x="28" y="80" font-family="Arial" font-size="15" fill="#6b7f7b">Gestão e escala ampliadas</text>
+  <text x="28" y="135" font-family="Arial" font-size="38" font-weight="700" fill="#183b37">R$ 189,90</text>
+  <text x="238" y="135" font-family="Arial" font-size="14" fill="#6b7f7b">/mês</text>
+  <text x="28" y="170" font-family="Arial" font-size="13" fill="#6b7f7b">10 profissionais · 15 recursos · 200 GB</text>
+  <text x="28" y="222" font-family="Arial" font-size="15" font-weight="700" fill="#183b37">Tudo do Pro +</text>
+  <text x="28" y="256" font-family="Arial" font-size="14" fill="#526a65">• Gestão avançada</text>
+  <text x="28" y="286" font-family="Arial" font-size="14" fill="#526a65">• Relatórios avançados</text>
+  <text x="28" y="316" font-family="Arial" font-size="14" fill="#526a65">• Limites ampliados</text>
+  <text x="28" y="346" font-family="Arial" font-size="14" fill="#526a65">• Portal/automações — DEFERRED</text>
+  <text x="28" y="376" font-family="Arial" font-size="14" fill="#526a65">• Add-ons medidos à parte</text>
+  <rect x="28" y="424" width="334" height="48" rx="12" fill="#edf4f2"/>
+  <text x="98" y="454" font-family="Arial" font-size="14" font-weight="700" fill="#183b37">Explorar demo Premium</text>
+</g>
+
+<text x="60" y="842" font-family="Arial" font-size="13" fill="#6b7f7b">14 dias sem cartão (proposta) · 10% off anual (proposta) · gating e cobrança ainda não implementados</text>
+</svg>

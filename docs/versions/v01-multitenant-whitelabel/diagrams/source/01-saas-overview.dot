@@ -1,0 +1,30 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad="0.3", nodesep="0.45", ranksep="0.7", label="Visão geral do SaaS", labelloc=t, fontsize=20, fontname="Arial"];
+  node [shape=box, style="rounded,filled", fillcolor="#f8fafc", color="#94a3b8", fontname="Arial", fontsize=11, margin="0.16,0.10"];
+  edge [color="#64748b", arrowsize=0.7, fontname="Arial"];
+  "Platform Owner";
+  "Platform Admin";
+  "Tenant Resolver";
+  "Clínica A";
+  "Clínica B";
+  "Gestão";
+  "Clínico";
+  "Agenda";
+  "Pacientes";
+  "Prontuário";
+  "Odontograma";
+  "Tratamento";
+  "Fotos";
+  "Platform Owner" -> "Platform Admin";
+  "Platform Admin" -> "Tenant Resolver";
+  "Tenant Resolver" -> "Clínica A";
+  "Tenant Resolver" -> "Clínica B";
+  "Clínica A" -> "Gestão";
+  "Clínica A" -> "Clínico";
+  "Gestão" -> "Agenda";
+  "Gestão" -> "Pacientes";
+  "Clínico" -> "Prontuário";
+  "Clínico" -> "Odontograma";
+  "Clínico" -> "Tratamento";
+  "Clínico" -> "Fotos";
+}

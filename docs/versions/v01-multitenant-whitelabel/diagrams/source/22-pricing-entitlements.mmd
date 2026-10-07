@@ -1,0 +1,9 @@
+flowchart LR
+  P["Pricing proposal<br/>(PROPOSTA)"] --> C["Plan catalog<br/>(NEXT)"]
+  C --> S["Tenant subscription<br/>planId + status + overrides"]
+  S --> E["Effective entitlements<br/>canUse / getLimit"]
+  E --> UI["UI gates"]
+  E --> BE["Backend / Worker gates"]
+  E --> L["Limit enforcement"]
+  L -.-> U["Usage counters"]
+  D["Demo tenant<br/>premium_demo"] -.-> E

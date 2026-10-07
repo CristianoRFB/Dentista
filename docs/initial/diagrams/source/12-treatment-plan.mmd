@@ -1,0 +1,9 @@
+%% Plano de tratamento
+flowchart LR
+  N1["Draft"] --> N2["Presented"]
+  N2["Presented"] --> N3["Approved"]
+  N2["Presented"] --> N4["Partially Approved"]
+  N3["Approved"] --> N5["In Progress"]
+  N4["Partially Approved"] --> N5["In Progress"]
+  N5["In Progress"] --> N6["Completed"]
+  N1["Draft"] --> N7["Cancelled"]

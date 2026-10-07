@@ -1,0 +1,15 @@
+%% ERD principal
+flowchart LR
+  N1["Tenant"] --> N2["Membership"]
+  N2["Membership"] --> N3["User"]
+  N1["Tenant"] --> N4["Professional"]
+  N1["Tenant"] --> N5["Patient"]
+  N5["Patient"] --> N6["Appointment"]
+  N5["Patient"] --> N7["ClinicalRecord"]
+  N7["ClinicalRecord"] --> N8["Amendment"]
+  N5["Patient"] --> N9["OdontogramEvent"]
+  N5["Patient"] --> N10["ClinicalPhoto"]
+  N5["Patient"] --> N11["TreatmentPlan"]
+  N11["TreatmentPlan"] --> N12["TreatmentItem"]
+  N12["TreatmentItem"] --> N13["Procedure"]
+  N1["Tenant"] --> N14["AuditLog"]

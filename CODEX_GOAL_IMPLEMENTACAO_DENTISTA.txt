@@ -1,0 +1,748 @@
+# CONTEXTO
+
+Produto: SaaS Dentista / OdontoFlow V2.
+
+Fonte técnica de verdade desta etapa: `Dentista_OdontoFlow_V2_SaaS_DECISOES_FECHADAS_v03.zip`.
+
+O repositório GitHub `CristianoRFB/Dentista` existe, porém está vazio. A base reaproveitável real está no ZIP v03, que contém aplicação React + TypeScript + Vite, Firebase Auth/Firestore, Security Rules, Worker Cloudflare + R2, rotas, módulos clínicos/scheduling, testes e documentação versionada.
+
+Não existe cliente real original comprovado nesta vertical. Não inventar tenant legado. Usar apenas tenants fictícios de teste/demonstração.
+
+Estágio global aprovado: `CORE_FIRST`.
+
+O GLOBAL STANDARD v01 de PlanCatalog/Entitlements já está aprovado no ecossistema, mas NÃO deve ser implementado neste GOAL. Primeiro é obrigatório concluir o Core Multi-Tenant + Core Clínico P0.
+
+Preços, planos, limites e distribuição comercial já estão aprovados e não devem ser alterados:
+- Essencial: R$ 79,90/mês
+- Pro: R$ 129,90/mês — recomendado
+- Premium: R$ 189,90/mês
+
+# OBJETIVO
+
+Evoluir a base atual do OdontoFlow V2 para um Core Multi-Tenant operacional, protegido e testável, preservando a stack e o domínio já modelados.
+
+Estado final esperado:
+- autenticação operacional;
+- tenant resolver real;
+- memberships + RBAC efetivos;
+- Platform Owner operacional;
+- isolamento Tenant A × Tenant B comprovado;
+- Security Rules validadas por Emulator;
+- white-label básico alimentado por dados reais do tenant;
+- pacientes/profissionais/procedimentos/recursos/agendamentos persistidos;
+- anti-double-booking protegido fora do frontend;
+- prontuário append-only + adendos;
+- upload clínico R2 com autorização real;
+- audit logs essenciais;
+- documentação atualizada sem fingir features futuras.
+
+Ao final, a vertical deve estar pronta para uma nova avaliação de readiness e, somente então, receber um GOAL separado de GLOBAL STANDARD v01.
+
+# FONTE DE VERDADE
+
+Antes de alterar qualquer arquivo:
+
+1. confirme que o working tree corresponde à base `Dentista_OdontoFlow_V2_SaaS_DECISOES_FECHADAS_v03.zip`;
+2. leia `AGENTS.md`;
+3. leia `README.md`;
+4. leia `docs/CURRENT.md`;
+5. leia a versão apontada por `docs/CURRENT.md`;
+6. leia `DECISIONS.md`, `IMPLEMENTATION-HANDOFF.md`, `ROADMAP.md` e `BACKLOG.md`;
+7. preserve decisões comerciais aprovadas.
+
+Arquivos/áreas confirmados na baseline:
+- `src/App.tsx`
+- `src/domain/types.ts`
+- `src/domain/permissions.ts`
+- `src/lib/firebase.ts`
+- `src/modules/auth/AuthProvider.tsx`
+- `src/modules/platform/PlatformDashboard.tsx`
+- `src/modules/tenant/TenantShell.tsx`
+- `src/modules/tenant/TenantDashboard.tsx`
+- `src/modules/patients/PatientsPage.tsx`
+- `src/modules/scheduling/AgendaPage.tsx`
+- `src/modules/scheduling/ResourcesPage.tsx`
+- `src/modules/scheduling/availability.ts`
+- `src/modules/clinical/PatientClinicalPage.tsx`
+- `src/modules/clinical-media/ClinicalPhotosPage.tsx`
+- `src/modules/clinical-media/r2Client.ts`
+- `src/modules/clinical-media/localCache.ts`
+- `src/sample/demoData.ts`
+- `firestore.rules`
+- `firestore.indexes.json`
+- `storage.rules`
+- `workers/media-api/src/index.ts`
+- `tests/*`
+
+Se essa baseline NÃO estiver disponível no workspace, PARE e reporte:
+`BLOCKED_BY_TECHNICAL_SOURCE — ACTIVE_BASELINE_MISSING`.
+
+Não recrie o sistema do zero e não gere um projeto paralelo.
+
+# ESCOPO DE IMPLEMENTAÇÃO
+
+## 1. Autenticação e proteção de rotas
+
+Implementar sobre `AuthProvider.tsx` e rotas atuais:
+- login;
+- logout;
+- estado de carregamento;
+- estado não autenticado;
+- protected routes;
+- tratamento de usuário sem membership ativa;
+- redirecionamentos coerentes;
+- nenhuma rota privada protegida apenas por UI.
+
+Não implementar portal do paciente neste GOAL.
+
+## 2. Tenant Resolver + Tenant Context
+
+Criar resolução centralizada e confiável:
+
+`tenantSlug -> tenantSlugs/{slug} -> tenantId -> tenant ativo -> configuração`
+
+Requisitos:
+- slug inválido => 404/estado de tenant não encontrado;
+- tenant `suspended` ou `archived` não opera normalmente;
+- `tenantId` nunca é aceito livremente do cliente como autorização;
+- áreas privadas deixam de usar `demoData` como source of truth;
+- branding/public profile vem do tenant quando aplicável;
+- demo data pode permanecer apenas em modo explicitamente demonstrativo/dev.
+
+## 3. Memberships + RBAC
+
+Usar o modelo já existente:
+
+`tenants/{tenantId}/memberships/{uid}`
+
+Preservar os papéis:
+- `tenant_owner`
+- `tenant_admin`
+- `dentist`
+- `receptionist`
+- `assistant`
+
+Implementar:
+- carregamento de membership ativa;
+- role e permissions;
+- guards de rota/ação;
+- membership inativa => acesso negado;
+- usuário de Tenant A não pode operar Tenant B;
+- menor privilégio;
+- `receptionist` sem `clinical.write`;
+- `assistant` restrito conforme permissions atuais.
+
+Não inventar papéis só para padronizar o ecossistema.
+
+## 4. Platform Owner
+
+Tornar o conceito já modelado operacional:
+- reconhecer `platform_owner` de modo seguro;
+- proteger `/platform`;
+- listar tenants reais;
+- criar tenant mínimo;
+- criar/associar slug;
+- criar owner/membership inicial;
+- ativar/suspender tenant sem apagar dados;
+- configurar branding básico;
+- auditar ações administrativas sensíveis.
+
+Platform Owner NÃO deve ter acesso clínico casual.
+
+Preservar o modelo de suporte clínico temporário já presente em Rules (`platformSupportAccess/{tenantId}`), exigindo:
+- ator;
+- tenant;
+- motivo;
+- expiração;
+- audit log.
+
+## 5. Firestore Rules e isolamento
+
+Endurecer `firestore.rules` apenas onde necessário e provar comportamento com Firebase Emulator + `@firebase/rules-unit-testing` ou equivalente.
+
+Garantir:
+- Tenant A não lê/escreve Tenant B;
+- membership precisa estar `active`;
+- permissions são verificadas;
+- dados no documento não podem contradizer tenant do path;
+- acesso clínico do Platform Owner exige suporte temporário válido;
+- pacientes não são deletados silenciosamente;
+- registros clínicos consolidados são append-only;
+- amendments são novos registros;
+- audit logs não podem ser forjados arbitrariamente;
+- chamadas diretas ao Firestore não burlam autorização.
+
+O teste atual `tests/tenantIsolation.test.ts` não é prova suficiente por si só. Substituir/complementar com testes reais de Rules.
+
+## 6. Persistência do núcleo operacional
+
+Substituir demo data como fonte operacional e persistir:
+- professionals;
+- patients;
+- procedures;
+- scheduleResources;
+- appointments.
+
+Implementar CRUD mínimo respeitando permissões.
+
+Regras:
+- queries privadas sempre tenant-scoped;
+- IDs/paths derivados do TenantContext;
+- sem hardcode de tenant demo;
+- evitar exclusão destrutiva quando histórico/referência exigir inativação/soft state;
+- tratar loading/empty/error.
+
+## 7. Agenda + anti-double-booking confiável
+
+Preservar `src/modules/scheduling/availability.ts` como lógica de domínio, mas não usá-la como única proteção.
+
+Criação/remarcação de appointment deve validar em camada confiável:
+- tenant ativo;
+- professional ativo;
+- start/end válidos;
+- conflito do mesmo professional;
+- conflito do mesmo `resourceId` quando houver;
+- bloqueios/indisponibilidades já modelados;
+- appointment cancelado não bloqueia;
+- concorrência/race condition não cria double booking.
+
+Não aceitar solução em que somente frontend verifica conflito.
+
+Use camada confiável compatível com a stack já aprovada. Preferir Cloudflare Worker quando adequado, sem introduzir serviço pago não aprovado.
+
+Se houver impedimento técnico real que exija mudança relevante de infraestrutura/custo, pare essa parte e documente a decisão necessária. Não reduza o requisito de integridade.
+
+## 8. Prontuário clínico P0
+
+Implementar o modelo já aprovado:
+- `ClinicalRecord`;
+- `ClinicalRecordAmendment`.
+
+Regras:
+- registro original append-only;
+- sem update/delete direto do registro consolidado;
+- correção por amendment;
+- tenantId;
+- patientId;
+- professional responsável;
+- actor/author;
+- timestamp;
+- appointmentId opcional;
+- `clinical.read` / `clinical.write`;
+- auditabilidade de mutações relevantes.
+
+Odontograma e plano de tratamento ficam fora deste GOAL.
+
+## 9. Mídia clínica privada em R2
+
+Endurecer `workers/media-api/src/index.ts`.
+
+O comportamento atual de considerar apenas `res.ok` ao ler membership NÃO é suficiente.
+
+Para upload exigir:
+- token Firebase válido;
+- tenant ativo;
+- membership ativa ou suporte clínico temporário válido;
+- permission `clinical.write` para membro do tenant;
+- patientId pertencente ao mesmo tenant;
+- content type permitido;
+- tamanho máximo técnico razoável;
+- object key tenant-scoped;
+- metadata com `tenantId`, `patientId`, `uploaderId`;
+- registro de metadata no Firestore quando necessário para o fluxo clínico;
+- nenhuma URL pública permanente.
+
+`storage.rules` permanece deny-all enquanto Firebase Storage não for a arquitetura ativa de fotos clínicas.
+
+Não implementar ainda limite comercial de 10/50/200 GB.
+
+## 10. Audit logs essenciais
+
+Implementar auditabilidade para ações deste GOAL:
+- criação/suspensão de tenant;
+- alteração de membership/role;
+- ativação/revogação de suporte clínico;
+- alteração clínica relevante;
+- mudança de configuração sensível;
+- ações administrativas críticas.
+
+Campos mínimos:
+- actorId;
+- actorRole;
+- tenantId;
+- action;
+- resourceType;
+- resourceId;
+- timestamp;
+- before/after somente quando seguro e necessário.
+
+Nunca registrar secrets ou conteúdo clínico desnecessário em logs.
+
+## 11. Dois tenants fictícios de teste
+
+Não existe cliente real original comprovado.
+
+Criar fixtures de testes/emulator:
+- Tenant A;
+- Tenant B.
+
+Provar isolamento de:
+- patients;
+- professionals;
+- appointments;
+- clinical records;
+- clinical media;
+- branding;
+- memberships.
+
+Dentist A não pode acessar Patient B.
+
+Usar somente dados fictícios.
+
+# DADOS E MIGRAÇÃO
+
+Não existe migração de cliente legado comprovada nesta etapa.
+
+Não transformar Clínica Aurora/demo em “cliente real”.
+
+Se o Codex encontrar dados reais ou artefatos de produção não documentados, PARE antes de qualquer ação destrutiva e reporte o conflito.
+
+# MULTI-TENANCY
+
+A implementação deve preservar:
+- um único codebase por vertical;
+- tenants por configuração;
+- `tenantSlugs` como resolução pública;
+- `memberships` como vínculo usuário/tenant;
+- RBAC específico do domínio;
+- Platform Owner global;
+- white-label por tenant;
+- backend e Rules tenant-aware;
+- testes Tenant A × Tenant B.
+
+Não criar Firebase/deploy por clínica.
+
+# GLOBAL STANDARD v01
+
+O GLOBAL STANDARD v01 já está aprovado, mas este repositório ainda está em `CORE_FIRST`.
+
+NÃO implementar neste GOAL:
+- PlanCatalog runtime;
+- EntitlementService;
+- `canUse()`;
+- `getLimit()`;
+- FeatureGating comercial;
+- Limits comerciais;
+- TenantOverrides;
+- ManualPlanAssignment;
+- trial lifecycle;
+- upgrade/downgrade comercial;
+- DemoMode integrado ao entitlement engine;
+- usage metering comercial.
+
+Preservar scaffolds existentes (`planId`, `SubscriptionStatus`, `tenant.features`, `tenant.limits`, `premium_demo`, proposta de pricing) sem tratá-los como implementação completa.
+
+# SEGURANÇA
+
+Obrigatório:
+- frontend não é enforcement;
+- backend/Rules protegem operações críticas;
+- Tenant A não lê/escreve Tenant B;
+- sem IDOR por `tenantId`, `patientId` ou IDs de recurso;
+- validação clínica fora do cliente;
+- arquivos clínicos sem URL pública permanente;
+- segurança e integridade nunca variam por plano;
+- não inserir secrets no frontend/repo.
+
+# DOCUMENTAÇÃO
+
+Atualizar somente documentação afetada pela implementação real.
+
+Obrigatório:
+- `docs/CURRENT.md` continua apontando para a versão vigente;
+- atualizar `STATUS.md`;
+- atualizar `ARCHITECTURE.md`;
+- atualizar `MULTI_TENANCY.md`;
+- atualizar `SECURITY.md`;
+- atualizar `DATA_MODEL.md`;
+- atualizar `DEPLOYMENT.md` se necessário;
+- atualizar `ONBOARDING.md` se necessário;
+- atualizar `SCREENS.md` se telas reais mudarem;
+- atualizar `ROADMAP.md`;
+- atualizar diagramas somente quando arquitetura correspondente mudar.
+
+Não usar wireframe/mockup como screenshot de implementação.
+
+# FASE FINAL OBRIGATÓRIA — PADRÃO GLOBAL DE DOCUMENTAÇÃO VISUAL
+
+Esta fase é obrigatória, mas deve ocorrer SOMENTE DEPOIS de a implementação principal estar concluída, os testes Tenant A × Tenant B passarem e o build estiver válido.
+
+Regra oficial adicional deste projeto:
+
+`SAAS_PADRAO_DOCS_LEADS_IMAGENS_GERADAS.md`
+
+Se esse arquivo estiver disponível no Project/workspace, leia-o antes de iniciar esta fase e preserve sua separação entre:
+
+1. **SCREENSHOT REAL** = prova do sistema realmente executado;
+2. **DIAGRAMA** = representação técnica editável/renderizada do sistema real;
+3. **IMAGEM GERADA** = conceito visual, direção de design, apresentação ou proposta comercial.
+
+Nunca misturar essas categorias. Nunca apresentar imagem gerada, mockup ou wireframe como screenshot de implementação.
+
+## Ordem obrigatória desta fase
+
+Executar nesta ordem, e apenas no final do GOAL:
+
+`IMPLEMENTAR CORE -> MIGRAR/SEEDAR SOMENTE O NECESSÁRIO -> TESTAR -> VALIDAR TENANT A × B -> BUILD -> DOCUMENTAR -> CAPTURAR SCREENSHOTS REAIS -> ATUALIZAR DIAGRAMAS -> GERAR VISUAIS CONCEITUAIS -> ATUALIZAR MANIFESTOS -> docs:check`
+
+Não antecipar a geração visual para mascarar funcionalidade ainda ausente.
+
+## Estrutura documental esperada
+
+Preservar a versão vigente apontada por `docs/CURRENT.md` e adaptar a estrutura existente sem apagar histórico útil.
+
+Estrutura mínima esperada quando aplicável:
+
+```text
+docs/
+├── CURRENT.md
+├── DIAGRAMS_MANIFEST.md
+├── LEADS_MANIFEST.md
+│
+└── versions/
+    └── <versao-atual>/
+        ├── README.md
+        ├── STATUS.md
+        ├── ARCHITECTURE.md
+        ├── DATA_MODEL.md
+        ├── SECURITY.md
+        ├── FIREBASE_STRUCTURE.md
+        ├── PROJECT_STRUCTURE.md
+        ├── SCREENS.md
+        ├── GENERATED_VISUALS.md
+        ├── LEADS_OVERVIEW.md
+        │
+        ├── diagrams/
+        │   ├── source/
+        │   └── rendered/
+        │
+        ├── screenshots/
+        │
+        ├── generated/
+        │   ├── concepts/
+        │   ├── mockups/
+        │   ├── lead-adapted/
+        │   └── covers/
+        │
+        └── leads/
+            └── <lead-slug>/
+                ├── LEAD_CONTEXT.md
+                ├── LEAD_REFERENCE_SUMMARY.md
+                ├── LEAD_VISUAL_DIRECTION.md
+                ├── captures/
+                ├── assets/
+                └── generated/
+```
+
+Não criar pasta de lead fictício somente para preencher estrutura.
+
+## Documentação técnica obrigatória
+
+Após o runtime real estar estável, atualizar/criar apenas com base no que existe de verdade:
+
+- `docs/CURRENT.md`;
+- `ARCHITECTURE.md`;
+- `DATA_MODEL.md`;
+- `SECURITY.md`;
+- `FIREBASE_STRUCTURE.md`;
+- `PROJECT_STRUCTURE.md`;
+- `SCREENS.md`;
+- `STATUS.md`;
+- `ROADMAP.md` quando afetado;
+- `GENERATED_VISUALS.md`;
+- `LEADS_OVERVIEW.md`;
+- `docs/DIAGRAMS_MANIFEST.md`;
+- `docs/LEADS_MANIFEST.md`.
+
+`FIREBASE_STRUCTURE.md` deve documentar o Firebase realmente utilizado nesta vertical, incluindo Auth, coleções/paths Firestore relevantes, índices, Rules, Emulator e relação com o Worker/R2, sem fingir Firebase Storage ativo para mídia clínica enquanto ele permanecer deny-all.
+
+`PROJECT_STRUCTURE.md` deve refletir a árvore relevante real do projeto após este GOAL, não uma arquitetura idealizada.
+
+## Diagramas
+
+Não recriar cegamente os diagramas existentes.
+
+Primeiro inventariar os diagramas atuais e, para cada um:
+- preservar se ainda estiver correto;
+- atualizar apenas se a implementação deste GOAL o afetar;
+- criar fonte editável se estiver faltando;
+- renderizar a versão vigente.
+
+Preferir:
+- Mermaid para fonte editável quando adequado;
+- SVG para render final;
+- PNG somente quando útil para apresentação/compatibilidade.
+
+Diagramas particularmente relevantes para esta vertical, quando afetados pelo Core implementado:
+- system context;
+- arquitetura multi-tenant;
+- auth + memberships + RBAC;
+- tenant resolver;
+- modelo Firestore/dados;
+- agenda + anti-double-booking;
+- prontuário append-only + amendments;
+- mídia clínica Firestore/R2;
+- Platform Owner + suporte clínico temporário;
+- deployment.
+
+`DIAGRAMS_MANIFEST.md` deve registrar fonte, render, estado e relação com a versão atual.
+
+## Screenshots REAIS
+
+Se o sistema puder ser executado localmente/emulator/demo ao final deste GOAL, capturar screenshots reais de telas principais.
+
+Prioridade desta vertical:
+- login;
+- dashboard do tenant;
+- agenda;
+- pacientes;
+- detalhe/prontuário do paciente;
+- recursos/cadeiras quando já implementados;
+- área Platform Owner;
+- tela pública/white-label do tenant, quando operacional.
+
+Capturar desktop e mobile nas telas em que responsividade for relevante e tecnicamente viável.
+
+Salvar em:
+
+`docs/versions/<versao-atual>/screenshots/`
+
+Regras:
+- screenshot deve vir do sistema executado;
+- usar somente dados fictícios;
+- não capturar secrets/tokens;
+- não usar wireframe/mockup/imagem gerada como prova;
+- se uma tela não existir, registrar como ausente/planejada em `SCREENS.md` e NÃO criar screenshot falso.
+
+## Imagens GERADAS / CONCEITUAIS do produto
+
+Criar uma base visual pequena e útil, claramente separada de screenshots reais.
+
+Salvar em:
+
+`docs/versions/<versao-atual>/generated/`
+
+Conjunto recomendado para Dentista, sem transformar isso em redesign completo:
+- `concepts/product-overview.*` — visão geral conceitual do OdontoFlow;
+- `concepts/dashboard-idealizado.*` — dashboard conceitual/premium;
+- `mockups/public-mobile.*` — visão conceitual da experiência pública/mobile;
+- `covers/product-cover.*` — capa/apresentação comercial.
+
+Se houver ferramenta/capacidade real de geração de imagem no ambiente, gerar imagens raster adequadas. Se não houver, NÃO fingir que foram geradas: registrar a pendência explicitamente em `GENERATED_VISUALS.md` e, no máximo, fornecer fonte conceitual editável claramente marcada como tal.
+
+Toda imagem conceitual deve ser marcada/documentada como:
+- `CONCEITUAL`;
+- `PLANEJADO` ou `IDEALIZADO` quando aplicável;
+- não representativa de feature já implementada, salvo quando baseada diretamente em tela real e isso estiver explícito.
+
+`GENERATED_VISUALS.md` deve listar, para cada arquivo:
+- nome;
+- tipo (`concept`, `mockup`, `lead-adapted`, `cover`);
+- objetivo;
+- base;
+- se representa estado real ou idealizado;
+- lead relacionado, se houver;
+- caminho.
+
+## Leads
+
+Nesta vertical NÃO existe lead real confirmado na baseline atual.
+
+Portanto:
+- NÃO inventar lead;
+- NÃO criar conteúdo de lead fictício;
+- preparar apenas a arquitetura documental e os manifestos;
+- `LEADS_OVERVIEW.md` e `LEADS_MANIFEST.md` devem registrar corretamente que não há lead confirmado, se esse continuar sendo o estado ao final da execução.
+
+Se, durante a execução, o repositório já contiver material inequívoco de lead real previamente documentado:
+- preservar;
+- organizar sem perder contexto;
+- não inventar fatos ausentes;
+- manter `captures/`, `assets/` e `generated/` separados;
+- não gerar novo lead por inferência.
+
+Quando houver lead real no futuro, usar:
+
+```text
+docs/versions/<versao-atual>/leads/<lead-slug>/
+├── LEAD_CONTEXT.md
+├── LEAD_REFERENCE_SUMMARY.md
+├── LEAD_VISUAL_DIRECTION.md
+├── captures/
+├── assets/
+└── generated/
+```
+
+## Scripts/verificadores de documentação
+
+Quando compatível com a stack atual, adicionar ao `package.json` scripts equivalentes a:
+
+- `npm run docs:diagrams`
+- `npm run docs:check`
+- `npm run docs:leads` (quando fizer sentido manter validador próprio de leads)
+
+Não instalar dependência pesada ou serviço externo somente por estética documental.
+
+`docs:diagrams` deve renderizar/revalidar diagramas editáveis suportados pelo projeto.
+
+`docs:check` deve validar no mínimo:
+- `docs/CURRENT.md` aponta para versão existente;
+- arquivos obrigatórios da versão existem;
+- `DIAGRAMS_MANIFEST.md` existe e seus paths são válidos;
+- todo diagrama listado possui source/rendered quando exigido;
+- screenshots referenciadas realmente existem;
+- `FIREBASE_STRUCTURE.md` existe quando Firebase é usado;
+- `PROJECT_STRUCTURE.md` existe;
+- `GENERATED_VISUALS.md` é consistente com `generated/`;
+- `LEADS_MANIFEST.md` e `LEADS_OVERVIEW.md` são consistentes;
+- links/caminhos relativos importantes não estão quebrados;
+- nenhuma imagem gerada está classificada como screenshot real.
+
+`docs:leads`, se criado, deve validar:
+- leads manifestados possuem pasta correspondente;
+- nenhum lead listado aponta para path inexistente;
+- `captures/`, `assets/` e `generated/` são coerentes;
+- estado "sem leads confirmados" também é válido.
+
+## Critério documental/visual de aceite
+
+Esta fase final só é considerada concluída quando, de acordo com o que for tecnicamente possível no ambiente:
+
+- documentação canônica reflete o código implementado;
+- Firebase real está documentado;
+- estrutura real do projeto está documentada;
+- diagramas afetados possuem fonte editável e render atual;
+- screenshots reais das principais telas implementadas foram capturados quando o sistema pôde ser executado;
+- telas inexistentes não foram falsificadas;
+- imagens geradas/conceituais estão separadas e rotuladas;
+- não há lead fictício;
+- manifestos estão atualizados;
+- `docs:check` passa;
+- `docs:diagrams` passa quando aplicável;
+- `docs:leads` passa quando existir.
+
+# TESTES
+
+Adicionar/ajustar testes para cobrir:
+- auth e guards;
+- tenant resolver;
+- slug válido/inválido;
+- tenant ativo/suspenso;
+- membership ativa/inativa;
+- permissions por role;
+- Platform Owner;
+- suporte clínico temporário;
+- Firestore Rules via Emulator;
+- Tenant A × Tenant B;
+- patients/professionals/procedures/resources/appointments;
+- anti-double-booking por professional;
+- anti-double-booking por recurso físico;
+- concorrência de appointments;
+- prontuário append-only;
+- amendment válido;
+- R2 com/sem `clinical.write`;
+- R2 membership ativa/inativa;
+- R2 patient de outro tenant;
+- ausência de URL pública permanente.
+
+Executar ao final:
+- `npm run typecheck`;
+- `npm test`;
+- `npm run build`;
+- `npm run check:standards`;
+- suíte de Emulator/Rules criada para este GOAL.
+
+# CRITÉRIOS DE ACEITE
+
+O GOAL só está concluído quando:
+
+1. login/logout funcionam;
+2. rotas privadas estão realmente protegidas;
+3. `tenantSlug` resolve tenant real e ativo;
+4. membership ativa é necessária para áreas privadas;
+5. RBAC impede ações indevidas;
+6. Platform Owner está operacional sem acesso clínico casual;
+7. Tenant A não acessa Tenant B;
+8. Rules passam em testes de Emulator;
+9. professionals/patients/procedures/resources/appointments estão persistidos;
+10. demo data não é source of truth das áreas privadas;
+11. criação/remarcação de appointments impede conflito de forma confiável;
+12. prontuário é append-only com amendments;
+13. Worker R2 exige autorização clínica real;
+14. patient/tenant da mídia são validados;
+15. mídia clínica não possui URL pública permanente;
+16. audit logs essenciais existem;
+17. dois tenants fictícios comprovam isolamento;
+18. documentação reflete apenas o runtime implementado;
+19. preços/planos/limites aprovados permanecem inalterados;
+20. nenhum entitlement comercial completo foi implementado prematuramente;
+21. typecheck, testes, build, standards e Emulator passam.
+
+# CRITÉRIOS ADICIONAIS DE ACEITE — DOCS/VISUAIS
+
+Além dos critérios anteriores, o GOAL só está documentalmente concluído quando:
+
+22. `docs/CURRENT.md` aponta para a versão vigente real;
+23. `DIAGRAMS_MANIFEST.md` está atualizado;
+24. `LEADS_MANIFEST.md` existe e não inventa leads;
+25. `FIREBASE_STRUCTURE.md` documenta a estrutura Firebase efetivamente usada;
+26. `PROJECT_STRUCTURE.md` reflete a árvore real do projeto;
+27. diagramas afetados têm fonte editável + render atual;
+28. screenshots reais existem para as telas implementadas quando o ambiente permitiu execução;
+29. nenhuma imagem gerada/mockup foi apresentada como screenshot real;
+30. `GENERATED_VISUALS.md` inventaria claramente todo material conceitual;
+31. a estrutura de leads está preparada e vazia/manifestada corretamente se não houver lead confirmado;
+32. `npm run docs:check` passa;
+33. `npm run docs:diagrams` passa quando aplicável;
+34. `npm run docs:leads` passa quando esse script existir.
+
+# FORA DE ESCOPO
+
+Não implementar agora:
+- PlanCatalog/EntitlementService/FeatureGating/Limits comerciais;
+- billing/gateway/checkout/webhooks/dunning;
+- odontograma operacional;
+- plano de tratamento operacional;
+- orçamento;
+- financeiro;
+- relatórios;
+- Central de Retorno persistida;
+- pré-cadastro público tokenizado;
+- portal do paciente;
+- WhatsApp;
+- IA/transcrição;
+- assinatura digital;
+- fiscal/NFS-e;
+- estoque;
+- comissão;
+- multi-unidade;
+- marketplace;
+- custom domain automático;
+- biblioteca npm/shared global.
+
+# STOP CONDITIONS
+
+Pare e reporte em vez de improvisar se:
+- a baseline v03 não estiver no workspace;
+- aparecer cliente/dado real não documentado;
+- houver risco de perda de dados;
+- o anti-double-booking exigir infraestrutura paga/nova não aprovada;
+- houver conflito entre docs/CURRENT.md e a baseline ativa;
+- alguma alteração exigir reabrir pricing/planos/limites aprovados.
+
+# RESULTADO ESPERADO DESTA ETAPA
+
+`CORE MULTI-TENANT + CORE CLÍNICO P0 OPERACIONAL`
+
+Depois deste GOAL, executar um novo readiness gate.
+Somente se ele passar, gerar outro GOAL para o GLOBAL STANDARD v01.

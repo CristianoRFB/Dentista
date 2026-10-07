@@ -1,0 +1,10 @@
+flowchart TD
+  A[Solicitar horário] --> B{Profissional disponível?}
+  B -- não --> X[Rejeitar / sugerir outro]
+  B -- sim --> C{Recurso disponível?}
+  C -- não --> X
+  C -- sim ou não obrigatório --> D{Sem bloqueio/folga?}
+  D -- não --> X
+  D -- sim --> T[Validação transacional]
+  T -- livre --> OK[Confirmar appointment]
+  T -- conflito --> X

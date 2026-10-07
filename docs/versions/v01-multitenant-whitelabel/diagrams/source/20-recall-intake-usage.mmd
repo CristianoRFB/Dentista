@@ -1,0 +1,8 @@
+flowchart LR
+  P[Paciente] --> I[IntakeSubmission\npending_review]
+  I --> R[Recepção revisa]
+  R --> PR[Patient oficial]
+  PR --> V[Consulta]
+  V --> RC[Recall planned/due]
+  RC --> A[Novo appointment]
+  A -. se houver integração paga .-> U[UsageCounter]

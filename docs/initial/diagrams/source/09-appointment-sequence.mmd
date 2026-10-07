@@ -1,0 +1,8 @@
+%% Sequência de criação
+flowchart LR
+  N1["UI"] --> N2["Appointment Service"]
+  N2["Appointment Service"] --> N3["Firestore Query"]
+  N3["Firestore Query"] --> N4["Conflict Validator"]
+  N4["Conflict Validator"] --> N5["Transaction"]
+  N5["Transaction"] --> N6["Appointment"]
+  N6["Appointment"] --> N7["Audit Log"]

@@ -1,0 +1,4 @@
+digraph G { rankdir=TB; graph [bgcolor="transparent", pad="0.3"]; node [shape=box, style="rounded,filled", fillcolor="#f7fbfa", color="#86a9a2", fontname="Arial"]; edge [color="#5c7c76"];
+Request [label="Solicitar horário", fillcolor="#dff1ed"]; P [label="Profissional disponível?"]; R [label="Recurso disponível?\n(cadeira/sala)"]; B [label="Sem bloqueio/folga?"]; Tx [label="Validação transacional"]; Confirm [label="Confirmar appointment", fillcolor="#dff1ed"]; Reject [label="Rejeitar / sugerir outro horário", fillcolor="#f5ead8"];
+Request -> P; P -> R [label="sim"]; P -> Reject [label="não"]; R -> B [label="sim/nao obrigatório"]; R -> Reject [label="não"]; B -> Tx [label="sim"]; B -> Reject [label="não"]; Tx -> Confirm [label="livre"]; Tx -> Reject [label="conflito"];
+}

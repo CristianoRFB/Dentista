@@ -1,0 +1,8 @@
+%% Suporte clínico da plataforma
+flowchart LR
+  N1["Platform Owner"] --> N2["Open Support"]
+  N2["Open Support"] --> N3["Reason + Expiry"]
+  N3["Reason + Expiry"] --> N4["Support Access Doc"]
+  N4["Support Access Doc"] --> N5["Clinical Read"]
+  N5["Clinical Read"] --> N6["Audit"]
+  N4["Support Access Doc"] --> N7["Expires"]

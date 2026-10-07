@@ -1,0 +1,9 @@
+%% Migração Single → Multi
+flowchart LR
+  N1["Legacy Backup"] --> N2["Identify Original Client"]
+  N2["Identify Original Client"] --> N3["Create Tenant"]
+  N3["Create Tenant"] --> N4["Backfill tenantId"]
+  N4["Backfill tenantId"] --> N5["Memberships"]
+  N5["Memberships"] --> N6["Rules Validation"]
+  N6["Rules Validation"] --> N7["Second Tenant Test"]
+  N7["Second Tenant Test"] --> N8["Cutover"]

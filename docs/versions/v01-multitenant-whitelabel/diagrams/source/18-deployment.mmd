@@ -1,0 +1,9 @@
+%% Deployment
+flowchart LR
+  N1["GitHub"] --> N2["Cloudflare Pages"]
+  N1["GitHub"] --> N3["Media Worker"]
+  N2["Cloudflare Pages"] --> N4["React App"]
+  N4["React App"] --> N5["Firebase Auth"]
+  N4["React App"] --> N6["Firestore"]
+  N4["React App"] --> N3["Media Worker"]
+  N3["Media Worker"] --> N7["R2"]
