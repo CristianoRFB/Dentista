@@ -6,6 +6,7 @@ import {
   createPlatformTenant, grantClinicalSupport, listActiveSupportAccess, listPlatformTenants,
   revokeClinicalSupport, setPlatformTenantStatus, updatePlatformTenantBranding,
 } from '../../lib/platformData';
+import { isValidTenantSlug } from '../tenant/tenantResolver';
 import { useAuth } from '../auth/AuthProvider';
 
 type SupportRow = { tenantId: string; actorId: string; reason: string; expiresAt?: { toDate?: () => Date }; revokedAt?: unknown };
@@ -47,7 +48,7 @@ export function PlatformDashboard() {
     try {
       if (!user) throw new Error('Entre com uma conta Platform Owner.');
       const slug = tenantForm.slug.trim().toLowerCase();
-      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) throw new Error('Use um slug com letras minúsculas, números e hífens.');
+      if (!isValidTenantSlug(slug)) throw new Error('Use um slug com letras minúsculas, números e hífens.');
       await createPlatformTenant(tenantForm, user.uid);
       setTenantForm({ name: '', slug: '', ownerUid: '', publicName: '', primaryColor: '#163d3a', accentColor: '#72b9ad' });
       setMessage('Tenant criado com slug, branding público inicial, membership do owner e auditoria.');

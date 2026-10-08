@@ -1,7 +1,7 @@
 # FEATURE_MATRIX — SaaS Dentista
 
-> Fonte: auditoria de pricing já produzida em 2026-10-06.  
-> Esta matriz NÃO é uma nova auditoria.  
+> Base comercial: auditoria de pricing produzida em 2026-10-06. Estados técnicos revisados em 2026-10-08 após validação do Core P0.
+> Esta atualização não altera preços, limites aprovados ou distribuição comercial.
 > Regra: o estado real prevalece sobre plano, marketing e demo.
 
 ## Leitura
@@ -16,42 +16,42 @@
 | Fundação | React + TypeScript + Vite | IMPLEMENTADA | Interna | — |
 | Fundação | Firebase Web configurável por env | IMPLEMENTADA | Interna | — |
 | Auth | Observação de sessão Firebase | IMPLEMENTADA | Interna | — |
-| Auth | Login/logout UI + proteção de rotas | PLANEJADA | Interna | — |
-| Multi-Tenant | Modelo `Tenant` + `tenantId` | EM IMPLEMENTAÇÃO | Interna | — |
-| Multi-Tenant | Tenant resolver `slug -> tenantId` | PLANEJADA | Interna | — |
-| Multi-Tenant | Memberships + RBAC | EM IMPLEMENTAÇÃO | Interna | — |
-| Segurança | Firestore Security Rules | EM IMPLEMENTAÇÃO | Interna | não diferenciar por plano |
+| Auth | Login/logout UI + proteção de rotas | IMPLEMENTADA | Interna | — |
+| Multi-Tenant | Modelo `Tenant` + `tenantId` | IMPLEMENTADA | Interna | — |
+| Multi-Tenant | Tenant resolver `slug -> tenantId` | IMPLEMENTADA | Interna | — |
+| Multi-Tenant | Memberships + RBAC | IMPLEMENTADA | Interna | não diferenciar por plano |
+| Segurança | Firestore Security Rules | IMPLEMENTADA | Interna | Emulator; não diferenciar por plano |
 | Segurança | Firebase Storage deny-all | IMPLEMENTADA | Interna | não diferenciar por plano |
-| Segurança | Sessão de suporte clínico do Platform Owner | PLANEJADA | Interna | acesso auditável |
-| Auditoria | Audit logs | PLANEJADA | Interna | não diferenciar por plano |
-| Plataforma | Platform Owner dashboard | EM IMPLEMENTAÇÃO | Interna | — |
-| White-label | Branding por tenant | EM IMPLEMENTAÇÃO | Essencial | 1 tenant = 1 identidade |
+| Segurança | Sessão de suporte clínico do Platform Owner | IMPLEMENTADA | Interna | acesso temporário auditável |
+| Auditoria | Audit logs essenciais do Core P0 | IMPLEMENTADA | Interna | tenants, memberships, branding, suporte, clínica, agenda e mídia; não diferenciar por plano |
+| Plataforma | Platform Owner dashboard | IMPLEMENTADA | Interna | tenants, owner inicial, status, branding e suporte |
+| White-label | Branding por tenant | IMPLEMENTADA | Essencial | perfil público básico; 1 tenant = 1 identidade |
 | Comercial | `tenant.features` + `tenant.limits` | EM IMPLEMENTAÇÃO | Interna | estrutura sem enforcement |
 | Comercial | Usage counters | EM IMPLEMENTAÇÃO | Interna | medição real ausente |
 | Comercial | Catálogo de planos / assinatura / trial | PLANEJADA | Interna | runtime ausente |
 | Comercial | Entitlements efetivos | PLANEJADA | Interna | `canUse/getLimit` ausentes |
-| Pacientes | Lista de pacientes | EM IMPLEMENTAÇÃO | Essencial | pacientes sem limite artificial |
-| Pacientes | CRUD persistido | PLANEJADA | Essencial | pacientes sem limite artificial |
-| Profissionais | Cadastro/CRUD | PLANEJADA | Essencial | 1 / 3 / 10 por Essencial/Pro/Premium |
-| Procedimentos | Cadastro/CRUD | PLANEJADA | Essencial | sem limite comercial definido |
-| Agenda | Visualização de agenda | EM IMPLEMENTAÇÃO | Essencial | agendamentos sem limite artificial |
+| Pacientes | Lista de pacientes | IMPLEMENTADA | Essencial | tenant-scoped; pacientes sem limite artificial |
+| Pacientes | CRUD persistido | IMPLEMENTADA | Essencial | criação e inativação; sem exclusão destrutiva |
+| Profissionais | Cadastro/CRUD | IMPLEMENTADA | Essencial | criação e inativação; cotas 1 / 3 / 10 ainda sem enforcement |
+| Procedimentos | Cadastro/CRUD | IMPLEMENTADA | Essencial | criação e inativação; sem limite comercial definido |
+| Agenda | Visualização de agenda | IMPLEMENTADA | Essencial | tenant-scoped; agendamentos sem limite artificial |
 | Agenda | Detecção pura de sobreposição/conflito | IMPLEMENTADA | Interna | — |
-| Agenda | Validação transacional anti-double-booking | PLANEJADA | Interna | obrigatória em todos os planos |
-| Agenda | Recursos físicos (cadeira/sala/equipamento) | EM IMPLEMENTAÇÃO | Pro | 1 / 5 / 15 cadastrados |
+| Agenda | Validação transacional anti-double-booking | IMPLEMENTADA | Interna | Worker + locks transacionais; obrigatória em todos os planos |
+| Agenda | Recursos físicos (cadeira/sala/equipamento) | IMPLEMENTADA | Pro | CRUD e conflito técnico; cotas 1 / 5 / 15 ainda sem enforcement |
 | Agenda | Agendamento público | EM IMPLEMENTAÇÃO | Essencial | sem limite artificial de agendamentos |
 | Agenda | Lembretes automáticos | DEFERRED | Add-on | provedor/custo/consentimento pendentes |
-| Clínica | Prontuário append-only | PLANEJADA | Essencial | histórico completo, sem corte por plano |
-| Clínica | Adendos de prontuário | PLANEJADA | Essencial | integridade clínica sem diferenciação |
+| Clínica | Prontuário append-only | IMPLEMENTADA | Essencial | registros imutáveis com autoria e auditoria; histórico completo, sem corte por plano |
+| Clínica | Adendos de prontuário | IMPLEMENTADA | Essencial | correção auditável por novo registro; integridade sem diferenciação |
 | Clínica | Odontograma orientado a eventos | PLANEJADA | Essencial | — |
 | Clínica | Plano de tratamento básico | PLANEJADA | Essencial | — |
 | Comercial clínica | Orçamentos | PLANEJADA | Pro | — |
 | Fotos | Catálogo/busca de classificações clínicas | IMPLEMENTADA | Essencial | — |
 | Fotos | Cache local IndexedDB | IMPLEMENTADA | Interna | detalhe técnico, não diferencial |
-| Fotos | Upload R2 privado | EM IMPLEMENTAÇÃO | Essencial | 10 / 50 / 200 GB incluídos |
+| Fotos | Upload R2 privado | IMPLEMENTADA | Essencial | Worker autenticado; binding de produção pendente; cotas de 10 / 50 / 200 GB sem enforcement |
 | Fotos | Timeline/comparação antes/depois | PLANEJADA | Pro | — |
 | Retorno | Central de retorno | EM IMPLEMENTAÇÃO | Pro | — |
 | Intake | Pré-cadastro por link | EM IMPLEMENTAÇÃO | Pro | endpoint seguro ainda pendente |
-| Site público | Mini-site white-label do tenant | EM IMPLEMENTAÇÃO | Essencial | — |
+| Site público | Mini-site white-label do tenant | IMPLEMENTADA | Essencial | perfil público configurável; agendamento público ainda não persiste |
 | Documentos | Receitas/atestados/templates básicos | PLANEJADA | Essencial | — |
 | Financeiro | Financeiro básico | PLANEJADA | Pro | — |
 | Relatórios | Relatórios básicos | PLANEJADA | Pro | — |

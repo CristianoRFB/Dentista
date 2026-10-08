@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" width="2036" height="180" viewBox="0 0 2036 180">
-<title id="title">Migração Single → Multi</title><desc id="desc">Diagrama Mermaid convertido a SVG pelo verificador local do projeto.</desc>
+<title id="title">PLANO FUTURO — não há cliente legado comprovado nem migração executada</title><desc id="desc">Diagrama Mermaid convertido a SVG pelo verificador local do projeto.</desc>
 <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#6c8580"/></marker></defs>
 <style>text{font-family:Arial,sans-serif;font-size:12px;fill:#183936}.node rect,.node polygon{fill:#f6faf9;stroke:#8aa9a3;stroke-width:1.5}.node.decision polygon{fill:#eef5f3}.edge-label{font-size:10px;fill:#425b56;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}</style>
-<text x="45" y="25" font-size="16" font-weight="700">Migração Single → Multi</text>
+<text x="45" y="25" font-size="16" font-weight="700">PLANO FUTURO — não há cliente legado comprovado nem migração executada</text>
 <g class="edge"><path d="M 241 90 L 295 90" fill="none" stroke="#6c8580" stroke-width="1.6" marker-end="url(#arrow)"/></g>
 <g class="edge"><path d="M 491 90 L 545 90" fill="none" stroke="#6c8580" stroke-width="1.6" marker-end="url(#arrow)"/></g>
 <g class="edge"><path d="M 741 90 L 795 90" fill="none" stroke="#6c8580" stroke-width="1.6" marker-end="url(#arrow)"/></g>

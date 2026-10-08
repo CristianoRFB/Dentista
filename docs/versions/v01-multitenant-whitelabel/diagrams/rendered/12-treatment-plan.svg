@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" width="1286" height="236" viewBox="0 0 1286 236">
-<title id="title">Plano de tratamento</title><desc id="desc">Diagrama Mermaid convertido a SVG pelo verificador local do projeto.</desc>
+<title id="title">FUTURO — modelo conceitual, plano de tratamento não implementado no runtime atual</title><desc id="desc">Diagrama Mermaid convertido a SVG pelo verificador local do projeto.</desc>
 <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#6c8580"/></marker></defs>
 <style>text{font-family:Arial,sans-serif;font-size:12px;fill:#183936}.node rect,.node polygon{fill:#f6faf9;stroke:#8aa9a3;stroke-width:1.5}.node.decision polygon{fill:#eef5f3}.edge-label{font-size:10px;fill:#425b56;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}</style>
-<text x="45" y="25" font-size="16" font-weight="700">Plano de tratamento</text>
+<text x="45" y="25" font-size="16" font-weight="700">FUTURO — modelo conceitual, plano de tratamento não implementado no runtime atual</text>
 <g class="edge"><path d="M 241 118 L 295 81.5" fill="none" stroke="#6c8580" stroke-width="1.6" marker-end="url(#arrow)"/></g>
 <g class="edge"><path d="M 491 81.5 L 545 81.5" fill="none" stroke="#6c8580" stroke-width="1.6" marker-end="url(#arrow)"/></g>
 <g class="edge"><path d="M 491 81.5 L 545 154.5" fill="none" stroke="#6c8580" stroke-width="1.6" marker-end="url(#arrow)"/></g>

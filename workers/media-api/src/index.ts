@@ -537,7 +537,7 @@ async function verifyClinicalAccess(
     return { tenant, membership, actorRole: membership.role };
   }
   const supportExpiry = support?.expiresAt ? Date.parse(String(support.expiresAt)) : NaN;
-  const hasSupport = owner && owner.status !== 'inactive'
+  const hasSupport = owner?.status === 'active'
     && support && support.tenantId === tenantId && support.actorId === uid
     && typeof support.reason === 'string' && support.reason.trim().length >= 12
     && Number.isFinite(supportExpiry) && supportExpiry > Date.now() && !support.revokedAt;

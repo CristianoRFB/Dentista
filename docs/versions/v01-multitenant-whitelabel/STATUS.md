@@ -17,7 +17,7 @@
 - Seed real: não há cliente real comprovado nem migração
 - Auth UI: Firebase login/logout implementados
 
-## Core operacional — 2026-10-07
+## Core operacional — 2026-10-08
 
 - login/logout por Firebase Auth e rotas privadas implementados;
 - resolução `slug → tenantSlugs → tenant ativo → membership/RBAC` implementada;
@@ -26,9 +26,13 @@
 - CRUD tenant-scoped para pacientes, profissionais, procedimentos e recursos; agenda gravada pelo Worker;
 - concorrência de agenda serializada por locks de profissional/recurso/dia em transações Firestore;
 - prontuário P0 e upload/download privado em R2 protegidos por autorização clínica;
-- testes locais: typecheck, 27 testes unitários, 10 testes de Rules/Emulator, typecheck do Worker e build passaram;
+- verificação final em 2026-10-08: typecheck da aplicação e do Worker, 51/51 testes unitários, 17/17 testes de Rules/Emulator, build, standards, diagramas, leads e docs:check passaram;
+- testes cobrem decisões dos guards de autenticação/Platform Owner, resolução de slug e tenant, membership, suporte temporário, validação de agendamento, conflitos por profissional/recurso/bloqueio, remarcação e cancelamento; o Emulator executa criação/inativação pela camada tenant-scoped, além de isolamento cruzado e concorrência de locks;
+- tenant resolver exige correspondência exata entre o slug da rota, o documento de slug e o tenant ativo; o guard do Platform Owner vincula a verificação assíncrona ao UID atual e só reconhece status explicitamente `active`; o Emulator cobre provisionamento auditado de tenant, slug, branding, suspensão e owner inicial, concessão/revogação do suporte clínico e nega prontuário/adendo sem paciente real do mesmo tenant;
+- login/logout, resolução do tenant e dashboard foram exercitados no navegador com conta e tenant fictícios descartáveis no Emulator;
 - produção ainda não configurada: falta provisionar URLs/segredos do Worker, bucket R2 e projeto Auth/Firestore conforme `DEPLOYMENT.md`;
-- screenshots em `screenshots/` são capturas reais do build de desenvolvimento com dados exclusivamente fictícios; materiais em `generated/` são conceitos e não prova de runtime.
+- screenshots reais não foram arquivados: o aplicativo foi executado e a interface do tenant foi inspecionada, mas a política do navegador bloqueou salvar a captura no workspace e proibiu tentativas equivalentes; `SCREENS.md` registra a limitação por tela;
+- quatro imagens em `generated/` foram criadas com ImageGen e são somente conceitos/mockups fictícios, sem valor de evidência do runtime.
 
 ## Fora do estado operacional
 

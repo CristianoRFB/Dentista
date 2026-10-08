@@ -7,7 +7,7 @@ Menor privilégio. `permissions[]` é a base das regras. Dados clínicos exigem 
 - Firebase Auth fornece UID; as rotas privadas exigem usuário autenticado, exceto o tenant demo em desenvolvimento explícito.
 - Firestore Rules validam `tenantId` do caminho e dos dados, tenant ativo, membership ativa, papel e permission. A role também limita quais permissões podem ser atribuídas.
 - Rules recusam writes de appointment e de metadados de foto diretamente pelo navegador; esses fluxos passam pelo Worker. Deletes de pacientes e registros clínicos são negados.
-- ClinicalRecord e amendments são criação-only. Auditoria clínica referencia a mutação associada e não armazena conteúdo do prontuário.
+- ClinicalRecord e amendments são criação-only. A Rules exige paciente existente no mesmo tenant; o amendment também deve referenciar o registro original daquele paciente. Auditoria clínica referencia a mutação associada e não armazena conteúdo do prontuário.
 - Platform Owner não lê conteúdo clínico sem suporte ativo com ator, tenant, motivo de pelo menos 12 caracteres e expiração; concessão, renovação e revogação geram audit logs.
 - Worker verifica assinatura/issuer/audience do Firebase ID token, tenant, membership/permission e vínculo do paciente. Upload restringe JPEG/PNG/WebP, valida bytes e limite técnico de 15 MiB; chave R2 é tenant/patient-scoped.
 - Download passa pelo Worker autenticado, retorna `private, no-store`, e não expõe URLs permanentes ou bucket público.

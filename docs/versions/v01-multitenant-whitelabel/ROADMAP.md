@@ -22,7 +22,7 @@
 - prontuário + adendos;
 - ClinicalPhoto upload real para R2.
 
-### Estado após Core Multi-Tenant + Clínico P0 (2026-10-07)
+### Estado após Core Multi-Tenant + Clínico P0 (2026-10-08)
 
 Concluídos no código e verificados localmente: Firebase Auth UI/guards, tenant resolver, memberships/RBAC, Platform Owner e suporte, Rules no Emulator, CRUD mínimo tenant-scoped de pacientes/profissionais/procedimentos/recursos, agenda via Worker com locks transacionais, prontuário append-only/adendos, R2 privado, auditoria e white-label básico.
 

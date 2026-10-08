@@ -12,11 +12,20 @@ service cloud.firestore {
     function isPlatformOwner() {
       return signedIn()
         && exists(platformOwnerPath())
-        && get(platformOwnerPath()).data.status != 'inactive';
+        && get(platformOwnerPath()).data.status == 'active';
     }
 
     function tenantPath(tenantId) {
       return /databases/$(database)/documents/tenants/$(tenantId);
+    }
+
+    function tenantPatientPath(tenantId, patientId) {
+      return /databases/$(database)/documents/tenants/$(tenantId)/patients/$(patientId);
+    }
+
+    function patientBelongsToTenant(tenantId, patientId) {
+      return exists(tenantPatientPath(tenantId, patientId))
+        && get(tenantPatientPath(tenantId, patientId)).data.tenantId == tenantId;
     }
 
     function membershipPath(tenantId) {
@@ -430,6 +439,7 @@ service cloud.firestore {
         match /clinicalRecords/{recordId} {
           allow get, list: if clinicalRead(tenantId);
           allow create: if clinicalWrite(tenantId)
+            && patientBelongsToTenant(tenantId, patientId)
             && request.resource.data.tenantId == tenantId
             && request.resource.data.patientId == patientId
             && request.resource.data.dentistId is string
@@ -454,10 +464,13 @@ service cloud.firestore {
         match /clinicalRecordAmendments/{amendmentId} {
           allow get, list: if clinicalRead(tenantId);
           allow create: if clinicalWrite(tenantId)
+            && patientBelongsToTenant(tenantId, patientId)
             && request.resource.data.tenantId == tenantId
             && request.resource.data.patientId == patientId
             && request.resource.data.recordId is string
             && exists(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(patientId)/clinicalRecords/$(request.resource.data.recordId))
+            && get(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(patientId)/clinicalRecords/$(request.resource.data.recordId)).data.tenantId == tenantId
+            && get(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(patientId)/clinicalRecords/$(request.resource.data.recordId)).data.patientId == patientId
             && request.resource.data.reason is string && request.resource.data.reason.size() >= 5 && request.resource.data.reason.size() <= 500
             && request.resource.data.content is string && request.resource.data.content.size() > 0 && request.resource.data.content.size() <= 12000
             && request.resource.data.createdBy == request.auth.uid

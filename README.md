@@ -8,7 +8,7 @@ O repositório GitHub estava vazio quando a fundação foi iniciada. Portanto, e
 
 Esta revisão também incorpora uma decisão de produto importante: a landing deve **apresentar o software como produto**, usando benefícios + demonstrações de UI, em vez de uma página institucional genérica.
 
-## Core operacional — 2026-10-07
+## Core operacional — 2026-10-08
 
 O Core Multi-Tenant e Clínico P0 agora inclui login/logout, guards, tenant resolver, memberships/RBAC, Platform Owner, CRUD tenant-scoped de pacientes/profissionais/procedimentos/recursos, agenda transacional pelo Worker, prontuário append-only/adendos, fotos privadas em R2 e audit logs essenciais.
 

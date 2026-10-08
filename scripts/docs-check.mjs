@@ -10,7 +10,7 @@ if (!version) throw new Error('docs/CURRENT.md não aponta para uma versão.');
 const versionRoot = path.join(docsRoot, 'versions', version);
 const required = [
   'README.md','STATUS.md','ARCHITECTURE.md','DATA_MODEL.md','SECURITY.md','FIREBASE_STRUCTURE.md',
-  'PROJECT_STRUCTURE.md','SCREENS.md','GENERATED_VISUALS.md','LEADS_OVERVIEW.md','DIAGRAMS_MANIFEST.md',
+  'PROJECT_STRUCTURE.md','SCREENS.md','GENERATED_VISUALS.md','LEADS_OVERVIEW.md',
 ];
 const missing = [];
 for (const file of required) {
@@ -19,7 +19,9 @@ for (const file of required) {
 try { await access(versionRoot); } catch { missing.push(`versions/${version}/`); }
 if (missing.length) throw new Error(`Documentação obrigatória ausente:\n- ${missing.join('\n- ')}`);
 
-const diagrams = await readFile(path.join(docsRoot, 'DIAGRAMS_MANIFEST.md'), 'utf8');
+let diagrams;
+try { diagrams = await readFile(path.join(docsRoot, 'DIAGRAMS_MANIFEST.md'), 'utf8'); }
+catch { throw new Error('docs/DIAGRAMS_MANIFEST.md ausente.'); }
 const diagramRows = [...diagrams.matchAll(/^\|\s*([^|]+)\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|/gm)];
 if (!diagramRows.length) throw new Error('DIAGRAMS_MANIFEST.md não lista diagramas.');
 for (const [, name, ...files] of diagramRows) {

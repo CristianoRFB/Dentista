@@ -1,6 +1,6 @@
 digraph G {
   rankdir=LR;
-  graph [bgcolor="white", pad="0.3", label="22-pricing-entitlements", labelloc=t, fontsize=18, fontname="Arial"];
+  graph [bgcolor="white", pad="0.3", label="PROPOSTA/NEXT — entitlement runtime, limites e uso comercial não implementados; preços não alterados", labelloc=t, fontsize=18, fontname="Arial"];
   node [shape=box, style="rounded,filled", fillcolor="#f6faf9", color="#8aa9a3", fontname="Arial", fontsize=11];
   edge [color="#5f7b76", fontname="Arial", fontsize=9];
   "P" [label="Pricing proposal\n(PROPOSTA)"];

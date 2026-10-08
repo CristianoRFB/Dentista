@@ -4,15 +4,13 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { auth } from './firebase';
-import type { TenantAccessState } from '../modules/tenant/TenantContext';
+import type { TenantAccessState } from '../modules/tenant/tenantResolver';
+import {
+  createTenantRecordInDb, requirePermission, requireReady, updateTenantRecordInDb,
+  type TenantRecordCollection,
+} from './tenantDataCore';
 
-export type TenantRecordCollection = 'patients' | 'professionals' | 'procedures' | 'scheduleResources' | 'recalls' | 'appointments';
-
-function requireReady(session: TenantAccessState) {
-  if (session.status !== 'ready') throw new Error('Acesso ao tenant indisponível');
-  if (session.isDemo) throw new Error('Dados demonstrativos são somente para leitura');
-  return session;
-}
+export type { TenantRecordCollection } from './tenantDataCore';
 
 function normalizeDocument<T extends DocumentData>(data: T, id: string) {
   const normalized: Record<string, unknown> = { ...data, id };
@@ -29,11 +27,7 @@ function clinicalActor(session: TenantAccessState) {
   return { actorId, actorRole: session.membership?.role ?? 'platform_owner' };
 }
 
-export function requirePermission(session: TenantAccessState, permission: string) {
-  if (session.status !== 'ready' || !session.permissions.includes(permission)) {
-    throw new Error('Você não tem permissão para esta ação.');
-  }
-}
+export { requirePermission } from './tenantDataCore';
 
 export async function listTenantRecords<T extends DocumentData>(
   session: TenantAccessState,
@@ -63,30 +57,7 @@ export async function createTenantRecord(
   action: string,
   resourceType: string,
 ) {
-  const ready = requireReady(session);
-  requirePermission(ready, permission);
-  const recordRef = doc(collection(db, 'tenants', ready.tenant.id, collectionName));
-  const auditRef = doc(collection(db, 'tenants', ready.tenant.id, 'auditLogs'));
-  const actorRole = ready.membership?.role ?? 'platform_owner';
-  await runTransaction(db, async transaction => {
-    transaction.set(recordRef, {
-      ...values,
-      tenantId: ready.tenant.id,
-      lastAuditLogId: auditRef.id,
-      createdAt: serverTimestamp(),
-      createdBy: ready.membership?.userId,
-    });
-    transaction.set(auditRef, {
-      tenantId: ready.tenant.id,
-      actorId: ready.membership?.userId,
-      actorRole,
-      action,
-      resourceType,
-      resourceId: recordRef.id,
-      timestamp: serverTimestamp(),
-    });
-  });
-  return recordRef.id;
+  return createTenantRecordInDb(db, session, collectionName, values, permission, action, resourceType);
 }
 
 export async function updateTenantRecord(
@@ -98,21 +69,7 @@ export async function updateTenantRecord(
   action: string,
   resourceType: string,
 ) {
-  const ready = requireReady(session);
-  requirePermission(ready, permission);
-  const recordRef = doc(db, 'tenants', ready.tenant.id, collectionName, id);
-  const auditRef = doc(collection(db, 'tenants', ready.tenant.id, 'auditLogs'));
-  const actorId = ready.membership?.userId;
-  if (!actorId) throw new Error('Membership ativa necessária');
-  await runTransaction(db, async transaction => {
-    const current = await transaction.get(recordRef);
-    if (!current.exists() || current.data().tenantId !== ready.tenant.id) throw new Error('Registro não encontrado');
-    transaction.update(recordRef, { ...values, tenantId: ready.tenant.id, lastAuditLogId: auditRef.id, updatedAt: serverTimestamp() });
-    transaction.set(auditRef, {
-      tenantId: ready.tenant.id, actorId, actorRole: ready.membership!.role,
-      action, resourceType, resourceId: id, timestamp: serverTimestamp(),
-    });
-  });
+  return updateTenantRecordInDb(db, session, collectionName, id, values, permission, action, resourceType);
 }
 
 export async function addPatientClinicalRecord(
