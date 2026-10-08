@@ -7,6 +7,8 @@ import { demoTenants } from '../../sample/demoData';
 import { demoModeEnabled } from '../auth/AuthRoutes';
 import { useAuth } from '../auth/AuthProvider';
 import { resolveTenantAccess, type TenantAccessState, type TenantResolverSource } from './tenantResolver';
+import { canUse } from '../../commercial/entitlementService';
+import type { EntitlementFeature } from '../../commercial/planCatalog';
 
 export type { TenantAccessState } from './tenantResolver';
 
@@ -95,10 +97,13 @@ export function TenantAccessGate() {
   return <Outlet />;
 }
 
-export function TenantPermissionGate({ permission, anyOf }: { permission?: string; anyOf?: string[] }) {
+export function TenantPermissionGate({ permission, anyOf, feature, anyFeature }: { permission?: string; anyOf?: string[]; feature?: EntitlementFeature; anyFeature?: EntitlementFeature[] }) {
   const state = useTenantAccess();
   if (state.status !== 'ready') return <TenantAccessView />;
   const allowed = permission ? state.permissions.includes(permission) : (anyOf ?? []).some(item => state.permissions.includes(item));
+  const featureAllowed = feature ? canUse(state.tenant, feature)
+    : anyFeature ? anyFeature.some(key => canUse(state.tenant, key)) : true;
   if (!allowed) return <main className="state-page"><h1>Acesso negado</h1><p>Seu perfil não tem permissão para esta área.</p></main>;
+  if (!featureAllowed) return <main className="state-page"><h1>Recurso indisponível</h1><p>O plano ou o estado atual deste tenant não permite usar esta área. Os dados clínicos e o histórico continuam preservados.</p></main>;
   return <Outlet />;
 }

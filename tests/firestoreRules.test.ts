@@ -17,7 +17,7 @@ let env: RulesTestEnvironment;
 
 const tenant = (id: string, status = 'active') => ({
   id, name: 'Clínica de teste ' + id, slug: 'clinica-' + id.toLowerCase(), status,
-  features: {}, limits: {}, lastAuditLogId: 'seed',
+      features: {}, limits: {}, lastAuditLogId: 'seed',
 });
 
 async function seed() {
@@ -130,15 +130,11 @@ describe('Firestore Rules — isolamento e autorização', () => {
     const patientId = await createTenantRecordInDb(db, session, 'patients', {
       name: 'Paciente de teste', searchName: 'paciente de teste', status: 'active',
     }, 'patients.manage', 'patient.create', 'patient');
-    const professionalId = await createTenantRecordInDb(db, session, 'professionals', {
-      displayName: 'Profissional de teste', specialty: 'Clínica geral', status: 'active',
-    }, 'professionals.manage', 'professional.create', 'professional');
+    const professionalId = 'prof-a';
     const procedureId = await createTenantRecordInDb(db, session, 'procedures', {
       name: 'Consulta de teste', durationMinutes: 30, active: true,
     }, 'procedures.manage', 'procedure.create', 'procedure');
-    const resourceId = await createTenantRecordInDb(db, session, 'scheduleResources', {
-      name: 'Cadeira de teste', type: 'chair', active: true,
-    }, 'resources.manage', 'resource.create', 'scheduleResource');
+    const resourceId = 'chair-a';
 
     expect((await assertSucceeds(getDoc(doc(db, 'tenants/A/patients', patientId)))).data()?.tenantId).toBe('A');
     expect((await assertSucceeds(getDoc(doc(db, 'tenants/A/professionals', professionalId)))).data()?.displayName).toBe('Profissional de teste');
@@ -146,14 +142,14 @@ describe('Firestore Rules — isolamento e autorização', () => {
     expect((await assertSucceeds(getDoc(doc(db, 'tenants/A/scheduleResources', resourceId)))).data()?.active).toBe(true);
 
     await updateTenantRecordInDb(db, session, 'patients', patientId, { status: 'inactive' }, 'patients.manage', 'patient.deactivate', 'patient');
-    await updateTenantRecordInDb(db, session, 'professionals', professionalId, { status: 'inactive' }, 'professionals.manage', 'professional.deactivate', 'professional');
+    await assertFails(updateTenantRecordInDb(db, session, 'professionals', professionalId, { status: 'inactive' }, 'professionals.manage', 'professional.deactivate', 'professional'));
     await updateTenantRecordInDb(db, session, 'procedures', procedureId, { active: false }, 'procedures.manage', 'procedure.deactivate', 'procedure');
-    await updateTenantRecordInDb(db, session, 'scheduleResources', resourceId, { active: false }, 'resources.manage', 'resource.deactivate', 'scheduleResource');
+    await assertFails(updateTenantRecordInDb(db, session, 'scheduleResources', resourceId, { active: false }, 'resources.manage', 'resource.deactivate', 'scheduleResource'));
 
     expect((await assertSucceeds(getDoc(doc(db, 'tenants/A/patients', patientId)))).data()?.status).toBe('inactive');
-    expect((await assertSucceeds(getDoc(doc(db, 'tenants/A/professionals', professionalId)))).data()?.status).toBe('inactive');
+    expect((await assertSucceeds(getDoc(doc(db, 'tenants/A/professionals', professionalId)))).data()?.status).toBe('active');
     expect((await assertSucceeds(getDoc(doc(db, 'tenants/A/procedures', procedureId)))).data()?.active).toBe(false);
-    expect((await assertSucceeds(getDoc(doc(db, 'tenants/A/scheduleResources', resourceId)))).data()?.active).toBe(false);
+    expect((await assertSucceeds(getDoc(doc(db, 'tenants/A/scheduleResources', resourceId)))).data()?.active).toBe(true);
     const otherTenant = env.authenticatedContext('dentist-b').firestore();
     await assertFails(getDoc(doc(otherTenant, 'tenants/A/patients', patientId)));
   });
@@ -327,6 +323,7 @@ describe('Firestore Rules — isolamento e autorização', () => {
       if (existingSlug.exists()) throw new Error('slug já existe');
       transaction.set(tenantRef, {
         id: tenantId, name: 'Clínica C', slug: 'clinica-c', status: 'active', features: {}, limits: {},
+        planId: 'essential', subscriptionStatus: 'active', trialUntil: null, entitlementOverrides: {}, limitOverrides: {},
         branding: { publicName: 'Clínica C', primaryColor: '#163d3a', accentColor: '#72b9ad' },
         lastAuditLogId: tenantAuditId, createdBy: 'platform-owner', createdAt: serverTimestamp(),
       });
@@ -345,7 +342,9 @@ describe('Firestore Rules — isolamento e autorização', () => {
       });
       transaction.set(doc(db, 'tenants', tenantId, 'auditLogs', tenantAuditId), {
         tenantId, actorId: 'platform-owner', actorRole: 'platform_owner', action: 'tenant.create',
-        resourceType: 'tenant', resourceId: tenantId, timestamp: serverTimestamp(),
+        resourceType: 'tenant', resourceId: tenantId, timestamp: serverTimestamp(), reason: 'Provisionamento inicial da clínica',
+        before: { planId: null, subscriptionStatus: null, trialUntil: null, entitlementOverrides: {}, limitOverrides: {} },
+        after: { planId: 'essential', subscriptionStatus: 'active', trialUntil: null, entitlementOverrides: {}, limitOverrides: {} },
       });
       transaction.set(doc(db, 'tenants', tenantId, 'auditLogs', membershipAuditId), {
         tenantId, actorId: 'platform-owner', actorRole: 'platform_owner', action: 'membership.create',
@@ -361,6 +360,28 @@ describe('Firestore Rules — isolamento e autorização', () => {
     expect((await assertSucceeds(getDoc(membershipRef))).data()?.role).toBe('tenant_owner');
     expect((await assertSucceeds(getDoc(profileRef))).data()?.publicName).toBe('Clínica C');
     expect((await assertSucceeds(getDoc(slugRef))).data()?.status).toBe('active');
+
+    const commercialAuditId = 'tenant-commercial-audit';
+    await assertSucceeds(runTransaction(db, async transaction => {
+      const current = await transaction.get(tenantRef);
+      if (!current.exists()) throw new Error('tenant não existe');
+      const data = current.data();
+      const before = {
+        planId: data.planId, subscriptionStatus: data.subscriptionStatus, trialUntil: data.trialUntil,
+        entitlementOverrides: data.entitlementOverrides, limitOverrides: data.limitOverrides,
+      };
+      const after = {
+        planId: 'pro', subscriptionStatus: 'active', trialUntil: null,
+        entitlementOverrides: {}, limitOverrides: { professionals: 4 },
+      };
+      transaction.update(tenantRef, { ...after, lastAuditLogId: commercialAuditId, updatedAt: serverTimestamp() });
+      transaction.set(doc(db, 'tenants', tenantId, 'auditLogs', commercialAuditId), {
+        tenantId, actorId: 'platform-owner', actorRole: 'platform_owner', action: 'tenant.commercial.update',
+        resourceType: 'tenant', resourceId: tenantId, timestamp: serverTimestamp(),
+        reason: 'Condição comercial autorizada pelo operador', before, after,
+      });
+    }));
+    expect((await assertSucceeds(getDoc(tenantRef))).data()).toMatchObject({ planId: 'pro', limitOverrides: { professionals: 4 } });
 
     const tenantBrandAuditId = 'tenant-branding-audit';
     const profileBrandAuditId = 'profile-branding-audit';

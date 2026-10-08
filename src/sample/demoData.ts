@@ -8,11 +8,11 @@ export const demoTenants:Tenant[]=[
     status:'active',
     planId:'premium_demo',
     subscriptionStatus:'demo',
-    features:{odontogram:true,clinicalPhotos:true,recalls:true,patientIntake:true,resources:true,publicSite:true,publicBooking:true},
+    features:{agenda:true,patients:true,professionals:true,procedures:true,physical_resources:true,clinical_records:true,clinical_photos:true,recall_center:true,mini_site:true},
     limits:{professionals:5,resources:4},
     branding:{primaryColor:'#163d3a',accentColor:'#72b9ad',publicName:'Clínica Aurora',tagline:'Odontologia clara, humana e organizada.'}
   },
-  {id:'tenant_test_b',name:'Odonto Teste B',slug:'odonto-teste-b',status:'active',planId:'essential',subscriptionStatus:'trial',features:{odontogram:true},limits:{professionals:1}}
+  {id:'tenant_test_b',name:'Odonto Teste B',slug:'odonto-teste-b',status:'active',planId:'essential',subscriptionStatus:'trial',trialUntil:'2099-01-01T00:00:00.000Z',features:{},limits:{professionals:1}}
 ];
 
 export const demoPatients:Patient[]=[

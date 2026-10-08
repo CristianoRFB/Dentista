@@ -3,6 +3,7 @@ import type { Membership, MembershipRole, Procedure, Professional } from '../../
 import { createTenantRecord, listTenantRecords, updateTenantRecord } from '../../lib/tenantData';
 import { listTenantMemberships, saveTenantMembership } from '../../lib/membershipData';
 import { useTenantAccess } from './TenantContext';
+import { canCreateCommercialCapacity, getEffectiveEntitlements } from '../../commercial/entitlementService';
 
 export function CatalogsPage() {
   const session = useTenantAccess();
@@ -17,6 +18,12 @@ export function CatalogsPage() {
   const [memberRole, setMemberRole] = useState<MembershipRole>('dentist');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const entitlements = session.status === 'ready' ? getEffectiveEntitlements(session.tenant) : null;
+  const activeProfessionals = professionals.filter(person => person.status === 'active').length;
+  const activeMembers = memberships.filter(member => member.status === 'active' && member.role !== 'tenant_owner').length;
+  const canAddCapacity = session.status === 'ready' && canCreateCommercialCapacity(session.tenant);
+  const professionalLimit = entitlements?.limits.professionals ?? null;
+  const memberLimit = entitlements?.limits.adminUsers ?? null;
 
   async function refresh() {
     if (session.isDemo) {
@@ -84,11 +91,11 @@ export function CatalogsPage() {
     <div className="grid cols-2">
       {session.permissions.includes('memberships.manage') && !session.isDemo && <section className="card team-management">
         <h2>Equipe e permissões</h2>
-        <p className="muted">Adicione contas já cadastradas no Firebase Auth. A função aplica somente as permissões do papel escolhido.</p>
+        <p className="muted">Adicione contas já cadastradas no Firebase Auth. Responsável da clínica não conta no limite. Ativos: {activeMembers}/{memberLimit ?? '—'}.</p>
         <form className="data-form" onSubmit={addMember}>
           <label>UID da conta<input required maxLength={128} value={memberUid} onChange={event => setMemberUid(event.target.value)} /></label>
           <label>Papel<select value={memberRole} onChange={event => setMemberRole(event.target.value as MembershipRole)}><option value="dentist">Dentista</option><option value="receptionist">Recepção</option><option value="assistant">Assistente</option><option value="tenant_admin">Administrador da clínica</option><option value="tenant_owner">Responsável da clínica</option></select></label>
-          <button className="btn primary" type="submit">Adicionar ou atualizar</button>
+          <button className="btn primary" type="submit" disabled={!canAddCapacity || activeMembers >= (memberLimit ?? 0) && !memberships.some(member => member.userId === memberUid.trim() && member.status === 'active' && member.role !== 'tenant_owner')}>Adicionar ou atualizar</button>
         </form>
         <ul className="managed-list">{memberships.map(member => <li key={member.userId}>
           <span><b>{member.userId}</b><small>{member.role} · {member.status}</small></span>
@@ -100,10 +107,11 @@ export function CatalogsPage() {
       </section>}
       {session.permissions.includes('professionals.manage') && !session.isDemo && <section className="card">
         <h2>Profissionais</h2>
+        <p className="muted">Ativos: {activeProfessionals}/{professionalLimit ?? '—'}.</p>
         <form className="data-form" onSubmit={addProfessional}>
           <label>Nome<input required maxLength={160} value={professionalName} onChange={event => setProfessionalName(event.target.value)} /></label>
           <label>Especialidade<input maxLength={120} value={specialty} onChange={event => setSpecialty(event.target.value)} /></label>
-          <button className="btn primary" type="submit">Adicionar profissional</button>
+          <button className="btn primary" type="submit" disabled={!canAddCapacity || activeProfessionals >= (professionalLimit ?? 0)}>Adicionar profissional</button>
         </form>
         <ul className="managed-list">{professionals.map(person => <li key={person.id}><span><b>{person.displayName}</b><small>{person.specialty || 'Sem especialidade'} · {person.status}</small></span>{person.status === 'active' && <button className="text-button" type="button" onClick={() => void deactivateProfessional(person)}>Inativar</button>}</li>)}</ul>
       </section>}

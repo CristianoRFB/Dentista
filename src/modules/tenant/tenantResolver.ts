@@ -47,7 +47,8 @@ export async function resolveTenantAccess(input: ResolveTenantAccessInput): Prom
   if (authLoading) {
     return { status: 'loading', tenant: null, membership: null, permissions: [], isPlatformOwner: false, isDemo: false, error: null };
   }
-  if (demoMode && tenantSlug === 'demo-clinica' && !userUid && demoTenant) {
+  if (demoMode && !userUid && demoTenant?.slug === tenantSlug
+    && demoTenant.planId === 'premium_demo' && demoTenant.subscriptionStatus === 'demo') {
     return {
       status: 'ready', tenant: demoTenant, membership: null, permissions: [
         'patients.read','patients.manage','professionals.read','professionals.manage','procedures.read','procedures.manage',

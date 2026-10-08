@@ -39,13 +39,13 @@ export function App() {
         <Route path="/:tenantSlug/app" element={<TenantAccessProvider><TenantAccessGate /></TenantAccessProvider>}>
           <Route element={<TenantShell />}>
             <Route index element={<TenantDashboard />} />
-            <Route element={<TenantPermissionGate permission="appointments.read" />}><Route path="agenda" element={<AgendaPage />} /></Route>
-            <Route element={<TenantPermissionGate permission="resources.read" />}><Route path="recursos" element={<ResourcesPage />} /></Route>
-            <Route element={<TenantPermissionGate anyOf={['professionals.read','procedures.read']} />}><Route path="cadastros" element={<CatalogsPage />} /></Route>
-            <Route element={<TenantPermissionGate permission="recalls.read" />}><Route path="retornos" element={<RecallCenterPage />} /></Route>
-            <Route element={<TenantPermissionGate permission="patients.read" />}><Route path="pacientes" element={<PatientsPage />} /></Route>
-            <Route element={<TenantPermissionGate permission="clinical.read" />}><Route path="pacientes/:patientId/clinico" element={<PatientClinicalPage />} /></Route>
-            <Route element={<TenantPermissionGate permission="clinical.read" />}><Route path="pacientes/:patientId/fotos" element={<ClinicalPhotosPage />} /></Route>
+            <Route element={<TenantPermissionGate permission="appointments.read" feature="agenda" />}><Route path="agenda" element={<AgendaPage />} /></Route>
+            <Route element={<TenantPermissionGate permission="resources.read" feature="physical_resources" />}><Route path="recursos" element={<ResourcesPage />} /></Route>
+            <Route element={<TenantPermissionGate anyOf={['professionals.read','procedures.read']} anyFeature={['professionals','procedures']} />}><Route path="cadastros" element={<CatalogsPage />} /></Route>
+            <Route element={<TenantPermissionGate permission="recalls.read" feature="recall_center" />}><Route path="retornos" element={<RecallCenterPage />} /></Route>
+            <Route element={<TenantPermissionGate permission="patients.read" feature="patients" />}><Route path="pacientes" element={<PatientsPage />} /></Route>
+            <Route element={<TenantPermissionGate permission="clinical.read" feature="clinical_records" />}><Route path="pacientes/:patientId/clinico" element={<PatientClinicalPage />} /></Route>
+            <Route element={<TenantPermissionGate permission="clinical.read" feature="clinical_photos" />}><Route path="pacientes/:patientId/fotos" element={<ClinicalPhotosPage />} /></Route>
           </Route>
         </Route>
       </Route>

@@ -1,5 +1,6 @@
 import { importPKCS8, SignJWT } from 'jose';
 import { verifyFirebaseIdToken } from './firebaseAuth';
+import { canCreateCommercialCapacity, canUse, getLimit } from '../../../src/commercial/entitlementService';
 import {
   findScheduleConflict, isValidAppointmentWindow, MAX_CONFLICT_LOOKBACK_MS,
   scheduleLockIds, utcDayKeys, type AppointmentWindow, type Reservation, type ScheduleBlockWindow,
@@ -261,6 +262,7 @@ async function verifyAppointmentAccess(env: Env, token: string, transaction: str
   if (!membership || membership.tenantId !== tenantId || membership.userId !== uid || !appointmentPermission(membership)) {
     throw new HttpError(403, 'appointment_permission_required');
   }
+  if (!canUse(tenant as any, 'agenda')) throw new HttpError(403, 'feature_not_available');
   return { tenant, membership };
 }
 
@@ -363,6 +365,10 @@ async function saveAppointment(env: Env, uid: string, input: Record<string, unkn
       if (input.appointmentId && (!oldAppointment || oldAppointment.tenantId !== tenantId
         || ['cancelled','no_show','completed'].includes(oldAppointment.status))) {
         throw new HttpError(404, 'appointment_unavailable');
+      }
+      if (!oldAppointment) {
+        const tenant = await getDocument(env, token, 'tenants/' + tenantId, transaction);
+        if (!tenant || !canCreateCommercialCapacity(tenant as any)) throw new HttpError(403, 'commercial_status_blocks_new_capacity');
       }
       await verifyAppointmentReferences(env, token, transaction, tenantId, candidate, patientId, procedureIds as string[]);
 
@@ -511,6 +517,161 @@ function hasRolePermission(membership: Record<string, any>, permission: string) 
   return membership.status === 'active' && permissions.includes(permission) && (rolePermissions[role] ?? []).includes(permission);
 }
 
+function permissionsForRole(role: string) {
+  const rolePermissions: Record<string, string[]> = {
+    tenant_owner: ['tenant.manage','memberships.read','memberships.manage','professionals.read','professionals.manage','patients.read','patients.manage','appointments.read','appointments.manage','resources.read','resources.manage','recalls.read','recalls.manage','intake.read','intake.manage','procedures.read','procedures.manage','billing.read','billing.write','usage.read','audit.read'],
+    tenant_admin: ['memberships.read','professionals.read','professionals.manage','patients.read','patients.manage','appointments.read','appointments.manage','resources.read','resources.manage','recalls.read','recalls.manage','intake.read','intake.manage','procedures.read','procedures.manage','billing.read','billing.write'],
+    dentist: ['professionals.read','patients.read','appointments.read','appointments.manage','procedures.read','clinical.read','clinical.write','treatment.read','treatment.write','recalls.read','recalls.manage','resources.read'],
+    receptionist: ['professionals.read','patients.read','patients.manage','appointments.read','appointments.manage','procedures.read','resources.read','recalls.read','recalls.manage','intake.read','intake.manage','billing.read','billing.write'],
+    assistant: ['professionals.read','patients.read','appointments.read','procedures.read','resources.read'],
+  };
+  return rolePermissions[role] ?? null;
+}
+
+type CapacityKind = 'professionals' | 'resources' | 'memberships';
+
+function capacityCollection(kind: CapacityKind) {
+  return kind === 'professionals' ? 'professionals' : kind === 'resources' ? 'scheduleResources' : 'memberships';
+}
+
+function capacityLimitKey(kind: CapacityKind) {
+  return kind === 'memberships' ? 'adminUsers' : kind;
+}
+
+function activeCapacityRows(kind: CapacityKind, rows: Record<string, any>[]) {
+  return rows.filter(row => row.status === 'active' || (kind === 'resources' && row.active === true))
+    .filter(row => kind !== 'memberships' || row.role !== 'tenant_owner');
+}
+
+function countDelta(kind: CapacityKind, before: Record<string, any> | null, after: Record<string, any> | null) {
+  const counted = (row: Record<string, any> | null) => !!row && (kind === 'resources' ? row.active === true : row.status === 'active')
+    && (kind !== 'memberships' || row.role !== 'tenant_owner');
+  return Number(counted(after)) - Number(counted(before));
+}
+
+function safeId(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+}
+
+async function mutateCapacity(env: Env, uid: string, input: Record<string, unknown>) {
+  const tenantId = typeof input.tenantId === 'string' ? input.tenantId : '';
+  const kind = input.kind as CapacityKind;
+  const operation = typeof input.operation === 'string' ? input.operation : '';
+  const recordIdInput = typeof input.recordId === 'string' ? input.recordId : '';
+  const allowedKinds: CapacityKind[] = ['professionals', 'resources', 'memberships'];
+  const allowedOperations = ['create', 'activate', 'deactivate', 'update'];
+  if (!safeId(tenantId) || !allowedKinds.includes(kind) || !allowedOperations.includes(operation)
+    || (operation !== 'create' && !safeId(recordIdInput))) throw new HttpError(400, 'invalid_payload');
+  const values = input.values && typeof input.values === 'object' && !Array.isArray(input.values)
+    ? input.values as Record<string, unknown> : {};
+  const token = await serviceAccountToken(env);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const transaction = await beginTransaction(env, token);
+    try {
+      const [tenant, membership] = await Promise.all([
+        getDocument(env, token, 'tenants/' + tenantId, transaction),
+        getDocument(env, token, 'tenants/' + tenantId + '/memberships/' + uid, transaction),
+      ]);
+      if (!tenant || tenant.id !== tenantId || tenant.status !== 'active') throw new HttpError(404, 'tenant_unavailable');
+      const requiredPermission = kind === 'memberships' ? 'memberships.manage' : kind === 'professionals' ? 'professionals.manage' : 'resources.manage';
+      if (!membership || membership.tenantId !== tenantId || membership.userId !== uid || !hasRolePermission(membership, requiredPermission)) {
+        throw new HttpError(403, 'capacity_permission_required');
+      }
+      const collectionId = capacityCollection(kind);
+      const recordId = operation === 'create' && kind !== 'memberships' ? crypto.randomUUID() : recordIdInput;
+      if (!safeId(recordId)) throw new HttpError(400, 'invalid_payload');
+      const recordPath = 'tenants/' + tenantId + '/' + collectionId + '/' + recordId;
+      const before = operation === 'create' && kind !== 'memberships' ? null : await getDocument(env, token, recordPath, transaction);
+      if (operation !== 'create' && (!before || before.tenantId !== tenantId)) throw new HttpError(404, 'capacity_record_unavailable');
+      if (operation === 'create' && before) throw new HttpError(409, 'capacity_record_exists');
+
+      let after: Record<string, any>;
+      if (kind === 'professionals') {
+        const status = operation === 'deactivate' ? 'inactive' : operation === 'activate' ? 'active' : before?.status ?? 'active';
+        const displayName = operation === 'create' ? values.displayName : before?.displayName;
+        const specialty = operation === 'create' ? values.specialty : before?.specialty;
+        if (operation === 'create' && (typeof displayName !== 'string' || !displayName.trim() || displayName.length > 160
+          || (specialty !== undefined && (typeof specialty !== 'string' || specialty.length > 120)))) throw new HttpError(400, 'invalid_professional');
+        after = { ...before, id: recordId, tenantId, displayName, specialty: typeof specialty === 'string' ? specialty : '', status };
+      } else if (kind === 'resources') {
+        const active = operation === 'deactivate' ? false : operation === 'activate' ? true : before?.active ?? true;
+        const name = operation === 'create' ? values.name : before?.name;
+        const type = operation === 'create' ? values.type : before?.type;
+        if (operation === 'create' && (typeof name !== 'string' || !name.trim() || name.length > 100
+          || !['chair','room','equipment'].includes(String(type)))) throw new HttpError(400, 'invalid_resource');
+        after = { ...before, id: recordId, tenantId, name, type, active };
+      } else {
+        const role = operation === 'create' || operation === 'update' ? values.role : before?.role;
+        const status = operation === 'deactivate' ? 'inactive' : operation === 'activate' ? 'active'
+          : operation === 'create' ? 'active' : values.status === 'active' || values.status === 'inactive' ? values.status : before?.status;
+        if (recordId === uid || !['tenant_owner','tenant_admin','dentist','receptionist','assistant'].includes(String(role))) throw new HttpError(400, 'invalid_membership');
+        if (role === 'tenant_owner') {
+          const [owner, platformOwner] = await Promise.all([
+            getDocument(env, token, 'tenants/' + tenantId + '/memberships/' + uid, transaction),
+            getDocument(env, token, 'platformOwners/' + uid, transaction),
+          ]);
+          if (owner?.role !== 'tenant_owner' && platformOwner?.status !== 'active') throw new HttpError(403, 'owner_role_assignment_restricted');
+        }
+        const permissions = permissionsForRole(String(role));
+        if (!permissions) throw new HttpError(400, 'invalid_membership');
+        after = { ...before, id: recordId, tenantId, userId: recordId, role, status, permissions };
+      }
+      if (!['create','activate','deactivate','update'].includes(operation)) throw new HttpError(400, 'invalid_operation');
+      const delta = countDelta(kind, before, after);
+      if (delta > 0) {
+        if (!canCreateCommercialCapacity(tenant as any)) throw new HttpError(403, 'commercial_status_blocks_new_capacity');
+        if (kind === 'professionals' && !canUse(tenant as any, 'professionals')) throw new HttpError(403, 'feature_not_available');
+        if (kind === 'resources' && !canUse(tenant as any, 'physical_resources')) throw new HttpError(403, 'feature_not_available');
+      }
+      const counterPath = 'tenants/' + tenantId + '/limitCounters/' + kind;
+      const counter = await getDocument(env, token, counterPath, transaction);
+      let count: number;
+      if (counter) {
+        if (counter.tenantId !== tenantId || counter.kind !== kind || !Number.isInteger(counter.count) || counter.count < 0) throw new HttpError(503, 'capacity_counter_invalid');
+        count = counter.count;
+      } else {
+        const rows = await queryCollection(env, token, 'tenants/' + tenantId, collectionId,
+          [{ fieldPath: kind === 'resources' ? 'active' : 'status', op: 'EQUAL', value: kind === 'resources' ? true : 'active' }], transaction);
+        count = activeCapacityRows(kind, rows).length;
+      }
+      let limit: number | null;
+      try { limit = getLimit(tenant as any, capacityLimitKey(kind) as any); }
+      catch { throw new HttpError(503, 'plan_limit_unavailable'); }
+      if (limit !== null && (!Number.isFinite(limit) || limit < 0)) throw new HttpError(503, 'plan_limit_unavailable');
+      if (delta > 0 && limit !== null && count + delta > limit) throw new HttpError(409, 'commercial_limit_reached');
+      const now = new Date();
+      const auditId = crypto.randomUUID();
+      after.lastAuditLogId = auditId;
+      after.updatedAt = now;
+      if (operation === 'create') { after.createdAt = now; after.createdBy = uid; }
+      const action = kind === 'professionals'
+        ? operation === 'create' ? 'professional.create' : operation === 'deactivate' ? 'professional.deactivate' : operation === 'activate' ? 'professional.activate' : 'professional.update'
+        : kind === 'resources'
+          ? operation === 'create' ? 'resource.create' : operation === 'deactivate' ? 'resource.deactivate' : operation === 'activate' ? 'resource.activate' : 'resource.update'
+          : operation === 'create' ? 'membership.create' : 'membership.update';
+      const updatedCounter = { tenantId, kind, count: Math.max(0, count + delta), updatedAt: now };
+      const writes: unknown[] = [
+        documentWrite(env, counterPath, updatedCounter, !counter),
+        documentWrite(env, recordPath, after, operation === 'create'),
+        documentWrite(env, 'tenants/' + tenantId + '/auditLogs/' + auditId, {
+          tenantId, actorId: uid, actorRole: membership.role, action,
+          resourceType: kind === 'professionals' ? 'professional' : kind === 'resources' ? 'scheduleResource' : 'membership',
+          resourceId: recordId, timestamp: now,
+        }, true),
+      ];
+      await commitTransaction(env, token, transaction, writes);
+      return { id: recordId, count: updatedCounter.count, limit };
+    } catch (error) {
+      await rollbackTransaction(env, token, transaction);
+      if (error instanceof FirestoreError && fsStatus(error) && attempt < 4) continue;
+      if (error instanceof HttpError) throw error;
+      if (error instanceof FirestoreError) throw new HttpError(error.status === 400 ? 409 : 503, 'firestore_transaction_failed');
+      throw new HttpError(503, 'capacity_update_failed');
+    }
+  }
+  throw new HttpError(409, 'capacity_changed_retry');
+}
+
 interface ClinicalAccess {
   tenant: Record<string, any>;
   membership: Record<string, any> | null;
@@ -583,7 +744,9 @@ async function uploadMedia(request: Request, env: Env, uid: string) {
   if (!extension || !await validImageBytes(file, file.type)) throw new HttpError(415, 'unsupported_image_type');
 
   const token = await serviceAccountToken(env);
-  await verifyClinicalAccess(env, token, uid, tenantId, patientId, 'clinical.write');
+  const access = await verifyClinicalAccess(env, token, uid, tenantId, patientId, 'clinical.write');
+  if (!canUse(access.tenant as any, 'clinical_photos')) throw new HttpError(403, 'feature_not_available');
+  if (access.tenant.planId === 'premium_demo' || access.tenant.subscriptionStatus === 'demo') throw new HttpError(409, 'demo_read_only');
   const id = crypto.randomUUID();
   const objectKey = 'tenants/' + tenantId + '/patients/' + patientId + '/' + id + '.' + extension;
   await env.CLINICAL_MEDIA.put(objectKey, file.stream(), {
@@ -646,6 +809,13 @@ async function handle(request: Request, env: Env) {
   if (request.method === 'GET' && url.pathname === '/health') return json(request, env, 200, { ok: true });
 
   const user = await authenticate(request, env);
+  if (request.method === 'POST' && url.pathname === '/v1/tenants/capacity') {
+    let payload: Record<string, unknown>;
+    try { payload = await request.json() as Record<string, unknown>; }
+    catch { throw new HttpError(400, 'invalid_json'); }
+    const result = await mutateCapacity(env, user.uid, payload);
+    return json(request, env, 200, result);
+  }
   if (request.method === 'POST' && url.pathname === '/v1/appointments') {
     let payload: Record<string, unknown>;
     try { payload = await request.json() as Record<string, unknown>; }

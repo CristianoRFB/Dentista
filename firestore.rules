@@ -163,16 +163,67 @@ service cloud.firestore {
         && getAfter(tenantAuditPath(tenantId, auditId)).data.timestamp == request.time;
     }
 
+    function commercialSnapshotMatches(snapshot, tenantData) {
+      return snapshot is map
+        && snapshot.keys().hasOnly(['planId','subscriptionStatus','trialUntil','entitlementOverrides','limitOverrides'])
+        && snapshot.get('planId', null) == tenantData.get('planId', null)
+        && snapshot.get('subscriptionStatus', null) == tenantData.get('subscriptionStatus', null)
+        && snapshot.get('trialUntil', null) == tenantData.get('trialUntil', null)
+        && snapshot.get('entitlementOverrides', {}) == tenantData.get('entitlementOverrides', {})
+        && snapshot.get('limitOverrides', {}) == tenantData.get('limitOverrides', {});
+    }
+
+    function validCommercialState(data) {
+      let entitlementOverrides = data.get('entitlementOverrides', {});
+      let limitOverrides = data.get('limitOverrides', {});
+      return data.planId in ['essential','pro','premium']
+        && data.subscriptionStatus in ['trial','active','past_due','suspended','cancelled']
+        && ((data.subscriptionStatus == 'trial' && data.trialUntil is timestamp && data.trialUntil > request.time
+            && data.trialUntil <= request.time + duration.value(14, 'd'))
+          || (data.subscriptionStatus != 'trial' && data.get('trialUntil', null) == null))
+        && entitlementOverrides is map
+        && entitlementOverrides.keys().hasOnly([
+          'agenda','patients','professionals','procedures','physical_resources','clinical_records','clinical_photos',
+          'recall_center','mini_site','intake_link','treatment_plans','financial_reports','advanced_reports',
+          'patient_portal','automations','multi_unit'
+        ])
+        && limitOverrides is map
+        && limitOverrides.keys().hasOnly(['professionals','adminUsers','resources','units','patients','appointments','clinicalHistory'])
+        && (!('professionals' in limitOverrides) || limitOverrides.professionals == null || (limitOverrides.professionals is int && limitOverrides.professionals >= 0))
+        && (!('adminUsers' in limitOverrides) || limitOverrides.adminUsers == null || (limitOverrides.adminUsers is int && limitOverrides.adminUsers >= 0))
+        && (!('resources' in limitOverrides) || limitOverrides.resources == null || (limitOverrides.resources is int && limitOverrides.resources >= 0))
+        && (!('units' in limitOverrides) || limitOverrides.units == null || (limitOverrides.units is int && limitOverrides.units >= 0))
+        && (!('patients' in limitOverrides) || limitOverrides.patients == null || (limitOverrides.patients is int && limitOverrides.patients >= 0))
+        && (!('appointments' in limitOverrides) || limitOverrides.appointments == null || (limitOverrides.appointments is int && limitOverrides.appointments >= 0))
+        && (!('clinicalHistory' in limitOverrides) || limitOverrides.clinicalHistory == null || (limitOverrides.clinicalHistory is int && limitOverrides.clinicalHistory >= 0));
+    }
+
+    function commercialAuditValid(data, tenantId, creating) {
+      let beforeData = data.before;
+      let afterData = data.after;
+      return data.reason is string && data.reason.size() >= 12 && data.reason.size() <= 400
+        && commercialSnapshotMatches(afterData, getAfter(tenantPath(tenantId)).data)
+        && validCommercialState(afterData)
+        && (creating
+          ? beforeData == {'planId':null,'subscriptionStatus':null,'trialUntil':null,'entitlementOverrides':{},'limitOverrides':{}}
+          : exists(tenantPath(tenantId))
+            && commercialSnapshotMatches(beforeData, get(tenantPath(tenantId)).data));
+    }
+
     function auditMutationMatches(tenantId, auditId, data) {
       let resourceId = data.resourceId;
       return (data.resourceType == 'tenant' && resourceId == tenantId
           && existsAfter(tenantPath(tenantId))
           && getAfter(tenantPath(tenantId)).data.lastAuditLogId == auditId
-          && ((data.action == 'tenant.create' && !exists(tenantPath(tenantId)))
+          && ((data.action == 'tenant.create' && !exists(tenantPath(tenantId))
+              && commercialAuditValid(data, tenantId, true))
             || (data.action in ['tenant.activate','tenant.suspend','tenant.branding.update']
               && exists(tenantPath(tenantId)) && get(tenantPath(tenantId)).data.lastAuditLogId != auditId
               && (data.action != 'tenant.activate' || getAfter(tenantPath(tenantId)).data.status == 'active')
-              && (data.action != 'tenant.suspend' || getAfter(tenantPath(tenantId)).data.status == 'suspended'))))
+              && (data.action != 'tenant.suspend' || getAfter(tenantPath(tenantId)).data.status == 'suspended'))
+            || (data.action == 'tenant.commercial.update' && exists(tenantPath(tenantId))
+              && get(tenantPath(tenantId)).data.lastAuditLogId != auditId
+              && commercialAuditValid(data, tenantId, false)))
         || (data.resourceType == 'membership'
           && existsAfter(/databases/$(database)/documents/tenants/$(tenantId)/memberships/$(resourceId))
           && getAfter(/databases/$(database)/documents/tenants/$(tenantId)/memberships/$(resourceId)).data.lastAuditLogId == auditId
@@ -224,7 +275,7 @@ service cloud.firestore {
 
     function auditEnvelopeValid(tenantId, auditId, data) {
       return signedIn()
-        && data.keys().hasOnly(['tenantId','actorId','actorRole','action','resourceType','resourceId','timestamp','patientId'])
+        && data.keys().hasOnly(['tenantId','actorId','actorRole','action','resourceType','resourceId','timestamp','patientId','reason','before','after'])
         && data.tenantId == tenantId
         && data.actorId == request.auth.uid
         && data.actorRole is string
@@ -234,6 +285,9 @@ service cloud.firestore {
         && data.timestamp == request.time
         && ((data.actorRole == 'platform_owner' && isPlatformOwner())
           || (hasMembership(tenantId) && data.actorRole == get(membershipPath(tenantId)).data.role))
+        && ((data.action in ['tenant.create','tenant.commercial.update'] && data.resourceType == 'tenant'
+            && 'reason' in data && 'before' in data && 'after' in data)
+          || (!('reason' in data) && !('before' in data) && !('after' in data)))
         && auditMutationMatches(tenantId, auditId, data);
     }
 
@@ -321,6 +375,7 @@ service cloud.firestore {
         && request.resource.data.status == 'active'
         && request.resource.data.features is map
         && request.resource.data.limits is map
+        && validCommercialState(request.resource.data)
         && request.resource.data.lastAuditLogId is string
         && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'tenant.create', 'tenant', tenantId);
       allow update: if (isPlatformOwner() || hasPermission(tenantId, 'tenant.manage'))
@@ -329,13 +384,20 @@ service cloud.firestore {
         && request.resource.data.status in ['active','suspended','archived']
         && request.resource.data.lastAuditLogId is string
         && request.resource.data.lastAuditLogId != resource.data.lastAuditLogId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','branding','features','limits','lastAuditLogId','updatedAt'])
-        && ((isPlatformOwner() && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId,
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','branding','features','limits','lastAuditLogId','updatedAt','planId','subscriptionStatus','trialUntil','entitlementOverrides','limitOverrides'])
+        && ((isPlatformOwner() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['planId','subscriptionStatus','trialUntil','entitlementOverrides','limitOverrides'])
+            && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId,
               request.resource.data.status != resource.data.status
                 ? (request.resource.data.status == 'suspended' ? 'tenant.suspend' : 'tenant.activate')
                 : 'tenant.branding.update',
               'tenant', tenantId))
+          || (isPlatformOwner()
+            && request.resource.data.diff(resource.data).affectedKeys().hasAny(['planId','subscriptionStatus','trialUntil','entitlementOverrides','limitOverrides'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['planId','subscriptionStatus','trialUntil','entitlementOverrides','limitOverrides','lastAuditLogId','updatedAt'])
+            && validCommercialState(request.resource.data)
+            && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'tenant.commercial.update', 'tenant', tenantId))
           || (hasPermission(tenantId, 'tenant.manage')
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['planId','subscriptionStatus','trialUntil','entitlementOverrides','limitOverrides'])
             && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'tenant.branding.update', 'tenant', tenantId)));
       allow delete: if false;
 
@@ -360,39 +422,18 @@ service cloud.firestore {
           || (signedIn() && request.auth.uid == uid)
           || hasPermission(tenantId, 'memberships.read');
         allow list: if isPlatformOwner() || hasPermission(tenantId, 'memberships.read');
-        allow create: if (isPlatformOwner() || hasPermission(tenantId, 'memberships.manage'))
+        allow create: if isPlatformOwner() && !exists(tenantPath(tenantId)) && existsAfter(tenantPath(tenantId))
           && signedIn() && request.auth.uid != uid
           && validMembershipData(tenantId, uid, request.resource.data)
           && request.resource.data.lastAuditLogId is string
           && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'membership.create', 'membership', uid);
-        allow update: if (isPlatformOwner() || hasPermission(tenantId, 'memberships.manage'))
-          && signedIn() && request.auth.uid != uid
-          && validMembershipData(tenantId, uid, request.resource.data)
-          && request.resource.data.lastAuditLogId is string
-          && request.resource.data.lastAuditLogId != resource.data.lastAuditLogId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role','status','permissions','lastAuditLogId','updatedAt'])
-          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'membership.update', 'membership', uid);
+        allow update: if false;
         allow delete: if false;
       }
 
       match /professionals/{professionalId} {
         allow get, list: if hasPermission(tenantId, 'professionals.read');
-        allow create: if hasPermission(tenantId, 'professionals.manage')
-          && request.resource.data.tenantId == tenantId
-          && request.resource.data.displayName is string
-          && request.resource.data.displayName.size() > 0
-          && request.resource.data.displayName.size() <= 160
-          && request.resource.data.status == 'active'
-          && request.resource.data.createdBy == request.auth.uid
-          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'professional.create', 'professional', professionalId);
-        allow update: if hasPermission(tenantId, 'professionals.manage')
-          && request.resource.data.tenantId == tenantId
-          && request.resource.data.displayName is string
-          && request.resource.data.status in ['active','inactive']
-          && request.resource.data.lastAuditLogId != resource.data.lastAuditLogId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','specialty','status','lastAuditLogId','updatedAt'])
-          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId,
-            request.resource.data.status == 'inactive' ? 'professional.deactivate' : 'professional.update', 'professional', professionalId);
+        allow create, update: if false;
         allow delete: if false;
       }
 
@@ -506,22 +547,7 @@ service cloud.firestore {
 
       match /scheduleResources/{resourceId} {
         allow get, list: if hasPermission(tenantId, 'resources.read');
-        allow create: if hasPermission(tenantId, 'resources.manage')
-          && request.resource.data.tenantId == tenantId
-          && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
-          && request.resource.data.type in ['chair','room','equipment']
-          && request.resource.data.active == true
-          && request.resource.data.createdBy == request.auth.uid
-          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'resource.create', 'scheduleResource', resourceId);
-        allow update: if hasPermission(tenantId, 'resources.manage')
-          && request.resource.data.tenantId == tenantId
-          && request.resource.data.name is string
-          && request.resource.data.type in ['chair','room','equipment']
-          && request.resource.data.active is bool
-          && request.resource.data.lastAuditLogId != resource.data.lastAuditLogId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','type','active','lastAuditLogId','updatedAt'])
-          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId,
-            request.resource.data.active ? 'resource.activate' : 'resource.deactivate', 'scheduleResource', resourceId);
+        allow create, update: if false;
         allow delete: if false;
       }
 
@@ -544,6 +570,10 @@ service cloud.firestore {
       match /usageCounters/{counterId} {
         allow get, list: if isPlatformOwner() || hasPermission(tenantId, 'usage.read');
         allow create, update, delete: if false;
+      }
+
+      match /limitCounters/{counterId} {
+        allow read, write: if false;
       }
 
       match /treatmentPlans/{planId} {

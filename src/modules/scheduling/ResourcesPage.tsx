@@ -3,6 +3,7 @@ import type { ScheduleResource } from '../../domain/types';
 import { createTenantRecord, listTenantRecords, updateTenantRecord } from '../../lib/tenantData';
 import { demoResources } from '../../sample/demoData';
 import { useTenantAccess } from '../tenant/TenantContext';
+import { canCreateCommercialCapacity, getEffectiveEntitlements } from '../../commercial/entitlementService';
 
 export function ResourcesPage() {
   const session = useTenantAccess();
@@ -11,6 +12,10 @@ export function ResourcesPage() {
   const [type, setType] = useState<ScheduleResource['type']>('chair');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const entitlements = session.status === 'ready' ? getEffectiveEntitlements(session.tenant) : null;
+  const activeCount = resources.filter(resource => resource.active).length;
+  const limit = entitlements?.limits.resources ?? null;
+  const canAddCapacity = session.status === 'ready' && canCreateCommercialCapacity(session.tenant);
 
   async function refresh() {
     try {
@@ -50,9 +55,10 @@ export function ResourcesPage() {
     {error && <p className="form-error" role="alert">{error}</p>}
     {session.permissions.includes('resources.manage') && !session.isDemo && <form className="card data-form inline-form" onSubmit={addResource}>
       <h2>Novo recurso</h2>
+      <p className="muted">Ativos: {activeCount}/{limit ?? '—'}.</p>
       <label>Nome<input required maxLength={100} value={name} onChange={event => setName(event.target.value)} /></label>
       <label>Tipo<select value={type} onChange={event => setType(event.target.value as ScheduleResource['type'])}><option value="chair">Cadeira</option><option value="room">Sala</option><option value="equipment">Equipamento</option></select></label>
-      <button className="btn primary" disabled={saving} type="submit">{saving ? 'Salvando…' : 'Adicionar recurso'}</button>
+      <button className="btn primary" disabled={saving || !canAddCapacity || activeCount >= (limit ?? 0)} type="submit">{saving ? 'Salvando…' : 'Adicionar recurso'}</button>
     </form>}
     <div className="grid cols-3">{resources.length === 0 ? <article className="card"><p>Ainda não há recursos cadastrados.</p></article> : resources.map(resource => <article className="card resource-card" key={resource.id}>
       <span className="feature-icon">{resource.type === 'chair' ? '⌁' : resource.type === 'room' ? '□' : '◌'}</span>

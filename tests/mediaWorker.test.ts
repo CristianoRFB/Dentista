@@ -30,8 +30,8 @@ function seedAccess({
   role = 'dentist', status = 'active', permissions = ['clinical.read', 'clinical.write'], patientTenantId = 'A', tenantStatus = 'active',
 }: { role?: string; status?: string; permissions?: string[]; patientTenantId?: string; tenantStatus?: string } = {}) {
   documents.clear();
-  documents.set('tenants/A', { id: 'A', status: tenantStatus });
-  documents.set('tenants/B', { id: 'B', status: 'active' });
+  documents.set('tenants/A', { id: 'A', status: tenantStatus, planId: 'premium', subscriptionStatus: 'active', features: {} });
+  documents.set('tenants/B', { id: 'B', status: 'active', planId: 'essential', subscriptionStatus: 'active', features: {} });
   documents.set('tenants/A/memberships/dentist-a', {
     userId: 'dentist-a', tenantId: 'A', role, status, permissions,
   });
@@ -152,6 +152,15 @@ describe('Worker de mídia clínica', () => {
     expect(response.status).toBe(201);
     expect(JSON.stringify(writes)).toContain('platform_owner');
     expect(env.CLINICAL_MEDIA.put).toHaveBeenCalledOnce();
+  });
+
+  it('nega mídia quando a configuração operacional desliga a feature ou o tenant é demo', async () => {
+    documents.set('tenants/A', { ...documents.get('tenants/A'), features: { clinical_photos: false } });
+    expect((await upload('verified-test-token')).status).toBe(403);
+    expect(env.CLINICAL_MEDIA.put).not.toHaveBeenCalled();
+    documents.set('tenants/A', { ...documents.get('tenants/A'), planId: 'premium_demo', subscriptionStatus: 'demo', features: {} });
+    expect((await upload('verified-test-token')).status).toBe(409);
+    expect(env.CLINICAL_MEDIA.put).not.toHaveBeenCalled();
   });
 
   it.each([

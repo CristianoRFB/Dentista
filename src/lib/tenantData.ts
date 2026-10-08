@@ -3,6 +3,7 @@ import {
   type DocumentData, type QueryConstraint,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { mutateTenantCapacity } from './capacityClient';
 import { auth } from './firebase';
 import type { TenantAccessState } from '../modules/tenant/tenantResolver';
 import {
@@ -57,6 +58,8 @@ export async function createTenantRecord(
   action: string,
   resourceType: string,
 ) {
+  if (collectionName === 'professionals') return (await mutateTenantCapacity(session, 'professionals', 'create', values)).id!;
+  if (collectionName === 'scheduleResources') return (await mutateTenantCapacity(session, 'resources', 'create', values)).id!;
   return createTenantRecordInDb(db, session, collectionName, values, permission, action, resourceType);
 }
 
@@ -69,6 +72,16 @@ export async function updateTenantRecord(
   action: string,
   resourceType: string,
 ) {
+  if (collectionName === 'professionals') {
+    const operation = values.status === 'inactive' ? 'deactivate' : values.status === 'active' ? 'activate' : 'update';
+    await mutateTenantCapacity(session, 'professionals', operation, values, id);
+    return;
+  }
+  if (collectionName === 'scheduleResources') {
+    const operation = values.active === false ? 'deactivate' : values.active === true ? 'activate' : 'update';
+    await mutateTenantCapacity(session, 'resources', operation, values, id);
+    return;
+  }
   return updateTenantRecordInDb(db, session, collectionName, id, values, permission, action, resourceType);
 }
 

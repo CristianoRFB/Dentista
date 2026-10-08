@@ -2,12 +2,17 @@ import {
   collection, doc, getDocs, runTransaction, serverTimestamp, Timestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { Tenant, TenantBranding } from '../domain/types';
+import type { SubscriptionStatus, Tenant, TenantBranding } from '../domain/types';
 import { permissionsForRole } from '../domain/permissions';
+import { validateCommercialAssignment } from '../commercial/entitlementService';
 
 export async function listPlatformTenants(): Promise<Tenant[]> {
   const tenants = await getDocs(collection(db, 'tenants'));
-  return tenants.docs.map(snapshot => ({ ...snapshot.data(), id: snapshot.id }) as Tenant);
+  return tenants.docs.map(snapshot => {
+    const data = snapshot.data();
+    const trialUntil = data.trialUntil?.toDate?.();
+    return { ...data, trialUntil: trialUntil instanceof Date ? trialUntil.toISOString() : data.trialUntil, id: snapshot.id } as Tenant;
+  });
 }
 
 function tenantAuditRef(tenantId: string, id: string) {
@@ -16,7 +21,10 @@ function tenantAuditRef(tenantId: string, id: string) {
 
 export async function createPlatformTenant(input: {
   name: string; slug: string; ownerUid: string; publicName: string; primaryColor: string; accentColor: string;
+  planId: string; subscriptionStatus: SubscriptionStatus; trialUntil?: string; reason: string;
 }, actorId: string) {
+  validateCommercialAssignment(input);
+  if (input.reason.trim().length < 12 || input.reason.trim().length > 400) throw new Error('Informe um motivo de 12 a 400 caracteres, sem dados clínicos ou segredos.');
   const tenantRef = doc(collection(db, 'tenants'));
   const slugRef = doc(db, 'tenantSlugs', input.slug);
   const membershipRef = doc(db, 'tenants', tenantRef.id, 'memberships', input.ownerUid);
@@ -33,6 +41,11 @@ export async function createPlatformTenant(input: {
       status: 'active',
       features: {},
       limits: {},
+      planId: input.planId,
+      subscriptionStatus: input.subscriptionStatus,
+      trialUntil: input.trialUntil ? Timestamp.fromDate(new Date(input.trialUntil)) : null,
+      entitlementOverrides: {},
+      limitOverrides: {},
       branding: { publicName: input.publicName.trim(), primaryColor: input.primaryColor, accentColor: input.accentColor },
       createdAt: serverTimestamp(),
       createdBy: actorId,
@@ -72,6 +85,13 @@ export async function createPlatformTenant(input: {
     transaction.set(tenantAuditRef(tenantRef.id, tenantAuditId), {
       tenantId: tenantRef.id, actorId, actorRole: 'platform_owner',
       action: 'tenant.create', resourceType: 'tenant', resourceId: tenantRef.id, timestamp: serverTimestamp(),
+      reason: input.reason.trim(),
+      before: { planId: null, subscriptionStatus: null, trialUntil: null, entitlementOverrides: {}, limitOverrides: {} },
+      after: {
+        planId: input.planId, subscriptionStatus: input.subscriptionStatus,
+        trialUntil: input.trialUntil ? Timestamp.fromDate(new Date(input.trialUntil)) : null,
+        entitlementOverrides: {}, limitOverrides: {},
+      },
     });
     transaction.set(tenantAuditRef(tenantRef.id, membershipAuditId), {
       tenantId: tenantRef.id, actorId, actorRole: 'platform_owner',
@@ -80,6 +100,41 @@ export async function createPlatformTenant(input: {
     transaction.set(tenantAuditRef(tenantRef.id, profileAuditId), {
       tenantId: tenantRef.id, actorId, actorRole: 'platform_owner',
       action: 'publicProfile.create', resourceType: 'publicProfile', resourceId: 'public', timestamp: serverTimestamp(),
+    });
+  });
+}
+
+export async function updatePlatformTenantCommercialState(tenant: Tenant, input: {
+  planId: string; subscriptionStatus: SubscriptionStatus; trialUntil?: string;
+  entitlementOverrides: Record<string, boolean>; limitOverrides: Record<string, number | null>; reason: string;
+}, actorId: string) {
+  validateCommercialAssignment(input);
+  if (input.reason.trim().length < 12 || input.reason.trim().length > 400) throw new Error('Informe um motivo de 12 a 400 caracteres, sem dados clínicos ou segredos.');
+  const tenantRef = doc(db, 'tenants', tenant.id);
+  const auditId = doc(collection(db, 'tenants', tenant.id, 'auditLogs')).id;
+  const trialUntil = input.trialUntil ? Timestamp.fromDate(new Date(input.trialUntil)) : null;
+  await runTransaction(db, async transaction => {
+    const current = await transaction.get(tenantRef);
+    if (!current.exists()) throw new Error('Tenant não encontrado.');
+    const data = current.data();
+    const before = {
+      planId: data.planId ?? null,
+      subscriptionStatus: data.subscriptionStatus ?? null,
+      trialUntil: data.trialUntil ?? null,
+      entitlementOverrides: data.entitlementOverrides ?? {},
+      limitOverrides: data.limitOverrides ?? {},
+    };
+    const after = {
+      planId: input.planId,
+      subscriptionStatus: input.subscriptionStatus,
+      trialUntil,
+      entitlementOverrides: input.entitlementOverrides,
+      limitOverrides: input.limitOverrides,
+    };
+    transaction.update(tenantRef, { ...after, lastAuditLogId: auditId, updatedAt: serverTimestamp() });
+    transaction.set(tenantAuditRef(tenant.id, auditId), {
+      tenantId: tenant.id, actorId, actorRole: 'platform_owner', action: 'tenant.commercial.update',
+      resourceType: 'tenant', resourceId: tenant.id, timestamp: serverTimestamp(), reason: input.reason.trim(), before, after,
     });
   });
 }

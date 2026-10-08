@@ -1,6 +1,7 @@
 import { Link, Outlet, useParams } from 'react-router-dom';
 import { useReadyTenantAccess } from './TenantContext';
 import { useAuth } from '../auth/AuthProvider';
+import { canUse } from '../../commercial/entitlementService';
 
 export function TenantShell() {
   const { tenantSlug = 'demo-clinica' } = useParams();
@@ -12,11 +13,11 @@ export function TenantShell() {
       <Link to={base} className="app-brand"><span className="brand-mark small">O</span><div><b>OdontoFlow</b><small>{tenant.branding?.publicName ?? tenant.name}</small></div></Link>
       <nav aria-label="Navegação da clínica">
         <Link to={base}>▦ <span>Dashboard</span></Link>
-        {permissions.includes('appointments.read') && <Link to={base + '/agenda'}>⌁ <span>Agenda</span></Link>}
-        {permissions.includes('patients.read') && <Link to={base + '/pacientes'}>◫ <span>Pacientes</span></Link>}
-        {permissions.includes('recalls.read') && <Link to={base + '/retornos'}>↺ <span>Retornos</span></Link>}
-        {permissions.includes('resources.read') && <Link to={base + '/recursos'}>□ <span>Cadeiras e salas</span></Link>}
-        {(permissions.includes('professionals.manage') || permissions.includes('procedures.manage')) && <Link to={base + '/cadastros'}>⚙ <span>Cadastros</span></Link>}
+        {permissions.includes('appointments.read') && canUse(tenant, 'agenda') && <Link to={base + '/agenda'}>⌁ <span>Agenda</span></Link>}
+        {permissions.includes('patients.read') && canUse(tenant, 'patients') && <Link to={base + '/pacientes'}>◫ <span>Pacientes</span></Link>}
+        {permissions.includes('recalls.read') && canUse(tenant, 'recall_center') && <Link to={base + '/retornos'}>↺ <span>Retornos</span></Link>}
+        {permissions.includes('resources.read') && canUse(tenant, 'physical_resources') && <Link to={base + '/recursos'}>□ <span>Cadeiras e salas</span></Link>}
+        {(permissions.includes('professionals.manage') || permissions.includes('procedures.manage')) && canUse(tenant, 'professionals') && <Link to={base + '/cadastros'}>⚙ <span>Cadastros</span></Link>}
       </nav>
       <div className="sidebar-bottom">
         {isDemo && <span className="demo-banner">Modo demonstrativo · dados fictícios</span>}

@@ -63,10 +63,10 @@ function seed() {
   currentVersion = 0;
   transactionNumber = 0;
   const rows: Array<[string, Record<string, unknown>]> = [
-    ['tenants/A', { id: 'A', status: 'active' }],
-    ['tenants/B', { id: 'B', status: 'active' }],
+    ['tenants/A', { id: 'A', status: 'active', planId: 'pro', subscriptionStatus: 'active', features: {}, limitOverrides: {} }],
+    ['tenants/B', { id: 'B', status: 'active', planId: 'essential', subscriptionStatus: 'active', features: {}, limitOverrides: {} }],
     ['tenants/A/memberships/dentist-a', {
-      userId: 'dentist-a', tenantId: 'A', role: 'dentist', status: 'active', permissions: ['appointments.manage'],
+      userId: 'dentist-a', tenantId: 'A', role: 'tenant_owner', status: 'active', permissions: ['appointments.manage','memberships.manage','professionals.manage','resources.manage'],
     }],
     ['tenants/A/patients/patient-a', { id: 'patient-a', tenantId: 'A', status: 'active' }],
     ['tenants/B/patients/patient-b', { id: 'patient-b', tenantId: 'B', status: 'active' }],
@@ -209,6 +209,14 @@ async function save({
   }), workerEnv);
 }
 
+async function mutateCapacity(kind: 'professionals' | 'resources' | 'memberships', operation: 'create' | 'activate' | 'deactivate' | 'update', values: Record<string, unknown>, recordId?: string) {
+  return appointmentWorker.fetch(new Request('https://worker.test/v1/tenants/capacity', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer valid-test-token', Origin: 'https://app.test', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenantId: 'A', kind, operation, values, recordId }),
+  }), workerEnv);
+}
+
 describe('Worker de agendamentos — validação e persistência', () => {
   it('persiste consulta, locks e audit log para tenant ativo', async () => {
     const response = await save({ procedureIds: ['proc-a'] });
@@ -260,5 +268,37 @@ describe('Worker de agendamentos — validação e persistência', () => {
       save({ startsAt: '2026-10-08T15:30:00.000Z', endsAt: '2026-10-08T16:30:00.000Z', resourceId: 'chair-b' }),
     ]);
     expect(results.map(response => response.status).sort()).toEqual([200, 409]);
+  });
+});
+
+describe('Worker de limites comerciais', () => {
+  it('serializa cadastros concorrentes e impede ultrapassar a cota de profissionais', async () => {
+    const results = await Promise.all([
+      mutateCapacity('professionals', 'create', { displayName: 'Dentista 3', specialty: 'Clínica geral' }),
+      mutateCapacity('professionals', 'create', { displayName: 'Dentista 4', specialty: 'Ortodontia' }),
+    ]);
+    expect(results.map(response => response.status).sort()).toEqual([200, 409]);
+    expect(documents.get('tenants/A/limitCounters/professionals')?.count).toBe(3);
+    expect([...documents.values()].filter(item => item.tenantId === 'A' && item.status === 'active' && item.displayName).length).toBe(3);
+  });
+
+  it('permite inativar acima da nova cota e depois reativar somente se houver capacidade', async () => {
+    documents.set('tenants/A', { ...documents.get('tenants/A'), planId: 'essential' });
+    documents.set('tenants/A/limitCounters/professionals', { tenantId: 'A', kind: 'professionals', count: 2 });
+    const inactive = await mutateCapacity('professionals', 'deactivate', {}, 'prof-b');
+    expect(inactive.status).toBe(200);
+    expect(documents.get('tenants/A/limitCounters/professionals')?.count).toBe(1);
+    expect((await mutateCapacity('professionals', 'activate', {}, 'prof-b')).status).toBe(409);
+  });
+
+  it('não conta o tenant_owner no limite de memberships adicionais', async () => {
+    for (let index = 1; index <= 5; index++) documents.set('tenants/A/memberships/member-' + index, {
+      tenantId: 'A', userId: 'member-' + index, role: 'dentist', status: 'active', permissions: [],
+    });
+    const allowed = await mutateCapacity('memberships', 'create', { role: 'dentist', status: 'active' }, 'member-6');
+    expect(allowed.status).toBe(200);
+    const denied = await mutateCapacity('memberships', 'create', { role: 'dentist', status: 'active' }, 'member-7');
+    expect(denied.status).toBe(409);
+    expect(documents.get('tenants/A/limitCounters/memberships')?.count).toBe(6);
   });
 });

@@ -27,11 +27,12 @@ export interface Tenant {
   features: Record<string, boolean>;
   limits: Record<string, number>;
   branding?: TenantBranding;
-  /** Commercial scaffolding only in v01. Entitlements are NOT enforced yet. */
+  /** Runtime commercial assignment, managed manually by a Platform Owner. */
   planId?: PlanId;
   subscriptionStatus?: SubscriptionStatus;
   trialUntil?: string;
-  entitlementOverrides?: Record<string, boolean | number>;
+  entitlementOverrides?: Record<string, boolean>;
+  limitOverrides?: Record<string, number | null>;
 }
 
 export interface Membership {
