@@ -22,6 +22,12 @@
 - prontuário + adendos;
 - ClinicalPhoto upload real para R2.
 
+### Estado após Core Multi-Tenant + Clínico P0 (2026-10-07)
+
+Concluídos no código e verificados localmente: Firebase Auth UI/guards, tenant resolver, memberships/RBAC, Platform Owner e suporte, Rules no Emulator, CRUD mínimo tenant-scoped de pacientes/profissionais/procedimentos/recursos, agenda via Worker com locks transacionais, prontuário append-only/adendos, R2 privado, auditoria e white-label básico.
+
+Antes de produção: configurar credenciais reais do Worker, projeto Auth/Firestore e binding R2; executar readiness gate com ambiente provisionado. Esta etapa não executa deploy nem migração.
+
 ## Fase 2 — Experiência clínica
 - odontograma interativo;
 - plano de tratamento;
@@ -29,6 +35,8 @@
 - central de retorno persistida;
 - pré-cadastro tokenizado + revisão;
 - documentos e templates.
+
+Odontograma e plano de tratamento permanecem nesta fase; suas fontes de diagrama são marcadas como futuro e não significam que a funcionalidade esteja ativa.
 
 ## Fase 3 — Comercial e onboarding
 - onboarding de tenant;

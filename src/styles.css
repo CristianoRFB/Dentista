@@ -45,6 +45,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible 
 .hero-actions { display:flex; gap:10px; flex-wrap:wrap; margin:28px 0 18px; }
 .hero-trust { display:flex; flex-wrap:wrap; gap:16px; color:#60706d; font-size:12px; font-weight:650; }
 .product-window { background:#fff; border:1px solid #dce6e3; border-radius:24px; box-shadow:0 30px 70px rgba(24,54,51,.16); overflow:hidden; transform:perspective(1200px) rotateY(-2deg) rotateX(1deg); }
+.concept-label { padding:8px 12px; background:#eef7f4; color:#315c54; border-bottom:1px solid #dce6e3; font-size:11px; font-weight:700; text-align:center; letter-spacing:.01em; }
 .window-bar { height:44px; display:flex; align-items:center; justify-content:space-between; padding:0 14px; border-bottom:1px solid var(--line); color:#788582; font-size:11px; }
 .window-bar>div { display:flex; gap:5px; }.window-bar i{width:7px;height:7px;border-radius:50%;background:#cad5d2;display:block}.window-bar b{font-weight:700;color:#63706e}
 .window-body { min-height:420px; display:grid; grid-template-columns:48px 1fr; background:#f9fbfa; }

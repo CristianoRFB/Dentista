@@ -14,6 +14,10 @@ import { RecallCenterPage } from './modules/recalls/RecallCenterPage';
 import { PatientsPage } from './modules/patients/PatientsPage';
 import { PatientClinicalPage } from './modules/clinical/PatientClinicalPage';
 import { ClinicalPhotosPage } from './modules/clinical-media/ClinicalPhotosPage';
+import { LoginPage } from './modules/auth/LoginPage';
+import { AuthRequired, PlatformOwnerRequired } from './modules/auth/AuthRoutes';
+import { TenantAccessGate, TenantAccessProvider, TenantPermissionGate } from './modules/tenant/TenantContext';
+import { CatalogsPage } from './modules/tenant/CatalogsPage';
 
 export function App() {
   return (
@@ -22,20 +26,28 @@ export function App() {
       <div id="app-content" tabIndex={-1}>
         <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={<LoginPage />} />
       <Route path="/precos" element={<PricingPage />} />
       <Route path="/recursos/:feature" element={<FeaturePage />} />
-      <Route path="/platform" element={<PlatformDashboard />} />
       <Route path="/:tenantSlug" element={<TenantPublicSite />} />
       <Route path="/:tenantSlug/agendar" element={<PublicBookingPage />} />
       <Route path="/:tenantSlug/cadastro" element={<PublicIntakePage />} />
-      <Route path="/:tenantSlug/app" element={<TenantShell />}>
-        <Route index element={<TenantDashboard />} />
-        <Route path="agenda" element={<AgendaPage />} />
-        <Route path="recursos" element={<ResourcesPage />} />
-        <Route path="retornos" element={<RecallCenterPage />} />
-        <Route path="pacientes" element={<PatientsPage />} />
-        <Route path="pacientes/:patientId/clinico" element={<PatientClinicalPage />} />
-        <Route path="pacientes/:patientId/fotos" element={<ClinicalPhotosPage />} />
+      <Route element={<AuthRequired />}>
+        <Route element={<PlatformOwnerRequired />}>
+          <Route path="/platform" element={<PlatformDashboard />} />
+        </Route>
+        <Route path="/:tenantSlug/app" element={<TenantAccessProvider><TenantAccessGate /></TenantAccessProvider>}>
+          <Route element={<TenantShell />}>
+            <Route index element={<TenantDashboard />} />
+            <Route element={<TenantPermissionGate permission="appointments.read" />}><Route path="agenda" element={<AgendaPage />} /></Route>
+            <Route element={<TenantPermissionGate permission="resources.read" />}><Route path="recursos" element={<ResourcesPage />} /></Route>
+            <Route element={<TenantPermissionGate anyOf={['professionals.read','procedures.read']} />}><Route path="cadastros" element={<CatalogsPage />} /></Route>
+            <Route element={<TenantPermissionGate permission="recalls.read" />}><Route path="retornos" element={<RecallCenterPage />} /></Route>
+            <Route element={<TenantPermissionGate permission="patients.read" />}><Route path="pacientes" element={<PatientsPage />} /></Route>
+            <Route element={<TenantPermissionGate permission="clinical.read" />}><Route path="pacientes/:patientId/clinico" element={<PatientClinicalPage />} /></Route>
+            <Route element={<TenantPermissionGate permission="clinical.read" />}><Route path="pacientes/:patientId/fotos" element={<ClinicalPhotosPage />} /></Route>
+          </Route>
+        </Route>
       </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

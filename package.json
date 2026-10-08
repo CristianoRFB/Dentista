@@ -10,7 +10,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b --pretty false",
-    "check:standards": "node scripts/check-doc-standards.mjs"
+    "check:standards": "node scripts/check-doc-standards.mjs",
+    "test:rules": "firebase emulators:exec --project demo-odontoflow --only firestore \"vitest run --config vitest.rules.config.ts\"",
+    "worker:typecheck": "npm --prefix workers/media-api run typecheck",
+    "docs:check": "node scripts/docs-check.mjs",
+    "docs:diagrams": "node scripts/docs-diagrams.mjs",
+    "docs:leads": "node scripts/docs-leads.mjs"
   },
   "dependencies": {
     "firebase": "^11.0.2",
@@ -19,9 +24,11 @@
     "react-router-dom": "^6.28.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
+    "firebase-tools": "^14.11.2",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
     "vitest": "^2.1.5"

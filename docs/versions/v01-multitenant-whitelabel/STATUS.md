@@ -2,12 +2,11 @@
 
 - Fundação: criada e revisada após benchmark comercial
 - Repo legado: inexistente/vazio
-- Frontend scaffold: executável e ampliado
-- Landing comercial: reestruturada para demonstrar produto
-- Páginas públicas de recursos/preços: scaffold
-- Firebase config: integrado via env
-- Firestore Rules: base inicial
-- R2 Worker: base inicial
+- Frontend React/Vite: executável; Core P0 implementado
+- Landing/comercial: conceitual, com status real/futuro explícito
+- Firebase Auth/Firestore: integração via env e Emulator para Rules
+- Firestore Rules: enforcement tenant/RBAC/clínico validado
+- Worker agenda + R2 privado: autorização e transações implementadas
 - Diagramas: 22 fontes + renders
 - Wireframes/mockups: base anterior + novos fluxos comerciais
 - Agenda por recursos físicos: modelagem inicial
@@ -15,8 +14,28 @@
 - Pré-cadastro por link: scaffold demonstrativo
 - Medição de custos variáveis: modelagem inicial
 - Produção: não configurada
-- Seed real: pendente
-- Auth UI: pendente
+- Seed real: não há cliente real comprovado nem migração
+- Auth UI: Firebase login/logout implementados
+
+## Core operacional — 2026-10-07
+
+- login/logout por Firebase Auth e rotas privadas implementados;
+- resolução `slug → tenantSlugs → tenant ativo → membership/RBAC` implementada;
+- Platform Owner implementado para criar, listar, ativar/suspender tenant, configurar branding e abrir/revogar suporte clínico com auditoria;
+- Rules por tenant e permissão, prontuário append-only, adendos e auditoria validados no Firestore Emulator;
+- CRUD tenant-scoped para pacientes, profissionais, procedimentos e recursos; agenda gravada pelo Worker;
+- concorrência de agenda serializada por locks de profissional/recurso/dia em transações Firestore;
+- prontuário P0 e upload/download privado em R2 protegidos por autorização clínica;
+- testes locais: typecheck, 27 testes unitários, 10 testes de Rules/Emulator, typecheck do Worker e build passaram;
+- produção ainda não configurada: falta provisionar URLs/segredos do Worker, bucket R2 e projeto Auth/Firestore conforme `DEPLOYMENT.md`;
+- screenshots em `screenshots/` são capturas reais do build de desenvolvimento com dados exclusivamente fictícios; materiais em `generated/` são conceitos e não prova de runtime.
+
+## Fora do estado operacional
+
+- Central de Retorno: leitura sem escrita persistente;
+- pré-cadastro/agendamento público para tenants reais: indisponíveis neste estágio;
+- odontograma e plano de tratamento: modelagem/documentação, sem fluxo operacional;
+- pricing, entitlements e cobrança: proposta/scaffold, não controlam runtime.
 
 - Project Core v01: revisado/alinhado
 - Standards tracking: GLOBAL-v01 / APPOINTMENT-v01 / DENTIST-v01

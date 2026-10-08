@@ -1,4 +1,21 @@
-digraph G { rankdir=LR; graph [bgcolor="transparent", pad="0.3"]; node [shape=box, style="rounded,filled", fillcolor="#f7fbfa", color="#86a9a2", fontname="Arial"]; edge [color="#5c7c76"];
-Patient [label="Paciente"]; Intake [label="IntakeSubmission\npending_review", fillcolor="#f5ead8"]; Reception [label="Recepção\nrevisa"]; PatientRecord [label="Patient\noficial", fillcolor="#dff1ed"]; Visit [label="Consulta"]; Recall [label="Recall\nplanned/due"]; Schedule [label="Novo appointment"]; Usage [label="UsageCounter\nserviços variáveis"];
-Patient -> Intake -> Reception -> PatientRecord -> Visit -> Recall -> Schedule; Schedule -> Usage [style=dashed,label=" se integração cobrada"];
+digraph G {
+  rankdir=LR;
+  graph [bgcolor="white", pad="0.3", label="20-recall-intake-usage", labelloc=t, fontsize=18, fontname="Arial"];
+  node [shape=box, style="rounded,filled", fillcolor="#f6faf9", color="#8aa9a3", fontname="Arial", fontsize=11];
+  edge [color="#5f7b76", fontname="Arial", fontsize=9];
+  "P" [label="Paciente"];
+  "I" [label="I"];
+  "R" [label="R"];
+  "PR" [label="PR"];
+  "V" [label="V"];
+  "RC" [label="RC"];
+  "A" [label="A"];
+  "U" [label="UsageCounter"];
+  "P" -> "I";
+  "I" -> "R";
+  "R" -> "PR";
+  "PR" -> "V";
+  "V" -> "RC";
+  "RC" -> "A";
+  "A" -> "U" [label="se houver integração paga", style=dashed];
 }

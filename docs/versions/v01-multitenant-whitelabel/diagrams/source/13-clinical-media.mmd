@@ -1,10 +1,10 @@
 %% Mídia clínica
 flowchart LR
-  N1["Batch Upload"] --> N2["Local Cache"]
-  N1["Batch Upload"] --> N3["Media Worker"]
-  N3["Media Worker"] --> N4["R2 Private"]
-  N3["Media Worker"] --> N5["Firestore Metadata"]
-  N5["Firestore Metadata"] --> N6["Unverified"]
-  N6["Unverified"] --> N7["Classified"]
-  N7["Classified"] --> N8["Timeline"]
-  N7["Classified"] --> N9["Compare"]
+  U["Upload autenticado"] --> W["Worker verifica ID token"]
+  W --> A["Tenant ativo + membership / suporte + clinical.write"]
+  A --> P["Patient pertence ao tenant"]
+  P --> F["Tipo, bytes e limite 15 MiB"]
+  F --> R2["R2 privado: chave tenant/patient scoped"]
+  R2 --> M["Firestore metadata + audit"]
+  M --> D["Download autenticado com clinical.read"]
+  D --> H["Cache-Control private, no-store"]

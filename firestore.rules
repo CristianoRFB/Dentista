@@ -1,148 +1,551 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
-    function isPlatformOwner() {
-      return signedIn() && exists(/databases/$(database)/documents/platformOwners/$(request.auth.uid));
+    function signedIn() {
+      return request.auth != null;
     }
+
+    function platformOwnerPath() {
+      return /databases/$(database)/documents/platformOwners/$(request.auth.uid);
+    }
+
+    function isPlatformOwner() {
+      return signedIn()
+        && exists(platformOwnerPath())
+        && get(platformOwnerPath()).data.status != 'inactive';
+    }
+
+    function tenantPath(tenantId) {
+      return /databases/$(database)/documents/tenants/$(tenantId);
+    }
+
     function membershipPath(tenantId) {
       return /databases/$(database)/documents/tenants/$(tenantId)/memberships/$(request.auth.uid);
     }
-    function isMember(tenantId) {
-      return signedIn() && exists(membershipPath(tenantId)) && get(membershipPath(tenantId)).data.status == 'active';
+
+    function hasMembership(tenantId) {
+      return signedIn()
+        && exists(membershipPath(tenantId))
+        && get(membershipPath(tenantId)).data.tenantId == tenantId
+        && get(membershipPath(tenantId)).data.userId == request.auth.uid
+        && get(membershipPath(tenantId)).data.status == 'active';
     }
+
+    function activeTenant(tenantId) {
+      return exists(tenantPath(tenantId))
+        && get(tenantPath(tenantId)).data.id == tenantId
+        && get(tenantPath(tenantId)).data.status == 'active';
+    }
+
     function hasPermission(tenantId, permission) {
-      return isMember(tenantId) && permission in get(membershipPath(tenantId)).data.permissions;
+      return hasMembership(tenantId)
+        && activeTenant(tenantId)
+        && permission in get(membershipPath(tenantId)).data.permissions;
     }
+
+    function hasRolePermission(role, permission) {
+      return (role == 'tenant_owner' && permission in [
+          'tenant.manage','memberships.read','memberships.manage','professionals.read','professionals.manage',
+          'patients.read','patients.manage','appointments.read','appointments.manage','resources.read','resources.manage',
+          'recalls.read','recalls.manage','intake.read','intake.manage','procedures.read','procedures.manage',
+          'billing.read','billing.write','usage.read','audit.read'
+        ])
+        || (role == 'tenant_admin' && permission in [
+          'memberships.read','professionals.read','professionals.manage','patients.read','patients.manage',
+          'appointments.read','appointments.manage','resources.read','resources.manage','recalls.read','recalls.manage',
+          'intake.read','intake.manage','procedures.read','procedures.manage','billing.read','billing.write'
+        ])
+        || (role == 'dentist' && permission in [
+          'professionals.read','patients.read','appointments.read','appointments.manage','procedures.read',
+          'clinical.read','clinical.write','treatment.read','treatment.write','recalls.read','recalls.manage','resources.read'
+        ])
+        || (role == 'receptionist' && permission in [
+          'professionals.read','patients.read','patients.manage','appointments.read','appointments.manage',
+          'procedures.read','resources.read','recalls.read','recalls.manage','intake.read','intake.manage','billing.read','billing.write'
+        ])
+        || (role == 'assistant' && permission in [
+          'professionals.read','patients.read','appointments.read','procedures.read','resources.read'
+        ]);
+    }
+
+    function validMembershipData(tenantId, uid, data) {
+      return data.keys().hasOnly(['userId','tenantId','role','status','permissions','createdAt','createdBy','lastAuditLogId','updatedAt'])
+        && data.tenantId == tenantId
+        && data.userId == uid
+        && data.role in ['tenant_owner','tenant_admin','dentist','receptionist','assistant']
+        && data.status in ['active','inactive']
+        && data.permissions is list
+        && data.permissions.size() <= 24
+        && data.permissions.hasOnly([
+          'tenant.manage','memberships.read','memberships.manage','professionals.read','professionals.manage',
+          'patients.read','patients.manage','appointments.read','appointments.manage','resources.read','resources.manage',
+          'recalls.read','recalls.manage','intake.read','intake.manage','procedures.read','procedures.manage',
+          'billing.read','billing.write','usage.read','audit.read','clinical.read','clinical.write',
+          'treatment.read','treatment.write'
+        ])
+        && (data.role == 'tenant_owner' || data.permissions.hasOnly([
+          'memberships.read','professionals.read','professionals.manage','patients.read','patients.manage',
+          'appointments.read','appointments.manage','resources.read','resources.manage','recalls.read','recalls.manage',
+          'intake.read','intake.manage','procedures.read','procedures.manage','billing.read','billing.write',
+          'clinical.read','clinical.write','treatment.read','treatment.write','tenant.manage','memberships.manage',
+          'usage.read','audit.read'
+        ]))
+        && data.permissions.hasOnly(rolePermissions(data.role));
+    }
+
+    function rolePermissions(role) {
+      return role == 'tenant_owner' ? [
+        'tenant.manage','memberships.read','memberships.manage','professionals.read','professionals.manage',
+        'patients.read','patients.manage','appointments.read','appointments.manage','resources.read','resources.manage',
+        'recalls.read','recalls.manage','intake.read','intake.manage','procedures.read','procedures.manage',
+        'billing.read','billing.write','usage.read','audit.read'
+      ] : role == 'tenant_admin' ? [
+        'memberships.read','professionals.read','professionals.manage','patients.read','patients.manage',
+        'appointments.read','appointments.manage','resources.read','resources.manage','recalls.read','recalls.manage',
+        'intake.read','intake.manage','procedures.read','procedures.manage','billing.read','billing.write'
+      ] : role == 'dentist' ? [
+        'professionals.read','patients.read','appointments.read','appointments.manage','procedures.read',
+        'clinical.read','clinical.write','treatment.read','treatment.write','recalls.read','recalls.manage','resources.read'
+      ] : role == 'receptionist' ? [
+        'professionals.read','patients.read','patients.manage','appointments.read','appointments.manage',
+        'procedures.read','resources.read','recalls.read','recalls.manage','intake.read','intake.manage','billing.read','billing.write'
+      ] : [
+        'professionals.read','patients.read','appointments.read','procedures.read','resources.read'
+      ];
+    }
+
+    function supportPath(tenantId) {
+      return /databases/$(database)/documents/platformSupportAccess/$(tenantId);
+    }
+
     function hasActiveClinicalSupport(tenantId) {
       return isPlatformOwner()
-        && exists(/databases/$(database)/documents/platformSupportAccess/$(tenantId))
-        && get(/databases/$(database)/documents/platformSupportAccess/$(tenantId)).data.actorId == request.auth.uid
-        && get(/databases/$(database)/documents/platformSupportAccess/$(tenantId)).data.expiresAt > request.time;
+        && activeTenant(tenantId)
+        && exists(supportPath(tenantId))
+        && get(supportPath(tenantId)).data.tenantId == tenantId
+        && get(supportPath(tenantId)).data.actorId == request.auth.uid
+        && get(supportPath(tenantId)).data.reason is string
+        && get(supportPath(tenantId)).data.reason.size() >= 12
+        && get(supportPath(tenantId)).data.expiresAt is timestamp
+        && get(supportPath(tenantId)).data.expiresAt > request.time
+        && (!('revokedAt' in get(supportPath(tenantId)).data) || get(supportPath(tenantId)).data.revokedAt == null);
+    }
+
+    function clinicalRead(tenantId) {
+      return hasPermission(tenantId, 'clinical.read') || hasActiveClinicalSupport(tenantId);
+    }
+
+    function clinicalWrite(tenantId) {
+      return hasPermission(tenantId, 'clinical.write') || hasActiveClinicalSupport(tenantId);
+    }
+
+    function tenantAuditPath(tenantId, auditId) {
+      return /databases/$(database)/documents/tenants/$(tenantId)/auditLogs/$(auditId);
+    }
+
+    function auditAfterMatches(tenantId, auditId, action, resourceType, resourceId) {
+      return auditId is string
+        && existsAfter(tenantAuditPath(tenantId, auditId))
+        && getAfter(tenantAuditPath(tenantId, auditId)).data.tenantId == tenantId
+        && getAfter(tenantAuditPath(tenantId, auditId)).data.actorId == request.auth.uid
+        && getAfter(tenantAuditPath(tenantId, auditId)).data.action == action
+        && getAfter(tenantAuditPath(tenantId, auditId)).data.resourceType == resourceType
+        && getAfter(tenantAuditPath(tenantId, auditId)).data.resourceId == resourceId
+        && getAfter(tenantAuditPath(tenantId, auditId)).data.timestamp == request.time;
+    }
+
+    function auditMutationMatches(tenantId, auditId, data) {
+      let resourceId = data.resourceId;
+      return (data.resourceType == 'tenant' && resourceId == tenantId
+          && existsAfter(tenantPath(tenantId))
+          && getAfter(tenantPath(tenantId)).data.lastAuditLogId == auditId
+          && ((data.action == 'tenant.create' && !exists(tenantPath(tenantId)))
+            || (data.action in ['tenant.activate','tenant.suspend','tenant.branding.update']
+              && exists(tenantPath(tenantId)) && get(tenantPath(tenantId)).data.lastAuditLogId != auditId
+              && (data.action != 'tenant.activate' || getAfter(tenantPath(tenantId)).data.status == 'active')
+              && (data.action != 'tenant.suspend' || getAfter(tenantPath(tenantId)).data.status == 'suspended'))))
+        || (data.resourceType == 'membership'
+          && existsAfter(/databases/$(database)/documents/tenants/$(tenantId)/memberships/$(resourceId))
+          && getAfter(/databases/$(database)/documents/tenants/$(tenantId)/memberships/$(resourceId)).data.lastAuditLogId == auditId
+          && ((data.action == 'membership.create' && !exists(/databases/$(database)/documents/tenants/$(tenantId)/memberships/$(resourceId)))
+            || (data.action == 'membership.update' && exists(/databases/$(database)/documents/tenants/$(tenantId)/memberships/$(resourceId))
+              && get(/databases/$(database)/documents/tenants/$(tenantId)/memberships/$(resourceId)).data.lastAuditLogId != auditId)))
+        || (data.resourceType == 'patient'
+          && existsAfter(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(resourceId))
+          && getAfter(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(resourceId)).data.lastAuditLogId == auditId
+          && ((data.action == 'patient.create' && !exists(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(resourceId)))
+            || (data.action in ['patient.update','patient.deactivate'] && exists(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(resourceId))
+              && get(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(resourceId)).data.lastAuditLogId != auditId)))
+        || (data.resourceType == 'professional'
+          && existsAfter(/databases/$(database)/documents/tenants/$(tenantId)/professionals/$(resourceId))
+          && getAfter(/databases/$(database)/documents/tenants/$(tenantId)/professionals/$(resourceId)).data.lastAuditLogId == auditId
+          && ((data.action == 'professional.create' && !exists(/databases/$(database)/documents/tenants/$(tenantId)/professionals/$(resourceId)))
+            || (data.action in ['professional.update','professional.deactivate'] && exists(/databases/$(database)/documents/tenants/$(tenantId)/professionals/$(resourceId))
+              && get(/databases/$(database)/documents/tenants/$(tenantId)/professionals/$(resourceId)).data.lastAuditLogId != auditId)))
+        || (data.resourceType == 'procedure'
+          && existsAfter(/databases/$(database)/documents/tenants/$(tenantId)/procedures/$(resourceId))
+          && getAfter(/databases/$(database)/documents/tenants/$(tenantId)/procedures/$(resourceId)).data.lastAuditLogId == auditId
+          && ((data.action == 'procedure.create' && !exists(/databases/$(database)/documents/tenants/$(tenantId)/procedures/$(resourceId)))
+            || (data.action in ['procedure.update','procedure.deactivate'] && exists(/databases/$(database)/documents/tenants/$(tenantId)/procedures/$(resourceId))
+              && get(/databases/$(database)/documents/tenants/$(tenantId)/procedures/$(resourceId)).data.lastAuditLogId != auditId)))
+        || (data.resourceType == 'scheduleResource'
+          && existsAfter(/databases/$(database)/documents/tenants/$(tenantId)/scheduleResources/$(resourceId))
+          && getAfter(/databases/$(database)/documents/tenants/$(tenantId)/scheduleResources/$(resourceId)).data.lastAuditLogId == auditId
+          && ((data.action == 'resource.create' && !exists(/databases/$(database)/documents/tenants/$(tenantId)/scheduleResources/$(resourceId)))
+            || (data.action in ['resource.update','resource.activate','resource.deactivate'] && exists(/databases/$(database)/documents/tenants/$(tenantId)/scheduleResources/$(resourceId))
+              && get(/databases/$(database)/documents/tenants/$(tenantId)/scheduleResources/$(resourceId)).data.lastAuditLogId != auditId)))
+        || (data.resourceType == 'clinicalRecord'
+          && existsAfter(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(data.patientId)/clinicalRecords/$(resourceId))
+          && getAfter(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(data.patientId)/clinicalRecords/$(resourceId)).data.auditLogId == auditId
+          && !exists(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(data.patientId)/clinicalRecords/$(resourceId)))
+        || (data.resourceType == 'clinicalAmendment'
+          && existsAfter(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(data.patientId)/clinicalRecordAmendments/$(resourceId))
+          && getAfter(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(data.patientId)/clinicalRecordAmendments/$(resourceId)).data.auditLogId == auditId
+          && !exists(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(data.patientId)/clinicalRecordAmendments/$(resourceId)))
+        || (data.resourceType == 'publicProfile'
+          && existsAfter(/databases/$(database)/documents/tenants/$(tenantId)/publicProfile/$(resourceId))
+          && getAfter(/databases/$(database)/documents/tenants/$(tenantId)/publicProfile/$(resourceId)).data.lastAuditLogId == auditId
+          && ((data.action == 'publicProfile.create' && !exists(/databases/$(database)/documents/tenants/$(tenantId)/publicProfile/$(resourceId)))
+            || (data.action == 'publicProfile.update' && exists(/databases/$(database)/documents/tenants/$(tenantId)/publicProfile/$(resourceId))
+              && get(/databases/$(database)/documents/tenants/$(tenantId)/publicProfile/$(resourceId)).data.lastAuditLogId != auditId)))
+        || (data.resourceType == 'supportAccess' && resourceId == tenantId
+          && existsAfter(supportPath(tenantId))
+          && getAfter(supportPath(tenantId)).data.auditLogId == auditId);
+    }
+
+    function auditEnvelopeValid(tenantId, auditId, data) {
+      return signedIn()
+        && data.keys().hasOnly(['tenantId','actorId','actorRole','action','resourceType','resourceId','timestamp','patientId'])
+        && data.tenantId == tenantId
+        && data.actorId == request.auth.uid
+        && data.actorRole is string
+        && data.action is string
+        && data.resourceType is string
+        && data.resourceId is string
+        && data.timestamp == request.time
+        && ((data.actorRole == 'platform_owner' && isPlatformOwner())
+          || (hasMembership(tenantId) && data.actorRole == get(membershipPath(tenantId)).data.role))
+        && auditMutationMatches(tenantId, auditId, data);
+    }
+
+    function publicProfileValid(data, tenantId) {
+      return data.tenantId == tenantId
+        && data.keys().hasOnly([
+          'tenantId','publicName','tagline','description','phone','email','address','primaryColor',
+          'accentColor','logoUrl','lastAuditLogId','updatedAt'
+        ])
+        && data.publicName is string && data.publicName.size() <= 160
+        && data.tagline is string && data.tagline.size() <= 240
+        && data.description is string && data.description.size() <= 1000
+        && data.phone is string && data.phone.size() <= 40
+        && data.email is string && data.email.size() <= 254
+        && data.address is string && data.address.size() <= 300
+        && data.primaryColor is string && data.primaryColor.matches('^#[0-9A-Fa-f]{6}$')
+        && data.accentColor is string && data.accentColor.matches('^#[0-9A-Fa-f]{6}$')
+        && data.logoUrl is string && data.logoUrl.size() <= 500;
     }
 
     match /platformOwners/{uid} {
-      allow read: if isPlatformOwner() || (signedIn() && request.auth.uid == uid);
-      allow write: if isPlatformOwner();
+      allow get: if signedIn() && (request.auth.uid == uid || isPlatformOwner());
+      allow list: if isPlatformOwner();
+      // Bootstrap and revocation happen through trusted Firebase administration.
+      allow create, update, delete: if false;
     }
 
     match /platformSupportAccess/{tenantId} {
-      allow read, create, update, delete: if isPlatformOwner();
+      allow get, list: if isPlatformOwner();
+      allow create: if isPlatformOwner()
+        && activeTenant(tenantId)
+        && request.resource.data.tenantId == tenantId
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 12
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(8, 'h')
+        && request.resource.data.auditLogId is string
+        && auditAfterMatches(tenantId, request.resource.data.auditLogId, 'support_access.grant', 'supportAccess', tenantId);
+      allow update: if isPlatformOwner()
+        && activeTenant(tenantId)
+        && request.resource.data.tenantId == tenantId
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 12
+        && request.resource.data.auditLogId is string
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['actorId','reason','expiresAt','auditLogId','createdAt','revokedAt'])
+        && ((request.resource.data.revokedAt == request.time
+            && auditAfterMatches(tenantId, request.resource.data.auditLogId, 'support_access.revoke', 'supportAccess', tenantId))
+          || (request.resource.data.expiresAt is timestamp
+            && request.resource.data.expiresAt > request.time
+            && request.resource.data.expiresAt <= request.time + duration.value(8, 'h')
+            && auditAfterMatches(tenantId, request.resource.data.auditLogId, 'support_access.renew', 'supportAccess', tenantId)));
+      allow delete: if false;
     }
 
     match /tenantSlugs/{slug} {
-      allow read: if true;
-      allow write: if isPlatformOwner();
+      allow get, list: if true;
+      allow create: if isPlatformOwner()
+        && request.resource.data.slug == slug
+        && request.resource.data.tenantId is string
+        && request.resource.data.status == 'active'
+        && existsAfter(tenantPath(request.resource.data.tenantId))
+        && getAfter(tenantPath(request.resource.data.tenantId)).data.slug == slug
+        && auditAfterMatches(request.resource.data.tenantId, request.resource.data.auditLogId, 'tenant.create', 'tenant', request.resource.data.tenantId);
+      allow update: if isPlatformOwner()
+        && request.resource.data.slug == slug
+        && request.resource.data.tenantId == resource.data.tenantId
+        && request.resource.data.status in ['active','suspended']
+        && request.resource.data.status != resource.data.status
+        && request.resource.data.auditLogId is string
+        && request.resource.data.auditLogId != resource.data.auditLogId
+        && auditAfterMatches(request.resource.data.tenantId, request.resource.data.auditLogId,
+          request.resource.data.status == 'suspended' ? 'tenant.suspend' : 'tenant.activate', 'tenant', request.resource.data.tenantId);
+      allow delete: if false;
     }
 
     match /tenants/{tenantId} {
-      allow read: if isPlatformOwner() || isMember(tenantId);
-      allow create, delete: if isPlatformOwner();
-      allow update: if isPlatformOwner() || hasPermission(tenantId, 'tenant.manage');
+      allow get: if isPlatformOwner() || hasMembership(tenantId);
+      allow list: if isPlatformOwner();
+      allow create: if isPlatformOwner()
+        && request.resource.data.id == tenantId
+        && request.resource.data.slug is string
+        && request.resource.data.status == 'active'
+        && request.resource.data.features is map
+        && request.resource.data.limits is map
+        && request.resource.data.lastAuditLogId is string
+        && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'tenant.create', 'tenant', tenantId);
+      allow update: if (isPlatformOwner() || hasPermission(tenantId, 'tenant.manage'))
+        && request.resource.data.id == tenantId
+        && request.resource.data.slug == resource.data.slug
+        && request.resource.data.status in ['active','suspended','archived']
+        && request.resource.data.lastAuditLogId is string
+        && request.resource.data.lastAuditLogId != resource.data.lastAuditLogId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','branding','features','limits','lastAuditLogId','updatedAt'])
+        && ((isPlatformOwner() && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId,
+              request.resource.data.status != resource.data.status
+                ? (request.resource.data.status == 'suspended' ? 'tenant.suspend' : 'tenant.activate')
+                : 'tenant.branding.update',
+              'tenant', tenantId))
+          || (hasPermission(tenantId, 'tenant.manage')
+            && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'tenant.branding.update', 'tenant', tenantId)));
+      allow delete: if false;
 
-      match /publicProfile/{docId} {
-        allow read: if true;
-        allow write: if isPlatformOwner() || hasPermission(tenantId, 'tenant.manage');
+      match /publicProfile/{profileId} {
+        allow get, list: if true;
+        allow create: if profileId == 'public'
+          && publicProfileValid(request.resource.data, tenantId)
+          && request.resource.data.lastAuditLogId is string
+          && (isPlatformOwner() || hasPermission(tenantId, 'tenant.manage'))
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'publicProfile.create', 'publicProfile', profileId);
+        allow update: if profileId == 'public'
+          && publicProfileValid(request.resource.data, tenantId)
+          && request.resource.data.lastAuditLogId is string
+          && request.resource.data.lastAuditLogId != resource.data.lastAuditLogId
+          && (isPlatformOwner() || hasPermission(tenantId, 'tenant.manage'))
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'publicProfile.update', 'publicProfile', profileId);
+        allow delete: if false;
       }
 
       match /memberships/{uid} {
-        allow read: if isPlatformOwner()
+        allow get: if isPlatformOwner()
           || (signedIn() && request.auth.uid == uid)
           || hasPermission(tenantId, 'memberships.read');
-        allow create, update, delete: if isPlatformOwner() || hasPermission(tenantId, 'memberships.manage');
+        allow list: if isPlatformOwner() || hasPermission(tenantId, 'memberships.read');
+        allow create: if (isPlatformOwner() || hasPermission(tenantId, 'memberships.manage'))
+          && signedIn() && request.auth.uid != uid
+          && validMembershipData(tenantId, uid, request.resource.data)
+          && request.resource.data.lastAuditLogId is string
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'membership.create', 'membership', uid);
+        allow update: if (isPlatformOwner() || hasPermission(tenantId, 'memberships.manage'))
+          && signedIn() && request.auth.uid != uid
+          && validMembershipData(tenantId, uid, request.resource.data)
+          && request.resource.data.lastAuditLogId is string
+          && request.resource.data.lastAuditLogId != resource.data.lastAuditLogId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role','status','permissions','lastAuditLogId','updatedAt'])
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'membership.update', 'membership', uid);
+        allow delete: if false;
       }
 
       match /professionals/{professionalId} {
-        allow read: if isPlatformOwner() || hasPermission(tenantId, 'professionals.read');
-        allow write: if isPlatformOwner() || hasPermission(tenantId, 'professionals.manage');
+        allow get, list: if hasPermission(tenantId, 'professionals.read');
+        allow create: if hasPermission(tenantId, 'professionals.manage')
+          && request.resource.data.tenantId == tenantId
+          && request.resource.data.displayName is string
+          && request.resource.data.displayName.size() > 0
+          && request.resource.data.displayName.size() <= 160
+          && request.resource.data.status == 'active'
+          && request.resource.data.createdBy == request.auth.uid
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'professional.create', 'professional', professionalId);
+        allow update: if hasPermission(tenantId, 'professionals.manage')
+          && request.resource.data.tenantId == tenantId
+          && request.resource.data.displayName is string
+          && request.resource.data.status in ['active','inactive']
+          && request.resource.data.lastAuditLogId != resource.data.lastAuditLogId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','specialty','status','lastAuditLogId','updatedAt'])
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId,
+            request.resource.data.status == 'inactive' ? 'professional.deactivate' : 'professional.update', 'professional', professionalId);
+        allow delete: if false;
       }
 
       match /procedures/{procedureId} {
-        allow read: if isPlatformOwner() || hasPermission(tenantId, 'procedures.read');
-        allow write: if isPlatformOwner() || hasPermission(tenantId, 'procedures.manage');
+        allow get, list: if hasPermission(tenantId, 'procedures.read');
+        allow create: if hasPermission(tenantId, 'procedures.manage')
+          && request.resource.data.tenantId == tenantId
+          && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 120
+          && request.resource.data.durationMinutes is int && request.resource.data.durationMinutes >= 5 && request.resource.data.durationMinutes <= 480
+          && request.resource.data.active == true
+          && request.resource.data.createdBy == request.auth.uid
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'procedure.create', 'procedure', procedureId);
+        allow update: if hasPermission(tenantId, 'procedures.manage')
+          && request.resource.data.tenantId == tenantId
+          && request.resource.data.name is string
+          && request.resource.data.durationMinutes is int
+          && request.resource.data.durationMinutes >= 5 && request.resource.data.durationMinutes <= 480
+          && request.resource.data.lastAuditLogId != resource.data.lastAuditLogId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','durationMinutes','defaultPriceCents','active','lastAuditLogId','updatedAt'])
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId,
+            request.resource.data.active == false ? 'procedure.deactivate' : 'procedure.update', 'procedure', procedureId);
+        allow delete: if false;
       }
 
       match /patients/{patientId} {
-        allow read: if hasPermission(tenantId, 'patients.read') || hasActiveClinicalSupport(tenantId);
-        allow create, update: if hasPermission(tenantId, 'patients.manage') || hasActiveClinicalSupport(tenantId);
+        allow get, list: if hasPermission(tenantId, 'patients.read') || clinicalRead(tenantId);
+        allow create: if hasPermission(tenantId, 'patients.manage')
+          && request.resource.data.tenantId == tenantId
+          && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 160
+          && request.resource.data.searchName is string
+          && request.resource.data.status == 'active'
+          && request.resource.data.createdBy == request.auth.uid
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'patient.create', 'patient', patientId);
+        allow update: if hasPermission(tenantId, 'patients.manage')
+          && request.resource.data.tenantId == tenantId
+          && request.resource.data.name is string && request.resource.data.name.size() > 0
+          && request.resource.data.status in ['active','inactive']
+          && request.resource.data.lastAuditLogId != resource.data.lastAuditLogId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','phone','email','searchName','status','lastAuditLogId','updatedAt'])
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId,
+            request.resource.data.status == 'inactive' ? 'patient.deactivate' : 'patient.update', 'patient', patientId);
         allow delete: if false;
 
         match /clinicalRecords/{recordId} {
-          allow read: if hasPermission(tenantId, 'clinical.read') || hasActiveClinicalSupport(tenantId);
-          allow create: if hasPermission(tenantId, 'clinical.write') || hasActiveClinicalSupport(tenantId);
+          allow get, list: if clinicalRead(tenantId);
+          allow create: if clinicalWrite(tenantId)
+            && request.resource.data.tenantId == tenantId
+            && request.resource.data.patientId == patientId
+            && request.resource.data.dentistId is string
+            && exists(/databases/$(database)/documents/tenants/$(tenantId)/professionals/$(request.resource.data.dentistId))
+            && get(/databases/$(database)/documents/tenants/$(tenantId)/professionals/$(request.resource.data.dentistId)).data.tenantId == tenantId
+            && get(/databases/$(database)/documents/tenants/$(tenantId)/professionals/$(request.resource.data.dentistId)).data.status == 'active'
+            && request.resource.data.createdBy == request.auth.uid
+            && request.resource.data.recordType in ['evolution','procedure','note']
+            && request.resource.data.content is string
+            && request.resource.data.content.size() > 0
+            && request.resource.data.content.size() <= 12000
+            && request.resource.data.createdAt == request.time
+            && request.resource.data.keys().hasOnly(['tenantId','patientId','dentistId','appointmentId','recordType','content','createdAt','createdBy','auditLogId'])
+            && (!('appointmentId' in request.resource.data)
+              || (exists(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(request.resource.data.appointmentId))
+                && get(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(request.resource.data.appointmentId)).data.patientId == patientId
+                && get(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(request.resource.data.appointmentId)).data.tenantId == tenantId))
+            && auditAfterMatches(tenantId, request.resource.data.auditLogId, 'clinical_record.create', 'clinicalRecord', recordId);
           allow update, delete: if false;
         }
 
         match /clinicalRecordAmendments/{amendmentId} {
-          allow read: if hasPermission(tenantId, 'clinical.read') || hasActiveClinicalSupport(tenantId);
-          allow create: if hasPermission(tenantId, 'clinical.write') || hasActiveClinicalSupport(tenantId);
+          allow get, list: if clinicalRead(tenantId);
+          allow create: if clinicalWrite(tenantId)
+            && request.resource.data.tenantId == tenantId
+            && request.resource.data.patientId == patientId
+            && request.resource.data.recordId is string
+            && exists(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(patientId)/clinicalRecords/$(request.resource.data.recordId))
+            && request.resource.data.reason is string && request.resource.data.reason.size() >= 5 && request.resource.data.reason.size() <= 500
+            && request.resource.data.content is string && request.resource.data.content.size() > 0 && request.resource.data.content.size() <= 12000
+            && request.resource.data.createdBy == request.auth.uid
+            && request.resource.data.createdAt == request.time
+            && request.resource.data.keys().hasOnly(['tenantId','patientId','recordId','reason','content','professionalId','createdAt','createdBy','auditLogId'])
+            && auditAfterMatches(tenantId, request.resource.data.auditLogId, 'clinical_amendment.create', 'clinicalAmendment', amendmentId);
           allow update, delete: if false;
         }
 
-        match /odontogramEvents/{eventId} {
-          allow read: if hasPermission(tenantId, 'clinical.read') || hasActiveClinicalSupport(tenantId);
-          allow create: if hasPermission(tenantId, 'clinical.write') || hasActiveClinicalSupport(tenantId);
-          allow update, delete: if false;
-        }
-
-        match /clinicalPhotos/{photoId} {
-          allow read: if hasPermission(tenantId, 'clinical.read') || hasActiveClinicalSupport(tenantId);
-          allow create, update: if hasPermission(tenantId, 'clinical.write') || hasActiveClinicalSupport(tenantId);
-          allow delete: if false;
+      match /clinicalPhotos/{photoId} {
+          allow get, list: if clinicalRead(tenantId);
+          // Media is uploaded by the authenticated R2 Worker after server-side authorization.
+          allow create, update, delete: if false;
         }
       }
 
       match /appointments/{appointmentId} {
-        allow read: if hasPermission(tenantId, 'appointments.read') || hasActiveClinicalSupport(tenantId);
-        allow create, update: if hasPermission(tenantId, 'appointments.manage') || hasActiveClinicalSupport(tenantId);
-        allow delete: if false;
+        allow get, list: if hasPermission(tenantId, 'appointments.read');
+        // A trusted worker owns create/reschedule so direct Firestore writes cannot skip conflict checks.
+        allow create, update, delete: if false;
       }
 
       match /scheduleBlocks/{blockId} {
-        allow read: if hasPermission(tenantId, 'appointments.read');
-        allow write: if hasPermission(tenantId, 'appointments.manage');
+        allow get, list: if hasPermission(tenantId, 'appointments.read');
+        allow create, update: if hasPermission(tenantId, 'appointments.manage')
+          && request.resource.data.tenantId == tenantId
+          && request.resource.data.startsAt is string
+          && request.resource.data.endsAt is string
+          && request.resource.data.startsAt < request.resource.data.endsAt
+          && request.resource.data.active is bool;
+        allow delete: if false;
       }
 
       match /scheduleResources/{resourceId} {
-        allow read: if isPlatformOwner() || hasPermission(tenantId, 'resources.read');
-        allow write: if isPlatformOwner() || hasPermission(tenantId, 'resources.manage');
+        allow get, list: if hasPermission(tenantId, 'resources.read');
+        allow create: if hasPermission(tenantId, 'resources.manage')
+          && request.resource.data.tenantId == tenantId
+          && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+          && request.resource.data.type in ['chair','room','equipment']
+          && request.resource.data.active == true
+          && request.resource.data.createdBy == request.auth.uid
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'resource.create', 'scheduleResource', resourceId);
+        allow update: if hasPermission(tenantId, 'resources.manage')
+          && request.resource.data.tenantId == tenantId
+          && request.resource.data.name is string
+          && request.resource.data.type in ['chair','room','equipment']
+          && request.resource.data.active is bool
+          && request.resource.data.lastAuditLogId != resource.data.lastAuditLogId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','type','active','lastAuditLogId','updatedAt'])
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId,
+            request.resource.data.active ? 'resource.activate' : 'resource.deactivate', 'scheduleResource', resourceId);
+        allow delete: if false;
       }
 
       match /recalls/{recallId} {
-        allow read: if hasPermission(tenantId, 'recalls.read') || hasActiveClinicalSupport(tenantId);
-        allow create, update: if hasPermission(tenantId, 'recalls.manage') || hasActiveClinicalSupport(tenantId);
+        allow get, list: if hasPermission(tenantId, 'recalls.read');
+        allow create, update: if hasPermission(tenantId, 'recalls.manage')
+          && request.resource.data.tenantId == tenantId
+          && request.resource.data.patientId is string
+          && exists(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(request.resource.data.patientId))
+          && get(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(request.resource.data.patientId)).data.tenantId == tenantId;
         allow delete: if false;
       }
 
-      // Formulário público NÃO grava direto no Firestore. Em produção a submissão
-      // deve entrar por endpoint confiável/rate-limited e chegar aqui via backend.
       match /patientIntakeSubmissions/{submissionId} {
-        allow read: if hasPermission(tenantId, 'intake.read') || hasActiveClinicalSupport(tenantId);
+        allow get, list: if hasPermission(tenantId, 'intake.read') && resource.data.tenantId == tenantId;
         allow create: if false;
-        allow update: if hasPermission(tenantId, 'intake.manage') || hasActiveClinicalSupport(tenantId);
-        allow delete: if false;
+        allow update, delete: if false;
       }
 
       match /usageCounters/{counterId} {
-        allow read: if isPlatformOwner() || hasPermission(tenantId, 'usage.read');
-        allow write: if false;
+        allow get, list: if isPlatformOwner() || hasPermission(tenantId, 'usage.read');
+        allow create, update, delete: if false;
       }
 
       match /treatmentPlans/{planId} {
-        allow read: if hasPermission(tenantId, 'treatment.read') || hasActiveClinicalSupport(tenantId);
-        allow create, update: if hasPermission(tenantId, 'treatment.write') || hasActiveClinicalSupport(tenantId);
-        allow delete: if false;
+        allow get, list: if hasPermission(tenantId, 'treatment.read') || clinicalRead(tenantId);
+        allow create, update, delete: if false;
       }
 
       match /quotes/{quoteId} {
-        allow read: if hasPermission(tenantId, 'billing.read');
-        allow create, update: if hasPermission(tenantId, 'billing.write');
-        allow delete: if false;
+        allow get, list: if hasPermission(tenantId, 'billing.read');
+        allow create, update, delete: if false;
       }
 
-      match /auditLogs/{logId} {
-        allow read: if isPlatformOwner() || hasPermission(tenantId, 'audit.read');
-        allow create: if signedIn() && request.resource.data.actorId == request.auth.uid;
+      match /auditLogs/{auditId} {
+        allow get, list: if isPlatformOwner() || hasPermission(tenantId, 'audit.read');
+        allow create: if auditEnvelopeValid(tenantId, auditId, request.resource.data);
         allow update, delete: if false;
       }
     }

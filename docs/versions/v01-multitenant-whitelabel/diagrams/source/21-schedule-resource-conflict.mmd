@@ -1,10 +1,10 @@
 flowchart TD
-  A[Solicitar horário] --> B{Profissional disponível?}
-  B -- não --> X[Rejeitar / sugerir outro]
-  B -- sim --> C{Recurso disponível?}
-  C -- não --> X
-  C -- sim ou não obrigatório --> D{Sem bloqueio/folga?}
-  D -- não --> X
-  D -- sim --> T[Validação transacional]
-  T -- livre --> OK[Confirmar appointment]
-  T -- conflito --> X
+  A[Request autenticada] --> B{Tenant + membership ativos?}
+  B -- não --> X[Negar operação]
+  B -- sim --> C[Validar patient, professional, resource e procedure]
+  C --> D[Consultar appointments e scheduleBlocks]
+  D --> E[Ler locks diários em transação]
+  E --> F{Conflito por profissional, recurso ou bloqueio?}
+  F -- sim --> X
+  F -- não --> T[Gravar appointment + locks + audit]
+  T --> OK[Confirmar]

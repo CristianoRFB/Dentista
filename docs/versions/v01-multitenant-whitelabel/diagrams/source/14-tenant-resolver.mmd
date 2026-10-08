@@ -1,8 +1,12 @@
 %% Tenant Resolver
 flowchart LR
-  N1["URL /clinica-x"] --> N2["slug"]
-  N2["slug"] --> N3["tenantSlugs"]
-  N3["tenantSlugs"] --> N4["tenantId"]
-  N4["tenantId"] --> N5["Tenant Config"]
-  N4["tenantId"] --> N6["Membership"]
-  N4["tenantId"] --> N7["Data Scope"]
+  U["URL /{tenantSlug}/app"] --> S["Ler tenantSlugs/{slug}"]
+  S --> V{Slug existe e ativo?}
+  V -- não --> X["404 / indisponível"]
+  V -- sim --> T["Ler tenantId + tenant ativo"]
+  T --> A["Firebase Auth UID"]
+  A --> M["Ler memberships/{uid}"]
+  M --> P{Membership ativa?}
+  P -- não --> F["403 / acesso negado"]
+  P -- sim --> C["TenantContext + permissions"]
+  C --> D["Paths derivados do tenantId"]

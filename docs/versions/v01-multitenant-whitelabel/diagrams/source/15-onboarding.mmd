@@ -1,11 +1,10 @@
 %% Onboarding de tenant
 flowchart LR
-  N1["Platform Owner"] --> N2["Create Tenant"]
-  N2["Create Tenant"] --> N3["Slug"]
-  N3["Slug"] --> N4["Owner Membership"]
-  N4["Owner Membership"] --> N5["Branding"]
-  N5["Branding"] --> N6["Professionals"]
-  N6["Professionals"] --> N7["Procedures"]
-  N7["Procedures"] --> N8["Hours"]
-  N8["Hours"] --> N9["Features/Limits"]
-  N9["Features/Limits"] --> N10["Activate"]
+  O["Platform Owner autenticado"] --> T["Criar tenant + audit"]
+  T --> S["Associar slug único"]
+  T --> M["Criar membership tenant_owner"]
+  T --> P["Criar publicProfile básico"]
+  P --> B["Configurar branding + audit"]
+  S --> A["Tenant ativo"]
+  M --> A
+  A --> C["Clínica completa cadastros"]

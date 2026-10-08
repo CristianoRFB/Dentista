@@ -1,9 +1,9 @@
 %% Domínio clínico
 flowchart LR
-  N1["Patient"] --> N2["Clinical Records"]
-  N1["Patient"] --> N3["Odontogram Events"]
-  N1["Patient"] --> N4["Treatment Plan"]
-  N1["Patient"] --> N5["Clinical Photos"]
-  N2["Clinical Records"] --> N6["Amendments"]
-  N4["Treatment Plan"] --> N7["Procedures"]
-  N5["Clinical Photos"] --> N8["Timeline/Compare"]
+  P["Patient"] --> R["ClinicalRecord append-only"]
+  R --> A["ClinicalRecordAmendment"]
+  P --> M["ClinicalPhoto metadata"]
+  M --> W["Worker autorizado"]
+  W --> R2["R2 privado"]
+  R --> L["AuditLog sem conteúdo clínico"]
+  P --> F["Odontogram / TreatmentPlan — futuro"]

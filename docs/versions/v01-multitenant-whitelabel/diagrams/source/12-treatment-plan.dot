@@ -1,19 +1,20 @@
 digraph G {
-  graph [rankdir=LR, bgcolor="white", pad="0.3", nodesep="0.45", ranksep="0.7", label="Plano de tratamento", labelloc=t, fontsize=20, fontname="Arial"];
-  node [shape=box, style="rounded,filled", fillcolor="#f8fafc", color="#94a3b8", fontname="Arial", fontsize=11, margin="0.16,0.10"];
-  edge [color="#64748b", arrowsize=0.7, fontname="Arial"];
-  "Draft";
-  "Presented";
-  "Approved";
-  "Partially Approved";
-  "In Progress";
-  "Completed";
-  "Cancelled";
-  "Draft" -> "Presented";
-  "Presented" -> "Approved";
-  "Presented" -> "Partially Approved";
-  "Approved" -> "In Progress";
-  "Partially Approved" -> "In Progress";
-  "In Progress" -> "Completed";
-  "Draft" -> "Cancelled";
+  rankdir=LR;
+  graph [bgcolor="white", pad="0.3", label="Plano de tratamento", labelloc=t, fontsize=18, fontname="Arial"];
+  node [shape=box, style="rounded,filled", fillcolor="#f6faf9", color="#8aa9a3", fontname="Arial", fontsize=11];
+  edge [color="#5f7b76", fontname="Arial", fontsize=9];
+  "N1" [label="Draft"];
+  "N2" [label="Presented"];
+  "N3" [label="Approved"];
+  "N4" [label="Partially Approved"];
+  "N5" [label="In Progress"];
+  "N6" [label="Completed"];
+  "N7" [label="Cancelled"];
+  "N1" -> "N2";
+  "N2" -> "N3";
+  "N2" -> "N4";
+  "N3" -> "N5";
+  "N4" -> "N5";
+  "N5" -> "N6";
+  "N1" -> "N7";
 }

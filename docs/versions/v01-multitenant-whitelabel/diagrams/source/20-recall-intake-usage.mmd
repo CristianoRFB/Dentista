@@ -1,8 +1,9 @@
+%% FUTURO — intake público e retorno persistido não estão ativos; usage comercial é scaffold
 flowchart LR
-  P[Paciente] --> I[IntakeSubmission\npending_review]
-  I --> R[Recepção revisa]
-  R --> PR[Patient oficial]
-  PR --> V[Consulta]
-  V --> RC[Recall planned/due]
-  RC --> A[Novo appointment]
+  P[Paciente] --> I[Intake futuro: indisponível]
+  I --> R[Revisão futura pela recepção]
+  R --> PR[Patient oficial cadastrado internamente]
+  PR --> V[Appointment operacional]
+  V --> RC[Recall somente leitura / sem escrita]
+  RC --> A[Novo appointment pela equipe]
   A -. se houver integração paga .-> U[UsageCounter]

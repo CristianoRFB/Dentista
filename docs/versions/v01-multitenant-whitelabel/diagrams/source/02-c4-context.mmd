@@ -1,9 +1,10 @@
 %% C4 Context
 flowchart LR
-  N1["Platform Owner"] --> N2["OdontoFlow"]
-  N3["Dono da clínica"] --> N2["OdontoFlow"]
-  N4["Dentista"] --> N2["OdontoFlow"]
-  N5["Recepção"] --> N2["OdontoFlow"]
-  N6["Paciente"] --> N2["OdontoFlow"]
-  N2["OdontoFlow"] --> N7["Firebase"]
-  N2["OdontoFlow"] --> N8["Cloudflare"]
+  O["Platform Owner"] --> S["OdontoFlow V2"]
+  D["Dono / admin da clínica"] --> S
+  P["Dentista"] --> S
+  R["Recepção"] --> S
+  S --> F["Firebase Auth + Firestore Rules"]
+  S --> W["Cloudflare Worker"]
+  W --> R2["R2 privado"]
+  P --> N["Paciente fictício de teste"]

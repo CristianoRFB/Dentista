@@ -13,6 +13,10 @@ export interface TenantBranding {
   logoUrl?: string;
   publicName?: string;
   tagline?: string;
+  description?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
 }
 
 export interface Tenant {
@@ -36,6 +40,30 @@ export interface Membership {
   role: MembershipRole;
   status: 'active' | 'inactive';
   permissions: string[];
+}
+
+export type ActorRole = MembershipRole | 'platform_owner';
+
+export interface PlatformSupportAccess {
+  tenantId: string;
+  actorId: string;
+  reason: string;
+  expiresAt: string;
+  revokedAt?: string;
+  auditLogId: string;
+}
+
+export interface AuditLog {
+  id: string;
+  tenantId: string;
+  actorId: string;
+  actorRole: ActorRole;
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  timestamp: string;
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
 }
 
 export interface Professional {
@@ -126,6 +154,7 @@ export interface ClinicalRecord {
   content: string;
   createdAt: string;
   createdBy: string;
+  auditLogId?: string;
 }
 
 export interface ClinicalRecordAmendment {
@@ -137,6 +166,19 @@ export interface ClinicalRecordAmendment {
   content: string;
   createdAt: string;
   createdBy: string;
+  professionalId?: string;
+  auditLogId?: string;
+}
+
+export interface ScheduleBlock {
+  id: string;
+  tenantId: string;
+  professionalId?: string;
+  resourceId?: string;
+  startsAt: string;
+  endsAt: string;
+  reason?: string;
+  active: boolean;
 }
 
 export interface ClinicalPhoto {
@@ -154,4 +196,5 @@ export interface ClinicalPhoto {
   localCacheKey?: string;
   contentType: string;
   originalName: string;
+  createdBy?: string;
 }

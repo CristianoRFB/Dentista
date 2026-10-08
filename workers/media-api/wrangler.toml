@@ -4,6 +4,7 @@ compatibility_date = "2026-10-01"
 
 [vars]
 FIREBASE_PROJECT_ID = "dentista-ee9db"
+APP_ORIGIN = "http://localhost:5173"
 
 [[r2_buckets]]
 binding = "CLINICAL_MEDIA"

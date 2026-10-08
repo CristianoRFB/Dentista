@@ -8,6 +8,12 @@ O repositório GitHub estava vazio quando a fundação foi iniciada. Portanto, e
 
 Esta revisão também incorpora uma decisão de produto importante: a landing deve **apresentar o software como produto**, usando benefícios + demonstrações de UI, em vez de uma página institucional genérica.
 
+## Core operacional — 2026-10-07
+
+O Core Multi-Tenant e Clínico P0 agora inclui login/logout, guards, tenant resolver, memberships/RBAC, Platform Owner, CRUD tenant-scoped de pacientes/profissionais/procedimentos/recursos, agenda transacional pelo Worker, prontuário append-only/adendos, fotos privadas em R2 e audit logs essenciais.
+
+O modo demo é fictício, somente leitura e restrito a `npm run dev` com `VITE_USE_DEMO_DATA=true`. Não representa cliente real. Booking/intake públicos reais, retorno persistido, odontograma, planos de tratamento, billing e entitlement runtime continuam fora deste estágio.
+
 A arquitetura segue os padrões `GLOBAL-v01` + `APPOINTMENT-v01` + `DENTIST-v01`, alinhados ao Project Core `v01`.
 
 A arquitetura segue:
@@ -18,14 +24,14 @@ A arquitetura segue:
 - Platform Owner global;
 - dados clínicos com menor privilégio e suporte auditável;
 - Cloudflare Pages para frontend;
-- Cloudflare Worker + R2 privado para mídia clínica;
+- Cloudflare Worker para agenda e R2 privado para mídia clínica;
 - cache local/IndexedDB para fotos clínicas;
-- agenda com profissionais e recursos físicos (cadeira/sala) preparados;
-- central de retorno e pré-cadastro público com revisão preparados;
+- agenda com profissionais e recursos físicos validada fora do frontend;
+- Central de Retorno e pré-cadastro público ainda não persistidos;
 - `tenant.features`, `tenant.limits` e medição de uso preparados para estratégia comercial;
 - documentação versionada com `docs/CURRENT.md` como fonte da verdade;
 - diagramas editáveis + PNG/SVG;
-- testes de domínio e regras iniciais.
+- testes de domínio, autorização Worker e Firestore Rules via Emulator.
 
 ## Firebase fornecido
 
@@ -51,6 +57,8 @@ Em modo demonstrativo:
 VITE_USE_DEMO_DATA=true
 ```
 
+O modo demo só atua no servidor de desenvolvimento, usa fixtures fictícias e não habilita gravações. Para verificar Security Rules: `npm run test:rules` (Auth Emulator 9098 / Firestore Emulator 8081; projeto demo sem acesso à produção).
+
 Rotas úteis:
 
 - `/` landing comercial;
@@ -61,6 +69,8 @@ Rotas úteis:
 - `/demo-clinica/app` app do tenant demo;
 - `/demo-clinica/cadastro` pré-cadastro público demonstrativo;
 - `/platform` Platform Admin.
+
+Comandos de verificação: `npm run typecheck`, `npm test`, `npm run worker:typecheck`, `npm run build`, `npm run check:standards`, `npm run test:rules`, `npm run docs:diagrams`, `npm run docs:leads` e `npm run docs:check`.
 
 ## Documentação canônica
 
@@ -89,4 +99,4 @@ A fundação agora contém uma auditoria funcional e uma proposta de pricing da 
 - `docs/versions/v01-multitenant-whitelabel/ENTITLEMENTS_DELTA.md`
 - `docs/versions/v01-multitenant-whitelabel/COMMERCIAL_DEMO.md`
 
-Proposta atual para validação: **R$ 79,90 / R$ 129,90 / R$ 189,90**. Não existe cobrança automática nem entitlement real nesta versão.
+Preços preservados: **Essencial R$ 79,90 / Pro R$ 129,90 / Premium R$ 189,90 por mês**. Não existe cobrança automática nem entitlement runtime nesta versão.

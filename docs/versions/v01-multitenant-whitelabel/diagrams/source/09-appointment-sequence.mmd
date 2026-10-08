@@ -1,8 +1,9 @@
 %% Sequência de criação
 flowchart LR
-  N1["UI"] --> N2["Appointment Service"]
-  N2["Appointment Service"] --> N3["Firestore Query"]
-  N3["Firestore Query"] --> N4["Conflict Validator"]
-  N4["Conflict Validator"] --> N5["Transaction"]
-  N5["Transaction"] --> N6["Appointment"]
-  N6["Appointment"] --> N7["Audit Log"]
+  UI["UI envia request"] --> W["Worker valida ID token"]
+  W --> T["Transação: membership + tenant + referências"]
+  T --> Q["Consultar appointments e scheduleBlocks"]
+  Q --> K["Ler locks de profissional / recurso / dia"]
+  K --> V["Checar conflito e status cancelado"]
+  V -- livre --> C["Commit: appointment + locks + audit"]
+  V -- conflito --> X["Rollback e HTTP 409"]

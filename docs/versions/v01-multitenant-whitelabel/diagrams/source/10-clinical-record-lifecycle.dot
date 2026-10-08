@@ -1,16 +1,24 @@
 digraph G {
-  graph [rankdir=LR, bgcolor="white", pad="0.3", nodesep="0.45", ranksep="0.7", label="Ciclo do prontuário", labelloc=t, fontsize=20, fontname="Arial"];
-  node [shape=box, style="rounded,filled", fillcolor="#f8fafc", color="#94a3b8", fontname="Arial", fontsize=11, margin="0.16,0.10"];
-  edge [color="#64748b", arrowsize=0.7, fontname="Arial"];
-  "Draft Note";
-  "Clinical Record";
-  "Consolidated";
-  "Amendment Request";
-  "Amendment";
-  "Historical View";
-  "Draft Note" -> "Clinical Record";
-  "Clinical Record" -> "Consolidated";
-  "Consolidated" -> "Amendment Request";
-  "Amendment Request" -> "Amendment";
-  "Amendment" -> "Historical View";
+  rankdir=LR;
+  graph [bgcolor="white", pad="0.3", label="Ciclo do prontuário", labelloc=t, fontsize=18, fontname="Arial"];
+  node [shape=box, style="rounded,filled", fillcolor="#f6faf9", color="#8aa9a3", fontname="Arial", fontsize=11];
+  edge [color="#5f7b76", fontname="Arial", fontsize=9];
+  "A" [label="Dentista com clinical.write"];
+  "V" [label="V"];
+  "R" [label="R"];
+  "L" [label="Audit log da criação"];
+  "H" [label="H"];
+  "C" [label="C"];
+  "M" [label="M"];
+  "ML" [label="ML"];
+  "F" [label="Consulta com clinical.read"];
+  "A" -> "V";
+  "V" -> "R";
+  "R" -> "L";
+  "R" -> "H";
+  "H" -> "C";
+  "C" -> "M" [label="sim"];
+  "M" -> "ML";
+  "ML" -> "F";
+  "C" -> "F" [label="não"];
 }

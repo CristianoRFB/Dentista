@@ -18,3 +18,13 @@ export const permissionTemplates = {
   ],
   assistant: ['professionals.read','patients.read','appointments.read','procedures.read','resources.read']
 } as const;
+
+export type PermissionRole = keyof typeof permissionTemplates;
+
+export function permissionsForRole(role: PermissionRole): string[] {
+  return [...permissionTemplates[role]];
+}
+
+export function hasPermission(permissions: readonly string[], permission: string): boolean {
+  return permissions.includes(permission);
+}

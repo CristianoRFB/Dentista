@@ -1,16 +1,17 @@
 digraph G {
-  graph [rankdir=LR, bgcolor="white", pad="0.3", nodesep="0.45", ranksep="0.7", label="Odontograma por eventos", labelloc=t, fontsize=20, fontname="Arial"];
-  node [shape=box, style="rounded,filled", fillcolor="#f8fafc", color="#94a3b8", fontname="Arial", fontsize=11, margin="0.16,0.10"];
-  edge [color="#64748b", arrowsize=0.7, fontname="Arial"];
-  "Tooth/Region";
-  "Event 1";
-  "Event 2";
-  "Event 3";
-  "Derived Current State";
-  "Historical Timeline";
-  "Tooth/Region" -> "Event 1";
-  "Event 1" -> "Event 2";
-  "Event 2" -> "Event 3";
-  "Event 3" -> "Derived Current State";
-  "Derived Current State" -> "Historical Timeline";
+  rankdir=LR;
+  graph [bgcolor="white", pad="0.3", label="Odontograma por eventos", labelloc=t, fontsize=18, fontname="Arial"];
+  node [shape=box, style="rounded,filled", fillcolor="#f6faf9", color="#8aa9a3", fontname="Arial", fontsize=11];
+  edge [color="#5f7b76", fontname="Arial", fontsize=9];
+  "N1" [label="Tooth/Region"];
+  "N2" [label="Event 1"];
+  "N3" [label="Event 2"];
+  "N4" [label="Event 3"];
+  "N5" [label="Derived Current State"];
+  "N6" [label="Historical Timeline"];
+  "N1" -> "N2";
+  "N2" -> "N3";
+  "N3" -> "N4";
+  "N4" -> "N5";
+  "N5" -> "N6";
 }

@@ -1,9 +1,11 @@
 %% Fluxo de agendamento
 flowchart LR
-  N1["Request Slot"] --> N2["Resolve Tenant"]
-  N2["Resolve Tenant"] --> N3["Check Professional"]
-  N3["Check Professional"] --> N4["Check Business Hours"]
-  N4["Check Business Hours"] --> N5["Check Blocks"]
-  N5["Check Blocks"] --> N6["Check Appointments"]
-  N6["Check Appointments"] --> N7["Reserve Slot"]
-  N7["Reserve Slot"] --> N8["Confirmed"]
+  UI["React: criar / remarcar"] --> W["Worker: Firebase ID token"]
+  W --> A["Tenant ativo + permission"]
+  A --> R["Paciente, profissional, procedimento e recurso ativos"]
+  R --> B["Bloqueios do tenant"]
+  B --> C["Conflitos por profissional e recurso"]
+  C --> L["Locks diários em transação Firestore"]
+  L --> D{Conflito?}
+  D -- sim --> X["409: horário indisponível"]
+  D -- não --> S["Gravar appointment + audit log"]

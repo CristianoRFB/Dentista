@@ -1,4 +1,24 @@
-digraph G { rankdir=TB; graph [bgcolor="transparent", pad="0.3"]; node [shape=box, style="rounded,filled", fillcolor="#f7fbfa", color="#86a9a2", fontname="Arial"]; edge [color="#5c7c76"];
-Request [label="Solicitar horário", fillcolor="#dff1ed"]; P [label="Profissional disponível?"]; R [label="Recurso disponível?\n(cadeira/sala)"]; B [label="Sem bloqueio/folga?"]; Tx [label="Validação transacional"]; Confirm [label="Confirmar appointment", fillcolor="#dff1ed"]; Reject [label="Rejeitar / sugerir outro horário", fillcolor="#f5ead8"];
-Request -> P; P -> R [label="sim"]; P -> Reject [label="não"]; R -> B [label="sim/nao obrigatório"]; R -> Reject [label="não"]; B -> Tx [label="sim"]; B -> Reject [label="não"]; Tx -> Confirm [label="livre"]; Tx -> Reject [label="conflito"];
+digraph G {
+  rankdir=TB;
+  graph [bgcolor="white", pad="0.3", label="21-schedule-resource-conflict", labelloc=t, fontsize=18, fontname="Arial"];
+  node [shape=box, style="rounded,filled", fillcolor="#f6faf9", color="#8aa9a3", fontname="Arial", fontsize=11];
+  edge [color="#5f7b76", fontname="Arial", fontsize=9];
+  "A" [label="Request autenticada"];
+  "B" [label="B"];
+  "X" [label="X"];
+  "C" [label="C"];
+  "D" [label="D"];
+  "E" [label="E"];
+  "F" [label="F"];
+  "T" [label="T"];
+  "OK" [label="Confirmar"];
+  "A" -> "B";
+  "B" -> "X" [label="não"];
+  "B" -> "C" [label="sim"];
+  "C" -> "D";
+  "D" -> "E";
+  "E" -> "F";
+  "F" -> "X" [label="sim"];
+  "F" -> "T" [label="não"];
+  "T" -> "OK";
 }
