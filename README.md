@@ -90,13 +90,13 @@ Leia primeiro:
 Um novo consultório/clínica deve entrar por **configuração**, não por clone de repositório.
 
 
-## Pricing protocol aplicado
+## Plans & Entitlements v01
 
-A fundação agora contém uma auditoria funcional e uma proposta de pricing da vertical, sem fingir feature gating.
+Os planos e preços aprovados têm catálogo canônico de runtime, entitlements, atribuição manual pelo Platform Owner e enforcement transacional das quotas de profissionais, memberships adicionais e recursos físicos. A página pública informa implementação real e não tem checkout ou billing automático.
 
 - `docs/versions/v01-multitenant-whitelabel/FEATURE_INVENTORY.md`
 - `docs/versions/v01-multitenant-whitelabel/PRICING_AND_PLANS.md`
 - `docs/versions/v01-multitenant-whitelabel/ENTITLEMENTS_DELTA.md`
 - `docs/versions/v01-multitenant-whitelabel/COMMERCIAL_DEMO.md`
 
-Preços preservados: **Essencial R$ 79,90 / Pro R$ 129,90 / Premium R$ 189,90 por mês**. Não existe cobrança automática nem entitlement runtime nesta versão.
+Preços preservados: **Essencial R$ 79,90 / Pro R$ 129,90 / Premium R$ 189,90 por mês**; totais anuais: **R$ 862,92 / R$ 1.402,92 / R$ 2.050,92**. Não existe cobrança automática. Storage de 10/50/200 GB não é anunciado ou aplicado enquanto não houver medição confiável.

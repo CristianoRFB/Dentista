@@ -28,12 +28,15 @@ describe('PlanCatalog e EntitlementService', () => {
   it('aplica herança de plano, implementação real e configuração operacional', () => {
     expect(canUse(essentialA, 'agenda')).toBe(true);
     expect(canUse(essentialA, 'recall_center')).toBe(false);
-    expect(canUse(proA, 'recall_center')).toBe(true);
+    expect(canUse(proA, 'recall_center')).toBe(false);
     expect(canUse(premiumB, 'patient_portal')).toBe(false);
     expect(canUse({ ...proA, features: { recall_center: false } }, 'recall_center')).toBe(false);
-    expect(canUse({ ...essentialA, entitlementOverrides: { recall_center: true } }, 'recall_center')).toBe(true);
+    expect(canUse({ ...essentialA, entitlementOverrides: { recall_center: true } }, 'recall_center')).toBe(false);
     expect(canUse({ ...premiumB, entitlementOverrides: { patient_portal: true } }, 'patient_portal')).toBe(false);
     expect(canUse({ ...proA, entitlementOverrides: { recall_center: false } }, 'recall_center')).toBe(false);
+    expect(canUse({ ...premiumB, planId: 'premium_demo', subscriptionStatus: 'active' }, 'agenda')).toBe(false);
+    expect(canUse({ ...essentialA, subscriptionStatus: 'demo' }, 'clinical_records')).toBe(false);
+    expect(canUse({ ...proA, features: { recall_center: 'on' as never } }, 'recall_center')).toBe(false);
   });
 
   it('retorna quotas aprovadas, sem limites artificiais e sem enforcement de storage', () => {
@@ -48,17 +51,23 @@ describe('PlanCatalog e EntitlementService', () => {
     expect(getLimit({ ...essentialA, limitOverrides: { professionals: null } }, 'professionals')).toBeNull();
     expect(getLimit({ ...essentialA, limitOverrides: { professionals: -1 } }, 'professionals')).toBe(1);
     expect(getLimit({ ...essentialA, limitOverrides: { storageBytes: 1_000 } } as Tenant, 'storageBytes')).toBeNull();
-    expect(() => getLimit({ ...essentialA, planId: undefined }, 'professionals')).toThrow(/plano comercial válido/);
+    const unassigned = tenant('fictional-unassigned', undefined, undefined);
+    expect(getEffectiveEntitlements(unassigned).planId).toBeNull();
+    expect(() => getLimit(unassigned, 'professionals')).toThrow(/plano comercial válido/);
+    expect(canUse(unassigned, 'agenda')).toBe(false);
+    expect(canUse(unassigned, 'clinical_records')).toBe(true);
+    expect(canCreateCommercialCapacity(unassigned)).toBe(false);
+    expect(canUse({ ...unassigned, entitlementOverrides: { clinical_photos: false } }, 'clinical_photos')).toBe(true);
     expect(() => getLimit(essentialA, 'invented' as never)).toThrow(/Limite desconhecido/);
   });
 
   it('expira trial por data explícita sem converter status e bloqueia nova capacidade', () => {
     const now = Date.parse('2026-10-08T12:00:00.000Z');
     const trial = tenant('trial', 'pro', 'trial', { trialUntil: '2026-10-09T12:00:00.000Z' });
-    expect(canUse(trial, 'recall_center', now)).toBe(true);
+    expect(canUse(trial, 'agenda', now)).toBe(true);
     expect(canCreateCommercialCapacity(trial, now)).toBe(true);
     expect(getEffectiveEntitlements(trial, now + 86_400_001).trialExpired).toBe(true);
-    expect(canUse(trial, 'recall_center', now + 86_400_001)).toBe(false);
+    expect(canUse(trial, 'agenda', now + 86_400_001)).toBe(false);
     expect(canCreateCommercialCapacity(trial, now + 86_400_001)).toBe(false);
     expect(trial.subscriptionStatus).toBe('trial');
   });
@@ -67,7 +76,7 @@ describe('PlanCatalog e EntitlementService', () => {
     for (const status of ['past_due', 'suspended', 'cancelled'] as const) {
       const row = tenant('blocked-' + status, 'pro', status);
       expect(canCreateCommercialCapacity(row)).toBe(false);
-      expect(canUse(row, 'recall_center')).toBe(false);
+      expect(canUse(row, 'agenda')).toBe(false);
       expect(canUse(row, 'clinical_records')).toBe(true);
       expect(getLimit(row, 'clinicalHistory')).toBeNull();
     }

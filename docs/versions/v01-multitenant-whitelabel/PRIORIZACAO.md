@@ -1,47 +1,30 @@
-# PRIORIZACAO — Pricing & Entitlements
+# PRIORIZACAO — Plans & Entitlements
 
-> Decisões comerciais da vertical: **APROVADAS**.  
-> Esta priorização continua técnica; não autoriza implementação automática.
+> Execução do GOAL Global Standard v01 concluída no código local, mantendo decisões comerciais aprovadas.
 
-## NOW
+## IMPLEMENTADO
 
-Somente documentação/estado de decisão para consolidação global:
+1. PlanCatalog canônico Essencial/Pro/Premium, com valores mensais e anuais exatos.
+2. `premium_demo` como alias Premium read-only, sem cobrança.
+3. EntitlementService para catálogo, status, trial, overrides e flags operacionais.
+4. Gates de navegação/rotas e validação em Worker/Firestore Rules.
+5. Atribuição manual pelo Platform Owner com reason e auditoria before/after.
+6. Contadores transacionais para profissionais, memberships adicionais e recursos físicos.
+7. Rejeição de bypass por browser direto e preservação de dados ao reduzir quotas.
+8. Pricing page ligada ao catálogo, sem checkout e sem promessas de features não prontas.
 
-1. manter **Essencial / Pro / Premium** como nomenclatura aprovada;
-2. manter preços, anual, limites, demo e landing documentados como decisões travadas da vertical;
-3. manter `FEATURE_MATRIX.md` como referência de estado real x plano;
-4. manter `premium_demo` + `subscriptionStatus = demo` como conceito aprovado de demonstração;
-5. manter a landing/pricing honesta: sem checkout e sem feature planejada anunciada como pronta;
-6. encaminhar candidatos globais para comparação entre verticais;
-7. **não gerar nem executar GOAL de Codex sem pedido explícito**.
+## PENDENTE OPERACIONAL
 
-## NEXT
-
-Somente depois do núcleo P0 do produto estar operacional **e** depois da consolidação global definir o contrato compartilhado onde aplicável:
-
-1. catálogo de runtime;
-2. serviço de entitlement;
-3. feature gates de UI/rotas;
-4. validação backend;
-5. limites atômicos;
-6. usage real;
-7. plano manual pelo Platform Owner;
-8. status de assinatura e trial;
-9. upgrade/downgrade;
-10. testes por plano e demo;
-11. runbook operacional.
+- configurar e validar produção com credenciais existentes do Firebase/Worker/R2; não criar outro serviço ou ambiente por tenant;
+- snapshots reais continuam pendentes e independentes.
 
 ## DEFERRED
 
-- gateway/checkout/webhooks;
-- billing automático e cobrança por uso;
-- WhatsApp oficial;
-- IA/transcrição;
-- assinatura digital;
-- fiscal/NFS-e;
-- multi-unidade;
-- qualquer pacote Premium baseado em feature que ainda não exista.
+- medição de bytes R2 e quota pública/enforcement de storage;
+- checkout, gateway, webhooks, billing automático e cobrança por uso;
+- WhatsApp oficial, IA, assinatura digital, fiscal/NFS-e e integração externa;
+- multi-unidade e features Premium ainda não implementadas.
 
 ## Regra de escopo
 
-O GOAL clínico atual continua prioritário. Pricing não pode atrasar Auth, tenant resolver, memberships, Rules, CRUD clínico, agenda persistida, anti-double-booking, prontuário e upload clínico real.
+Conservar Core P0 e isolamento Multi-Tenant. Uma feature planejada não é liberada por override, e UI não substitui Worker/Rules.

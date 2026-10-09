@@ -1,35 +1,30 @@
-# DELTA_TECNICO — Pricing & Entitlements
+# DELTA_TECNICO — Plans & Entitlements v01
 
-> Somente o que ainda falta para planos reais.  
-> Decisões comerciais da vertical: **APROVADAS**; implementação técnica continua pendente.  
-> Estado considerado: após a refatoração executiva deste pacote.
+> Preços e quotas preservados conforme decisões aprovadas. Sem nova auditoria comercial e sem implementação de billing automático.
 
-| Área | Falta | Prioridade |
+| Área | Estado atual | Evidência/limite |
 |---|---|---|
-| Catálogo de planos | transformar a proposta estática em fonte canônica de runtime/versionada e permitir atribuição manual pelo Platform Owner | NEXT |
-| Entitlements | implementar `getEffectiveEntitlements`, `canUse` e `getLimit`, combinando plano + overrides + status | NEXT |
-| Feature gating | gates consistentes em navegação, rotas, componentes e ações; sem usar esconder botão como segurança | NEXT |
-| Limits | enforcement confiável/atômico para profissionais, admins, recursos físicos e storage | NEXT |
-| Backend validation | validar feature/limite/status em Worker/API/Function antes de mutações ou consumo de recurso | NEXT |
-| Demo mode | definir comportamento de `premium_demo/demo` dentro do entitlement engine sem tratá-lo como assinatura paga | NEXT |
-| Landing/pricing | ligar disponibilidade e limites ao catálogo canônico quando ele existir; manter sem checkout por enquanto | NEXT |
-| Subscription status | implementar transições e efeitos de `trial/active/past_due/suspended/cancelled/demo` | NEXT |
-| Trial | expiração real, datas, bloqueios e conversão manual/automática | NEXT |
-| Upgrade/downgrade | preservar dados clínicos; bloquear somente nova capacidade quando acima do limite; nunca apagar prontuário/fotos/histórico | NEXT |
-| Overrides | exceções por tenant como dados, nunca `if tenantId === ...` | NEXT |
-| Usage | medir bytes R2 e demais consumos variáveis antes de cobrar excedentes | NEXT |
-| Testes | fixtures Essencial/Pro/Premium/Demo; gating UI/backend; limites; overrides; status; upgrade/downgrade; Tenant A x B | NEXT |
-| Documentação operacional | runbook técnico de entitlement/status/downgrade quando o runtime for implementado | NEXT |
-| R2 / fotos clínicas | validar permissão granular, tenant ativo, entitlement `clinical_photos`, cota, usage e auditoria no backend | NEXT |
-| Agenda / equipe | enforcement de quantidade de profissionais e recursos físicos sem corrida de escrita | NEXT |
-| Cobrança | checkout, gateway, webhook e reconciliação financeira | DEFERRED |
-| Add-ons externos | WhatsApp, IA, assinatura digital e fiscal após provedor/custo/privacidade/contrato definidos | DEFERRED |
-| Multi-unidade | entitlement e modelo comercial somente quando houver demanda real | DEFERRED |
+| Catálogo de planos | IMPLEMENTADO | `src/commercial/planCatalog.ts` é a fonte canônica; preço mensal e total anual exatos |
+| Entitlements | IMPLEMENTADO | `getEffectiveEntitlements`, `canUse`, `getLimit`; plano + status + overrides + configuração + disponibilidade no código |
+| Demo | IMPLEMENTADO | `premium_demo/demo` é alias read-only; dados fictícios e sem capacidade/API de escrita |
+| Atribuição comercial | IMPLEMENTADA | Platform Owner, motivo obrigatório, snapshot before/after sem conteúdo clínico |
+| Feature gates | IMPLEMENTADOS | navegação/rotas e validações relevantes no Worker/Rules |
+| Profissionais | ENFORCED | 1 / 3 / 10; contador atômico do Worker; browser Firestore writes negados |
+| Memberships não-owner ativas | ENFORCED | 2 / 6 / 20; tenant_owner excluído; Worker transacional |
+| Recursos físicos ativos | ENFORCED | 1 / 5 / 15; primeiro recurso é permitido no Essencial; browser writes negados |
+| Downgrade e excesso | IMPLEMENTADO | dados existentes preservados; criação/reativação acima da quota recusada; desativação continua possível |
+| Clínica e histórico | PRESERVADOS | pacientes, agendamentos e histórico clínico sem limite artificial; acesso clínico não vira paywall |
+| Trial/status | MANUAL | trial explícito de até 14 dias; estados não fazem cobrança/conversão automática |
+| Storage R2 | PENDENTE DE MEDIÇÃO | `storageBytes = null`; sem franquia pública, enforcement, excedente ou cobrança |
+| Billing/checkout | DEFERRED | sem gateway, webhook, checkout ou cobrança automática |
+| Provisionamento/deploy | PENDENTE OPERACIONAL | usar o Worker/R2/Firebase existentes; não criar serviços ou ambientes por tenant |
+| Evidências visuais | PENDENTE | screenshots reais continuam independentes e não são substituídos por mockups |
 
-## O que já existe e não deve ser refeito
+## Regras de preservação
 
-- proposta comercial estática e página `/precos`;
-- `planId`, `subscriptionStatus` e `premium_demo` como modelagem/scaffold;
-- `tenant.features`, `tenant.limits` e usage modelado;
-- landing/demo com aviso de proposta;
-- isolamento, RBAC e segurança como responsabilidade interna, não feature Premium.
+- `tenant.features` desliga operação quando explicitamente `false`; não concede feature fora de plano/implementação.
+- `entitlementOverrides` pode habilitar/desabilitar somente chave conhecida e implementada.
+- `limitOverrides` aceita inteiro não negativo ou `null`; storage não pode ser sobrescrito.
+- `tenant.limits` fica legado e não é fonte de quota.
+- `past_due`, `suspended` e `cancelled` não liberam novos usos comerciais; clinical records/photos preservam fluxo clínico e histórico conforme RBAC.
+- demo não aceita mutação, mesmo com permissão ou chamada direta ao Worker.

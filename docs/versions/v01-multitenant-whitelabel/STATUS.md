@@ -36,40 +36,28 @@
 
 ## Fora do estado operacional
 
-- Central de Retorno: leitura sem escrita persistente;
+- Central de Retorno: tela de leitura sem escrita persistente; entitlement indisponível até a feature estar completa;
 - pré-cadastro/agendamento público para tenants reais: indisponíveis neste estágio;
 - odontograma e plano de tratamento: modelagem/documentação, sem fluxo operacional;
-- pricing, entitlements e cobrança: proposta/scaffold, não controlam runtime.
+- billing, checkout e cobrança automática: DEFERRED;
+- quota/storage R2: não medidos, não anunciados e não aplicados;
+- produção: ainda depende de credenciais/configuração externa e validação de ambiente;
+- screenshot real: página `/precos` inspecionada em demo local e exibida nesta sessão, mas não arquivada; demais telas pendentes; mockups não são evidência de runtime.
 
-- Project Core v01: revisado/alinhado
-- Standards tracking: GLOBAL-v01 / APPOINTMENT-v01 / DENTIST-v01
-- Acessibilidade GLOBAL-v01: baseline aplicada; auditoria completa pendente
-- Roadmap canônico: adicionado à versão vigente
-- Lembretes automáticos de agenda: DEFERRED
+- Project Core v01: revisado/alinhado;
+- Standards tracking: GLOBAL-v01 / APPOINTMENT-v01 / DENTIST-v01;
+- acessibilidade GLOBAL-v01: baseline aplicada; auditoria completa pendente;
+- lembretes automáticos de agenda: DEFERRED.
 
-## Pricing / entitlements — revisão 2026-10-06
+## Plans & Entitlements — execução 2026-10-09
 
-- protocolo global de pricing: auditado e aplicado localmente;
-- `FEATURE_INVENTORY.md`: criado;
-- `PRICING_AND_PLANS.md`: criado com proposta não aprovada;
-- `ENTITLEMENTS_DELTA.md`: criado;
-- `COMMERCIAL_DEMO.md`: criado;
-- pricing page: refatorada para mostrar PROPOSTA + estado técnico real;
-- demo tenant: marcado como `premium_demo` / `demo`;
-- plan catalog de runtime: NÃO implementado;
-- feature gating real: NÃO implementado;
-- backend entitlement validation: NÃO implementado;
-- cobrança/gateway: DEFERRED;
-- trial real: NEXT;
-- preços em produção: NÃO ATIVOS.
-
-
-## Pacote executivo pricing — refatoração
-
-- sem nova auditoria;
-- nomenclatura: Essencial / Pro / Premium;
-- Pro = recomendado;
-- FEATURE_MATRIX canônica criada;
-- delta técnico remanescente consolidado;
-- GOAL de entitlements criado com status NEXT;
-- entitlement runtime, gating e cobrança continuam NÃO implementados.
+- preços e limites aprovados preservados sem nova auditoria;
+- PlanCatalog canônico ligado à página de pricing e ao runtime;
+- status, trial manual e overrides comerciais atribuídos pelo Platform Owner com motivo e auditoria before/after;
+- `premium_demo/demo` é alias read-only e não plano pago;
+- entitlements e gates no frontend, Worker e Rules;
+- quotas transacionais de profissionais, memberships não-owner e recursos físicos; writes diretos de browser bloqueados;
+- downgrade não apaga dados; nova capacidade é recusada quando excede quota e desativação segue disponível;
+- pacientes, agendamentos e histórico clínico sem limite artificial;
+- storage 10/50/200 GB continua hipótese interna, sem quota pública ou enforcement;
+- gateway, checkout e billing automático continuam DEFERRED.

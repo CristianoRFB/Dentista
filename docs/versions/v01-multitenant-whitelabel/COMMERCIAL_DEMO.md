@@ -13,6 +13,8 @@ patients: fictícios
 professionals: fictícios
 ```
 
+`premium_demo` não é um quarto plano pago. A demo exibe banner permanente, usa apenas dados fictícios e é somente leitura. Worker e Rules recusam mutações.
+
 A demo mostra o potencial máximo **somente no que for demonstrável**.
 
 Capacidades ainda planejadas podem aparecer em telas conceituais apenas com rótulo claro:
@@ -47,20 +49,19 @@ O mini-site `/{tenantSlug}` vende/apresenta a clínica do cliente.
 
 ## Pricing
 
-A rota `/precos` nesta fundação é uma **página de proposta**, não checkout.
+A rota `/precos` mostra planos, valores e limites aprovados, sem checkout ou processamento de cobrança.
 
 Deve exibir:
 
-- `PROPOSTA EM VALIDAÇÃO`;
-- preço mensal sugerido;
-- desconto anual proposto;
+- preços mensais e anuais aprovados;
+- desconto anual de 10%;
 - plano recomendado;
 - diferenças decisivas;
 - limites;
 - aviso de disponibilidade real;
 - CTA para demo/interesse.
 
-Não deve exibir “assinar agora” até entitlement e onboarding real existirem.
+Não deve exibir “assinar agora”. Billing automático e checkout permanecem DEFERRED.
 
 ## Demo personalizada por lead
 

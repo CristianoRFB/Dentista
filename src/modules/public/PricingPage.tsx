@@ -3,6 +3,7 @@ import { annualEquivalentCents, commercialPlanProposal, formatBRL, PRICING_PROPO
 
 const stateLabel = {
   IMPLEMENTADA: 'implementada',
+  EM_IMPLEMENTACAO: 'em implementação',
   PLANEJADA: 'planejada',
   DEFERRED: 'deferred',
 } as const;

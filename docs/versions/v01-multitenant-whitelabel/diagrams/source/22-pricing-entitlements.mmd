@@ -1,10 +1,11 @@
-%% PROPOSTA/NEXT — entitlement runtime, limites e uso comercial não implementados; preços não alterados
+%% Plans & Entitlements Global Standard v01 — runtime implementado; billing automático deferred
 flowchart LR
-  P["Pricing proposal<br/>(PROPOSTA)"] --> C["Plan catalog<br/>(NEXT)"]
-  C --> S["Tenant subscription<br/>planId + status + overrides"]
-  S --> E["Effective entitlements<br/>canUse / getLimit"]
-  E --> UI["UI gates"]
-  E --> BE["Backend / Worker gates"]
-  E --> L["Limit enforcement"]
-  L -.-> U["Usage counters"]
-  D["Demo tenant<br/>premium_demo"] -.-> E
+  P["PlanCatalog<br/>preços e limites aprovados"] --> S["Tenant comercial<br/>plano + status + overrides"]
+  S --> E["Entitlements efetivos<br/>feature + limite + status"]
+  E --> UI["UI e rotas"]
+  E --> RULES["Firestore Rules"]
+  E --> W["Worker confiável"]
+  W --> C["Contadores transacionais<br/>profissionais / equipe / recursos"]
+  D["premium_demo<br/>dados fictícios · read-only"] --> E
+  R["Histórico clínico<br/>sempre preservado"] -.-> E
+  E -.-> B["Checkout e billing<br/>DEFERRED"]

@@ -1,32 +1,14 @@
-# Roadmap — fundação revisada
+# Roadmap — estado técnico revisado (2026-10-09)
 
-## Fase 0 — Fundação (este ZIP)
-- arquitetura Multi-Tenant White-Label;
-- Firebase base;
-- R2 privado para mídia clínica;
-- documentação canônica;
-- diagramas;
-- landing comercial demonstrativa;
-- agenda por profissional + recurso físico;
-- central de retorno e pré-cadastro como scaffolds;
-- features/limits/usage preparados.
+## Concluído — Core Multi-Tenant + Clínico P0
 
-## Fase 1 — Tornar o núcleo realmente operacional
-- autenticação real;
-- tenant resolver real;
-- memberships e Rules validadas em Emulator;
-- CRUD de profissionais/pacientes/procedimentos;
-- agenda persistida;
-- algoritmo transacional de conflito;
-- recursos físicos persistidos;
-- prontuário + adendos;
-- ClinicalPhoto upload real para R2.
+Firebase Auth UI/guards, tenant resolver, memberships/RBAC, Platform Owner e suporte clínico temporário, Firestore Rules, CRUD tenant-scoped de pacientes/profissionais/procedimentos/recursos, agenda persistida via Worker com locks transacionais, prontuário append-only/adendos, R2 privado, auditoria e white-label básico.
 
-### Estado após Core Multi-Tenant + Clínico P0 (2026-10-08)
+## Concluído — Plans & Entitlements Global Standard v01
 
-Concluídos no código e verificados localmente: Firebase Auth UI/guards, tenant resolver, memberships/RBAC, Platform Owner e suporte, Rules no Emulator, CRUD mínimo tenant-scoped de pacientes/profissionais/procedimentos/recursos, agenda via Worker com locks transacionais, prontuário append-only/adendos, R2 privado, auditoria e white-label básico.
+PlanCatalog com preços e limites aprovados, entitlement service, gates de feature, atribuição comercial manual auditada, trial explícito de até 14 dias, controles de capacidade no Worker, proteção de demo read-only e atualização da matriz técnica. Não há checkout, gateway ou billing automático.
 
-Antes de produção: configurar credenciais reais do Worker, projeto Auth/Firestore e binding R2; executar readiness gate com ambiente provisionado. Esta etapa não executa deploy nem migração.
+Antes de produção, o ambiente único da vertical precisa ter credenciais de Worker, projeto Auth/Firestore e binding R2 provisionados, além da origem exata da aplicação. Nenhum serviço pago ou ambiente por tenant é criado por este roadmap.
 
 ## Fase 2 — Experiência clínica
 - odontograma interativo;
@@ -38,13 +20,14 @@ Antes de produção: configurar credenciais reais do Worker, projeto Auth/Firest
 
 Odontograma e plano de tratamento permanecem nesta fase; suas fontes de diagrama são marcadas como futuro e não significam que a funcionalidade esteja ativa.
 
-## Fase 3 — Comercial e onboarding
-- onboarding de tenant;
-- branding configurável;
-- landing por clínica/agendamento público;
-- planos comerciais reais;
-- medição de uso;
-- suporte e auditoria completos.
+## Próxima fase — Experiência clínica e onboarding
+- odontograma interativo;
+- plano de tratamento e orçamento;
+- Central de Retorno persistida;
+- pré-cadastro tokenizado com revisão;
+- documentos e templates;
+- agendamento público persistente;
+- medição confiável de armazenamento R2 antes de qualquer quota pública.
 
 ## Depois, apenas com demanda real
 - assinatura digital;
@@ -83,15 +66,10 @@ Esses itens entram somente depois do núcleo persistido e de decisão explícita
 - proposta comercial explícita na landing/pricing.
 
 ### NEXT
-- entitlements de runtime;
-- limites e overrides;
-- plano manual pelo Platform Owner;
-- trial;
-- testes por plano;
-- upgrade/downgrade.
+- screenshot operacional real da página pública de pricing e da atribuição comercial manual, após ambiente configurado; nenhum mockup substitui captura real.
 
 ### DEFERRED
 - gateway, checkout e webhooks;
-- billing por consumo;
+- billing automático e cobrança por consumo;
 - WhatsApp/IA/fiscal;
 - multi-unidade.

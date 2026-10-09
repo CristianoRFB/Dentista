@@ -2,7 +2,7 @@
 
 ## O que existe
 
-Fundação React/TypeScript, Firebase config via env, regras Firestore iniciais, deny-all no Firebase Storage, Worker R2 inicial, domínio básico, páginas shell, testes unitários puros, 22 diagramas arquiteturais na versão canônica, wireframes históricos e novos wireframes de produto/comercial.
+Fundação React/TypeScript, Firebase config via env, Core P0 tenant-scoped, Firestore Rules e Emulator Suite, Firebase Storage deny-all, Worker com agenda transacional e mídia R2 privada, domínio básico, telas públicas e administrativas, testes automatizados e 22 diagramas da versão canônica.
 
 A revisão atual também inclui:
 
@@ -14,36 +14,26 @@ A revisão atual também inclui:
 - Central de Retorno;
 - cadeira/sala como recurso físico da agenda;
 - `UsageCounter` para custos variáveis futuros.
+- Core P0 operacional: Firebase Auth, tenant/RBAC, auditoria clínica, prontuário append-only, agenda transacional e mídia R2 privada;
+- Plans & Entitlements v01: catálogo canônico, feature gates, limites transacionais e atribuição comercial manual auditada pelo Platform Owner.
 
 ## O que NÃO deve ser assumido pronto
 
-- autenticação visual;
-- provisionamento de Platform Owner;
-- CRUD real completo;
-- transação anti-double-booking no Firestore;
-- persistência real da Central de Retorno;
-- endpoint confiável para pré-cadastro público;
-- confirmação real do agendamento público;
-- verificação granular de permissão no Worker R2 (P0 exige conferir `clinical.write`);
-- auditoria atômica de todas as mutações;
-- regras testadas por Emulator Suite;
-- deploy real Cloudflare/Firebase;
-- bucket R2 criado;
-- preços comerciais definidos;
-- dados reais;
-- conformidade jurídica/LGPD formal.
+- o CRUD completo de todos os domínios; pacientes, profissionais, procedimentos e recursos têm fluxos persistidos, mas há áreas ainda em scaffold;
+- escrita persistente da Central de Retorno, pré-cadastro público ou agendamento público para tenants reais;
+- odontograma, plano de tratamento, financeiro e relatórios, que permanecem planejados;
+- cobrança automática, checkout, gateway ou conversão automática de trial; todos estão fora do escopo atual;
+- medição de bytes e quota de storage R2; 10/50/200 GB é hipótese interna e não pode ser anunciada ou aplicada;
+- ambiente de produção: no estado verificado em 2026-10-09, o Firestore ainda não foi criado, o Console retornou erro ao iniciar a criação, Wrangler/Cloudflare não estão autenticados e `APP_ORIGIN` permanece local;
+- dados reais de clientes ou conformidade jurídica/LGPD formal.
 
 ## Ordem para o próximo agente
 
-1. `docs/CURRENT.md`;
-2. `DECISIONS.md`;
-3. `docs/versions/v01-multitenant-whitelabel/PRODUCT_STRATEGY.md`;
-4. `docs/versions/v01-multitenant-whitelabel/MARKETING_SITE.md`;
-5. `firestore.rules`;
-6. `src/domain/*`;
-7. diagramas da versão canônica;
-8. P0 do `BACKLOG.md`;
-9. só então expandir frontend.
+1. `docs/CURRENT.md` e a versão canônica indicada;
+2. `DECISIONS.md`, `docs/versions/v01-multitenant-whitelabel/STANDARDS.md` e `CORE_ALIGNMENT.md`;
+3. `STATUS.md`, `PLANS_AND_ENTITLEMENTS.md`, `FEATURE_MATRIX.md` e `DEPLOYMENT.md` para o estado atual;
+4. preservar o Core P0 já implementado e as decisões LOCAL da vertical;
+5. não refazer a auditoria comercial nem alterar preços/limites sem nova decisão explícita.
 
 ## Firebase
 
@@ -59,20 +49,12 @@ O benchmark Codental serve para estudar estrutura de comunicação: benefício p
 
 ## Revisão de planos/pricing
 
-Foi aplicada auditoria real antes da distribuição comercial. O agente seguinte deve ler, nesta ordem adicional:
+Auditoria comercial e aprovação de preços/limites já foram concluídas. O estado atual está registrado em:
 
-1. `FEATURE_INVENTORY.md`;
-2. `PRICING_AND_PLANS.md`;
-3. `ENTITLEMENTS_DELTA.md`;
-4. `COMMERCIAL_DEMO.md`.
+1. `docs/versions/v01-multitenant-whitelabel/PLANS_AND_ENTITLEMENTS.md`;
+2. `docs/versions/v01-multitenant-whitelabel/FEATURE_MATRIX.md`;
+3. `docs/versions/v01-multitenant-whitelabel/PRICING_AND_PLANS.md` e `DECISOES_PRICING.md`.
 
-### Não assumir pronto
+O `PlanCatalog` é a fonte canônica dos valores e limites aprovados. Entitlements são resolvidos por plano/status, flags e overrides; UI, Worker e Firestore Rules aplicam os gates. O Platform Owner atribui plano, status, trial e overrides manualmente, com motivo e snapshots auditados before/after. `premium_demo/demo` é apenas alias de demonstração read-only.
 
-- `planId`/status em tipos e demo são scaffold comercial;
-- `pricingProposal.ts` alimenta apenas a página demonstrativa;
-- não existe `canUse/getLimit` de runtime;
-- não existe validação backend de plano;
-- não existe checkout;
-- não existe gateway/webhook;
-- não existe trial real;
-- não existe enforcement de storage/profissionais/recursos.
+Checkout, gateway, webhook e billing automático continuam inexistentes por decisão de escopo. Storage não tem enforcement até medição confiável; capacidades de profissionais, memberships adicionais e recursos físicos têm enforcement transacional no Worker, com bypass direto negado nas Rules.

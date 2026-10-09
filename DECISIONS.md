@@ -64,8 +64,8 @@ Lembretes pertencem à vertical de agendamento, mas não entram no escopo estrut
 ## D-021 — Pricing protocol auditado antes de gating
 O protocolo global de planos/pricing foi aplicado por auditoria do estado real. A estratégia comercial desta vertical fica em `FEATURE_INVENTORY.md`, `PRICING_AND_PLANS.md` e `ENTITLEMENTS_DELTA.md`. Nenhuma dessas decisões implica entitlement implementado.
 
-## D-022 — Pricing inicial proposto
-A proposta para validação comercial é `Essencial R$ 79,90`, `Pro R$ 129,90` e `Premium R$ 189,90`, com 10% de desconto anual. Status: PROPOSTA/EM TESTE, não aprovado e não cobrado.
+## D-022 — Pricing inicial aprovado
+`Essencial R$ 79,90`, `Pro R$ 129,90` e `Premium R$ 189,90`, com 10% de desconto anual. Totais anuais aprovados: R$ 862,92, R$ 1.402,92 e R$ 2.050,92. Valores preservados; atribuição continua manual e não há billing automático.
 
 ## D-023 — Demo usa premium_demo
 O tenant demonstrativo pode carregar `planId = premium_demo` e `subscriptionStatus = demo`. Isso identifica a finalidade comercial; não significa que feature gating exista.
@@ -75,3 +75,9 @@ Isolamento, integridade clínica, histórico essencial, autenticação segura, r
 
 ## D-025 — Downgrade preserva dados
 Downgrade não apaga paciente, prontuário, foto ou histórico. Quando houver enforcement, o sistema deve preferir bloquear nova capacidade acima do limite e preservar leitura/exportação apropriada.
+
+## D-026 — Plans & Entitlements v01
+PlanCatalog local é a fonte canônica; `premium_demo` é alias Premium com `subscriptionStatus=demo`, dados fictícios e somente leitura. Platform Owner atribui manualmente plano, estado, trial e overrides com motivo e auditoria before/after. Worker e Firestore Rules impõem features e limites; frontend não é camada de segurança.
+
+## D-027 — Storage clínico sem quota pública ou enforcement
+10/50/200 GB permanece hipótese interna aprovada. Não publicar, limitar nem cobrar até medir bytes R2 por tenant e validar custo real. Pacientes, agendamentos e histórico clínico continuam sem limite artificial.

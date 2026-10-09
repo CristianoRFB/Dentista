@@ -30,23 +30,26 @@ OdontogramEvent, TreatmentPlan, TreatmentItem, Quote, billing e usage comercial 
 `tenantId, period, metric, value`
 
 
-## Metadados comerciais propostos
+## Estado comercial e entitlement
 
-A interface `Tenant` ganhou campos opcionais de scaffold:
+`Tenant` contém o estado comercial atribuído manualmente pelo Platform Owner:
 
 ```text
 planId?
 subscriptionStatus?
 trialUntil?
 entitlementOverrides?
+limitOverrides?
 ```
 
-Isso NÃO significa entitlement implementado. A fonte de autorização atual continua sendo RBAC/Rules; pricing ainda não controla runtime.
+`planId` aceita `essential`, `pro` e `premium`; `premium_demo` é alias exclusivo de demo. `entitlementOverrides` contém booleanos e `limitOverrides` contém inteiros não negativos ou `null` (sem limite), sem chave para storage.
 
-Estados propostos:
+Estados comerciais:
 
 ```text
 trial | active | past_due | suspended | cancelled | demo
 ```
 
-`UsageCounter` já existia como modelagem inicial e continuará sem escrita pública até existir backend confiável.
+`tenants/{tenantId}/limitCounters/{professionals|resources|memberships}` é privado ao Worker e mantém contagem atômica para as quotas aplicadas. Não é fonte pública para UI.
+
+`UsageCounter` segue sem medição confiável de bytes R2. `storageBytes` retorna `null`; a hipótese interna de 10/50/200 GB não é aplicada ou anunciada.

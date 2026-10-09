@@ -36,8 +36,7 @@ Pacientes, agendamentos e histórico clínico não recebem limite artificial.
 
 - implantação padrão durante validação: **R$ 0**;
 - migração complexa: **Add-on sob orçamento**;
-- trial futuro: **14 dias sem cartão**, somente depois do lifecycle de assinatura existir;
-- antes do trial real: usar demo;
+- trial: **14 dias sem cartão**, ativado manualmente pelo Platform Owner com `trialUntil` explícito; sem conversão automática;
 - WhatsApp, IA, assinatura digital, fiscal e storage excedente: **sem preço até custo/provedor estarem definidos**.
 
 ## Demo aprovada
@@ -46,6 +45,7 @@ Pacientes, agendamentos e histórico clínico não recebem limite artificial.
 - `subscriptionStatus = demo`;
 - dados fictícios;
 - ambiente identificado visualmente como demonstração;
+- somente leitura; mutações e capacidade comercial negadas no Worker/Rules;
 - libera apenas recursos realmente demonstráveis no build;
 - não gera cobrança.
 
@@ -55,8 +55,8 @@ Pacientes, agendamentos e histórico clínico não recebem limite artificial.
 - comparar profissionais, admins, recursos físicos e features comerciais relevantes;
 - storage só entra na promessa pública após validação de custo/uso;
 - feature não pronta nunca aparece como disponível;
-- sem `Assinar agora` enquanto não houver onboarding/entitlements de produção;
-- CTA permitido antes disso: demo, lista de interesse, contato.
+- sem checkout, `Assinar agora` ou cobrança automática;
+- CTA atual: explorar demo.
 
 ## Justificativa curta
 

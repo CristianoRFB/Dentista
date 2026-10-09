@@ -4,7 +4,7 @@ import {
   assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
-  collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, Timestamp, writeBatch,
+  collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch,
   runTransaction,
 } from 'firebase/firestore';
 import { permissionTemplates } from '../src/domain/permissions';
@@ -17,7 +17,9 @@ let env: RulesTestEnvironment;
 
 const tenant = (id: string, status = 'active') => ({
   id, name: 'Clínica de teste ' + id, slug: 'clinica-' + id.toLowerCase(), status,
-      features: {}, limits: {}, lastAuditLogId: 'seed',
+      features: {}, limits: {}, lastAuditLogId: 'seed', planId: 'essential',
+      subscriptionStatus: status === 'active' ? 'active' : 'suspended', trialUntil: null,
+      entitlementOverrides: {}, limitOverrides: {},
 });
 
 async function seed() {
@@ -117,7 +119,7 @@ describe('Firestore Rules — isolamento e autorização', () => {
     }));
   });
 
-  it('persiste pacientes, profissionais, procedimentos e recursos via camada de dados tenant-scoped', async () => {
+  it('persiste dados tenant-scoped e mantém profissionais/recursos protegidos contra writes diretos', async () => {
     const db = env.authenticatedContext('tenant-owner-a').firestore();
     const session: Extract<TenantAccessState, { status: 'ready' }> = {
       status: 'ready', tenant: tenant('A'),
@@ -137,7 +139,7 @@ describe('Firestore Rules — isolamento e autorização', () => {
     const resourceId = 'chair-a';
 
     expect((await assertSucceeds(getDoc(doc(db, 'tenants/A/patients', patientId)))).data()?.tenantId).toBe('A');
-    expect((await assertSucceeds(getDoc(doc(db, 'tenants/A/professionals', professionalId)))).data()?.displayName).toBe('Profissional de teste');
+    expect((await assertSucceeds(getDoc(doc(db, 'tenants/A/professionals', professionalId)))).data()?.displayName).toBe('Dentista A');
     expect((await assertSucceeds(getDoc(doc(db, 'tenants/A/procedures', procedureId)))).data()?.active).toBe(true);
     expect((await assertSucceeds(getDoc(doc(db, 'tenants/A/scheduleResources', resourceId)))).data()?.active).toBe(true);
 
@@ -421,7 +423,7 @@ describe('Firestore Rules — isolamento e autorização', () => {
     }));
     expect((await assertSucceeds(getDoc(tenantRef))).data()?.status).toBe('suspended');
     expect((await assertSucceeds(getDoc(slugRef))).data()?.status).toBe('suspended');
-    expect((await assertSucceeds(getDoc(profileRef))).data()?.publicName).toBe('Clínica C Atualizada');
+    await assertFails(getDoc(profileRef));
   });
 
   it('exige auditoria para conceder e revogar suporte clínico temporário', async () => {
@@ -456,6 +458,65 @@ describe('Firestore Rules — isolamento e autorização', () => {
     await assertFails(getDoc(doc(db, 'tenants/A/patients/patient-a')));
   });
 
+  it('impede owner de alterar estado comercial e valida auditoria, motivo e tipos de override', async () => {
+    const ownerDb = env.authenticatedContext('tenant-owner-a').firestore();
+    await assertFails(updateDoc(doc(ownerDb, 'tenants/A'), {
+      planId: 'premium', subscriptionStatus: 'active', trialUntil: null,
+      entitlementOverrides: {}, limitOverrides: { professionals: 10 }, lastAuditLogId: 'owner-forge',
+    }));
+
+    const platformDb = env.authenticatedContext('platform-owner').firestore();
+    const tenantRef = doc(platformDb, 'tenants/A');
+    const tryCommercialUpdate = (auditId: string, after: Record<string, unknown>, reason: string) => runTransaction(platformDb, async transaction => {
+      const current = await transaction.get(tenantRef);
+      if (!current.exists()) throw new Error('tenant não existe');
+      const beforeData = current.data();
+      const before = {
+        planId: beforeData.planId, subscriptionStatus: beforeData.subscriptionStatus,
+        trialUntil: beforeData.trialUntil, entitlementOverrides: beforeData.entitlementOverrides,
+        limitOverrides: beforeData.limitOverrides,
+      };
+      transaction.update(tenantRef, { ...after, lastAuditLogId: auditId, updatedAt: serverTimestamp() });
+      transaction.set(doc(platformDb, 'tenants/A/auditLogs', auditId), {
+        tenantId: 'A', actorId: 'platform-owner', actorRole: 'platform_owner', action: 'tenant.commercial.update',
+        resourceType: 'tenant', resourceId: 'A', timestamp: serverTimestamp(), reason, before, after,
+      });
+    });
+
+    await assertFails(tryCommercialUpdate('short-reason-audit', {
+      planId: 'pro', subscriptionStatus: 'active', trialUntil: null,
+      entitlementOverrides: {}, limitOverrides: {},
+    }, 'curto'));
+    await assertFails(tryCommercialUpdate('invalid-override-audit', {
+      planId: 'pro', subscriptionStatus: 'active', trialUntil: null,
+      entitlementOverrides: { agenda: 'true' }, limitOverrides: {},
+    }, 'Ajuste comercial com tipos inválidos'));
+    await assertFails(tryCommercialUpdate('invalid-limit-audit', {
+      planId: 'pro', subscriptionStatus: 'active', trialUntil: null,
+      entitlementOverrides: {}, limitOverrides: { professionals: -1 },
+    }, 'Ajuste comercial com limite inválido'));
+    expect((await assertSucceeds(getDoc(doc(platformDb, 'tenants/A')))).data()?.planId).toBe('essential');
+  });
+
+  it('mantém a demo somente leitura mesmo com membership ativa', async () => {
+    await env.withSecurityRulesDisabled(async context => {
+      const db = context.firestore();
+      await Promise.all([
+        setDoc(doc(db, 'tenants/D'), { ...tenant('D'), planId: 'premium_demo', subscriptionStatus: 'demo' }),
+        setDoc(doc(db, 'tenants/D/memberships/dentist-d'), {
+          userId: 'dentist-d', tenantId: 'D', role: 'dentist', status: 'active', permissions: [...permissionTemplates.dentist],
+        }),
+        setDoc(doc(db, 'tenants/D/patients/patient-d'), { id: 'patient-d', tenantId: 'D', name: 'Paciente fictício', status: 'active' }),
+      ]);
+    });
+    const demoDb = env.authenticatedContext('dentist-d').firestore();
+    await assertFails(updateDoc(doc(demoDb, 'tenants/D/patients/patient-d'), { name: 'Tentativa de escrita' }));
+    await assertFails(setDoc(doc(demoDb, 'tenants/D/patients/patient-new'), {
+      id: 'patient-new', tenantId: 'D', name: 'Novo registro', status: 'active', createdBy: 'dentist-d',
+      lastAuditLogId: 'demo-write-audit',
+    }));
+  });
+
   it('expõe somente branding público e impede Tenant A de alterá-lo em Tenant B', async () => {
     const a = env.authenticatedContext('dentist-a').firestore();
     expect((await assertSucceeds(getDoc(doc(a, 'tenants/A/publicProfile/public')))).data()?.publicName).toBe('Marca A');
@@ -467,6 +528,33 @@ describe('Firestore Rules — isolamento e autorização', () => {
     }));
     await assertFails(getDoc(doc(a, 'tenants/B/memberships/dentist-b')));
     await assertFails(getDoc(doc(a, 'tenants/B/patients/patient-b/clinicalPhotos/photo-b')));
+  });
+
+  it('nega mini-site público sem estado comercial explícito', async () => {
+    await env.withSecurityRulesDisabled(async context => {
+      const db = context.firestore();
+      const unassigned = tenant('UNASSIGNED');
+      delete (unassigned as Partial<typeof unassigned>).planId;
+      delete (unassigned as Partial<typeof unassigned>).subscriptionStatus;
+      await setDoc(doc(db, 'tenants/UNASSIGNED'), unassigned);
+      await setDoc(doc(db, 'tenants/UNASSIGNED/publicProfile/public'), {
+        tenantId: 'UNASSIGNED', publicName: 'Fixture fictício', tagline: '', description: '', phone: '', email: '', address: '',
+        primaryColor: '#163d3a', accentColor: '#72b9ad', logoUrl: '',
+      });
+      await setDoc(doc(db, 'tenants/UNASSIGNED/memberships/unassigned-dentist'), {
+        userId: 'unassigned-dentist', tenantId: 'UNASSIGNED', role: 'dentist', status: 'active', permissions: [...permissionTemplates.dentist],
+      });
+      await setDoc(doc(db, 'tenants/UNASSIGNED/patients/patient-fake'), {
+        id: 'patient-fake', tenantId: 'UNASSIGNED', name: 'Paciente fictício', searchName: 'paciente ficticio', status: 'active',
+      });
+      await setDoc(doc(db, 'tenants/UNASSIGNED/patients/patient-fake/clinicalRecords/record-fake'), {
+        id: 'record-fake', tenantId: 'UNASSIGNED', patientId: 'patient-fake', createdBy: 'unassigned-dentist', content: 'Registro de teste fictício',
+      });
+    });
+    const anonymous = env.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(anonymous, 'tenants/UNASSIGNED/publicProfile/public')));
+    const clinician = env.authenticatedContext('unassigned-dentist').firestore();
+    await assertSucceeds(getDoc(doc(clinician, 'tenants/UNASSIGNED/patients/patient-fake/clinicalRecords/record-fake')));
   });
 });
 

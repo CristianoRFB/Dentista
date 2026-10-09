@@ -43,15 +43,21 @@ export function isCommerciallyActive(tenant: Tenant, now = Date.now()) {
 export function getEffectiveEntitlements(tenant: Tenant, now = Date.now()): EffectiveEntitlements {
   const canonical = canonicalPlanId(tenant.planId);
   const demo = tenant.planId === 'premium_demo' && tenant.subscriptionStatus === 'demo';
-  const plan = canonical ? PLAN_CATALOG[canonical] : null;
+  const invalidDemoAlias = tenant.planId === 'premium_demo' && !demo;
+  const invalidDemoStatus = tenant.subscriptionStatus === 'demo' && !demo;
+  const plan = canonical && !invalidDemoAlias && !invalidDemoStatus ? PLAN_CATALOG[canonical] : null;
   const trialExpired = tenant.subscriptionStatus === 'trial' && !trialIsActive(tenant, now);
   const features = Object.fromEntries(FEATURE_KEYS.map(key => {
     const override = tenant.entitlementOverrides?.[key];
     const inPlan = !!plan?.featureKeys.includes(key);
     const overridden = typeof override === 'boolean' ? override : inPlan;
-    const enabledByRuntime = IMPLEMENTED_FEATURES.has(key) && tenant.features?.[key] !== false;
+    const configured = tenant.features?.[key];
+    const implemented = IMPLEMENTED_FEATURES.has(key);
+    const operationallyEnabled = configured === undefined || configured === true;
     const statusAllows = isCommerciallyActive(tenant, now) || CLINICAL_PRESERVATION_FEATURES.has(key);
-    return [key, !!plan && overridden && enabledByRuntime && statusAllows];
+    // Subscription state and commercial overrides never remove access to clinical history or media.
+    const preservedClinicalAccess = CLINICAL_PRESERVATION_FEATURES.has(key) && !invalidDemoAlias && !invalidDemoStatus;
+    return [key, implemented && operationallyEnabled && (preservedClinicalAccess || (!!plan && overridden && statusAllows))];
   })) as Record<EntitlementFeature, boolean>;
   const limits = Object.fromEntries(LIMIT_KEYS.map(key => {
     const approved = plan?.limits[key] ?? null;
@@ -62,7 +68,7 @@ export function getEffectiveEntitlements(tenant: Tenant, now = Date.now()): Effe
     return [key, candidate === null || (typeof candidate === 'number' && Number.isInteger(candidate) && candidate >= 0) ? candidate : approved];
   })) as Record<PlanLimit, number | null>;
   return {
-    planId: canonical,
+    planId: plan?.id ?? null,
     sourcePlanId: tenant.planId,
     subscriptionStatus: tenant.subscriptionStatus,
     trialExpired,

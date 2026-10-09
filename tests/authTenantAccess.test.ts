@@ -107,10 +107,11 @@ describe('guards de autenticação e tenant resolver', () => {
 
   it('só libera o tenant demo em modo de desenvolvimento explicitamente habilitado', async () => {
     const db = source();
-    const demo = await resolve({ tenantSlug: 'demo-clinica', userUid: null, demoMode: true, demoTenant: tenant, source: db });
+    const demoTenant: Tenant = { ...tenant, id: 'demo', slug: 'demo-clinica', planId: 'premium_demo', subscriptionStatus: 'demo' };
+    const demo = await resolve({ tenantSlug: 'demo-clinica', userUid: null, demoMode: true, demoTenant, source: db });
     expect(demo).toMatchObject({ status: 'ready', isDemo: true, membership: null });
     expect(db.getTenantSlug).not.toHaveBeenCalled();
-    const denied = await resolve({ tenantSlug: 'demo-clinica', userUid: null, demoMode: false, demoTenant: tenant, source: db });
+    const denied = await resolve({ tenantSlug: 'demo-clinica', userUid: null, demoMode: false, demoTenant, source: db });
     expect(denied.status).toBe('forbidden');
   });
 

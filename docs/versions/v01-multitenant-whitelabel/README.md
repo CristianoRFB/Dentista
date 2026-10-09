@@ -41,6 +41,7 @@ Pacote executivo/técnico vigente:
 - `DELTA_TECNICO.md`;
 - `PRIORIZACAO.md`;
 - `DECISOES_PRICING.md`;
+- `PLANS_AND_ENTITLEMENTS.md`;
 - GOAL ativo para Codex: `../../../../CODEX_GOAL_IMPLEMENTACAO_DENTISTA.txt` (CORE_FIRST). O GOAL antigo de pricing foi movido para `docs/historical/` e NÃO deve ser executado agora.
 
-Planos e preços continuam como proposta/recomendação. Entitlements e cobrança real não estão implementados.
+Planos e preços são aprovados e alimentam o PlanCatalog de runtime. Entitlements e quotas operacionais estão implementados; billing e checkout automáticos permanecem DEFERRED. Consulte `PLANS_AND_ENTITLEMENTS.md` para o contrato técnico operacional.

@@ -262,6 +262,7 @@ async function verifyAppointmentAccess(env: Env, token: string, transaction: str
   if (!membership || membership.tenantId !== tenantId || membership.userId !== uid || !appointmentPermission(membership)) {
     throw new HttpError(403, 'appointment_permission_required');
   }
+  if (tenant.planId === 'premium_demo' || tenant.subscriptionStatus === 'demo') throw new HttpError(409, 'demo_read_only');
   if (!canUse(tenant as any, 'agenda')) throw new HttpError(403, 'feature_not_available');
   return { tenant, membership };
 }
@@ -550,7 +551,7 @@ function countDelta(kind: CapacityKind, before: Record<string, any> | null, afte
 }
 
 function safeId(value: unknown): value is string {
-  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+  return typeof value === 'string' && /^[A-Za-z0-9:_-]{1,128}$/.test(value);
 }
 
 async function mutateCapacity(env: Env, uid: string, input: Record<string, unknown>) {
@@ -573,6 +574,7 @@ async function mutateCapacity(env: Env, uid: string, input: Record<string, unkno
         getDocument(env, token, 'tenants/' + tenantId + '/memberships/' + uid, transaction),
       ]);
       if (!tenant || tenant.id !== tenantId || tenant.status !== 'active') throw new HttpError(404, 'tenant_unavailable');
+      if (tenant.planId === 'premium_demo' || tenant.subscriptionStatus === 'demo') throw new HttpError(409, 'demo_read_only');
       const requiredPermission = kind === 'memberships' ? 'memberships.manage' : kind === 'professionals' ? 'professionals.manage' : 'resources.manage';
       if (!membership || membership.tenantId !== tenantId || membership.userId !== uid || !hasRolePermission(membership, requiredPermission)) {
         throw new HttpError(403, 'capacity_permission_required');
@@ -625,20 +627,23 @@ async function mutateCapacity(env: Env, uid: string, input: Record<string, unkno
       }
       const counterPath = 'tenants/' + tenantId + '/limitCounters/' + kind;
       const counter = await getDocument(env, token, counterPath, transaction);
-      let count: number;
+      let count: number | null;
       if (counter) {
         if (counter.tenantId !== tenantId || counter.kind !== kind || !Number.isInteger(counter.count) || counter.count < 0) throw new HttpError(503, 'capacity_counter_invalid');
         count = counter.count;
-      } else {
+      } else if (delta > 0) {
         const rows = await queryCollection(env, token, 'tenants/' + tenantId, collectionId,
           [{ fieldPath: kind === 'resources' ? 'active' : 'status', op: 'EQUAL', value: kind === 'resources' ? true : 'active' }], transaction);
         count = activeCapacityRows(kind, rows).length;
+      } else {
+        // A downgrade/inactivation must remain possible even before a counter has been initialized.
+        count = null;
       }
       let limit: number | null;
-      try { limit = getLimit(tenant as any, capacityLimitKey(kind) as any); }
+      try { limit = delta > 0 ? getLimit(tenant as any, capacityLimitKey(kind) as any) : null; }
       catch { throw new HttpError(503, 'plan_limit_unavailable'); }
       if (limit !== null && (!Number.isFinite(limit) || limit < 0)) throw new HttpError(503, 'plan_limit_unavailable');
-      if (delta > 0 && limit !== null && count + delta > limit) throw new HttpError(409, 'commercial_limit_reached');
+      if (delta > 0 && limit !== null && count !== null && count + delta > limit) throw new HttpError(409, 'commercial_limit_reached');
       const now = new Date();
       const auditId = crypto.randomUUID();
       after.lastAuditLogId = auditId;
@@ -649,9 +654,9 @@ async function mutateCapacity(env: Env, uid: string, input: Record<string, unkno
         : kind === 'resources'
           ? operation === 'create' ? 'resource.create' : operation === 'deactivate' ? 'resource.deactivate' : operation === 'activate' ? 'resource.activate' : 'resource.update'
           : operation === 'create' ? 'membership.create' : 'membership.update';
-      const updatedCounter = { tenantId, kind, count: Math.max(0, count + delta), updatedAt: now };
+      const updatedCounter = count === null ? null : { tenantId, kind, count: Math.max(0, count + delta), updatedAt: now };
       const writes: unknown[] = [
-        documentWrite(env, counterPath, updatedCounter, !counter),
+        ...(updatedCounter ? [documentWrite(env, counterPath, updatedCounter, !counter)] : []),
         documentWrite(env, recordPath, after, operation === 'create'),
         documentWrite(env, 'tenants/' + tenantId + '/auditLogs/' + auditId, {
           tenantId, actorId: uid, actorRole: membership.role, action,
@@ -660,7 +665,7 @@ async function mutateCapacity(env: Env, uid: string, input: Record<string, unkno
         }, true),
       ];
       await commitTransaction(env, token, transaction, writes);
-      return { id: recordId, count: updatedCounter.count, limit };
+      return { id: recordId, count: updatedCounter?.count ?? null, limit };
     } catch (error) {
       await rollbackTransaction(env, token, transaction);
       if (error instanceof FirestoreError && fsStatus(error) && attempt < 4) continue;

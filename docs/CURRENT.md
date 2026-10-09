@@ -29,5 +29,6 @@ Revisão comercial/pricing desta versão:
 - `docs/versions/v01-multitenant-whitelabel/DELTA_TECNICO.md`
 - `docs/versions/v01-multitenant-whitelabel/PRIORIZACAO.md`
 - `docs/versions/v01-multitenant-whitelabel/DECISOES_PRICING.md`
+- `docs/versions/v01-multitenant-whitelabel/PLANS_AND_ENTITLEMENTS.md`
 
 Snapshot de auditoria preservado em `FEATURE_INVENTORY.md`.

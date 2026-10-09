@@ -44,7 +44,7 @@ export const PLAN_CATALOG: Readonly<Record<PaidPlanId, PlanDefinition>> = {
 /** Features with a real, usable implementation in this checkout. Planned/demo-only items stay unavailable. */
 export const IMPLEMENTED_FEATURES: ReadonlySet<EntitlementFeature> = new Set([
   'agenda', 'patients', 'professionals', 'procedures', 'physical_resources',
-  'clinical_records', 'clinical_photos', 'recall_center', 'mini_site',
+  'clinical_records', 'clinical_photos', 'mini_site',
 ]);
 
 export function canonicalPlanId(planId: PlanId | undefined): PaidPlanId | null {

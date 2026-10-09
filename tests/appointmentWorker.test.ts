@@ -209,11 +209,11 @@ async function save({
   }), workerEnv);
 }
 
-async function mutateCapacity(kind: 'professionals' | 'resources' | 'memberships', operation: 'create' | 'activate' | 'deactivate' | 'update', values: Record<string, unknown>, recordId?: string) {
+async function mutateCapacity(kind: 'professionals' | 'resources' | 'memberships', operation: 'create' | 'activate' | 'deactivate' | 'update', values: Record<string, unknown>, recordId?: string, tenantId = 'A') {
   return appointmentWorker.fetch(new Request('https://worker.test/v1/tenants/capacity', {
     method: 'POST',
     headers: { Authorization: 'Bearer valid-test-token', Origin: 'https://app.test', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tenantId: 'A', kind, operation, values, recordId }),
+    body: JSON.stringify({ tenantId, kind, operation, values, recordId }),
   }), workerEnv);
 }
 
@@ -279,7 +279,7 @@ describe('Worker de limites comerciais', () => {
     ]);
     expect(results.map(response => response.status).sort()).toEqual([200, 409]);
     expect(documents.get('tenants/A/limitCounters/professionals')?.count).toBe(3);
-    expect([...documents.values()].filter(item => item.tenantId === 'A' && item.status === 'active' && item.displayName).length).toBe(3);
+    expect([...documents.entries()].filter(([path, item]) => path.startsWith('tenants/A/professionals/') && item.status === 'active').length).toBe(3);
   });
 
   it('permite inativar acima da nova cota e depois reativar somente se houver capacidade', async () => {
@@ -289,6 +289,31 @@ describe('Worker de limites comerciais', () => {
     expect(inactive.status).toBe(200);
     expect(documents.get('tenants/A/limitCounters/professionals')?.count).toBe(1);
     expect((await mutateCapacity('professionals', 'activate', {}, 'prof-b')).status).toBe(409);
+  });
+
+  it('permite inativação quando o contador ainda não existe, sem bloqueio comercial', async () => {
+    documents.set('tenants/A', { ...documents.get('tenants/A'), planId: 'essential', subscriptionStatus: 'cancelled' });
+    documents.delete('tenants/A/limitCounters/professionals');
+    const response = await mutateCapacity('professionals', 'deactivate', {}, 'prof-b');
+    expect(response.status).toBe(200);
+    expect(documents.get('tenants/A/professionals/prof-b')?.status).toBe('inactive');
+    expect(documents.has('tenants/A/limitCounters/professionals')).toBe(false);
+  });
+
+  it('nega nova capacidade em trial expirado e bloqueia mutação na demo inclusive desativação', async () => {
+    documents.set('tenants/A', {
+      ...documents.get('tenants/A'), planId: 'pro', subscriptionStatus: 'trial', trialUntil: '2020-01-01T00:00:00.000Z',
+    });
+    expect((await mutateCapacity('professionals', 'create', { displayName: 'Dentista novo' })).status).toBe(403);
+    documents.set('tenants/A', { ...documents.get('tenants/A'), planId: 'premium_demo', subscriptionStatus: 'demo' });
+    expect((await mutateCapacity('professionals', 'deactivate', {}, 'prof-b')).status).toBe(409);
+    expect(documents.get('tenants/A/professionals/prof-b')?.status).toBe('active');
+  });
+
+  it('não permite usar membership de Tenant A para alterar capacidade de Tenant B', async () => {
+    expect((await mutateCapacity('professionals', 'create', { displayName: 'Dentista cruzado' }, undefined, 'B')).status).toBe(403);
+    expect([...documents.keys()].some(path => path.startsWith('tenants/B/professionals/'))).toBe(true);
+    expect(documents.has('tenants/B/limitCounters/professionals')).toBe(false);
   });
 
   it('não conta o tenant_owner no limite de memberships adicionais', async () => {

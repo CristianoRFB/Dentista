@@ -14,7 +14,7 @@ Camadas: Platform, Tenant, Scheduling, Patients, Clinical, Billing, Documents, A
 - Platform Owner não recebe acesso clínico por ser operador. Acesso requer documento `platformSupportAccess/{tenantId}` válido, motivo e expiração.
 - modo demonstrativo só é habilitado em desenvolvimento com `VITE_USE_DEMO_DATA=true`; seus dados fictícios não são usados como origem operacional conectada.
 
-Não estão implementados odontograma, plano de tratamento, billing, entitlements, intake público persistente ou escrita da Central de Retorno.
+Não estão implementados odontograma, plano de tratamento, billing automático, intake público persistente ou escrita da Central de Retorno. Plans & Entitlements v01 já está implementado conforme o estado descrito nesta versão.
 
 
 ## Extensões após revisão comercial
@@ -26,22 +26,12 @@ Não estão implementados odontograma, plano de tratamento, billing, entitlement
 - camada pública de marketing separada da aplicação autenticada.
 
 
-## Camada comercial proposta
+## Plans & Entitlements v01
 
-A revisão de pricing adiciona **arquitetura de especificação**, não entitlement funcional:
+`src/commercial/planCatalog.ts` é a fonte canônica local de preços, features implementadas e limites aprovados. `entitlementService.ts` calcula features efetivas a partir de plano, status, overrides e flags operacionais; ausência de flag usa o default do catálogo e `false` desliga. Feature planejada/deferred não é liberada por override.
 
-```text
-Pricing proposal / plan catalog
-        ↓
-Tenant subscription metadata
-        ↓
-Effective entitlements (NEXT)
-        ↓
-┌───────────────────────┐
-│ UI feature gates      │
-│ backend/Worker checks │
-│ limit enforcement     │
-└───────────────────────┘
-```
+Platform Owner atribui manualmente `planId`, `subscriptionStatus`, `trialUntil`, `entitlementOverrides` e `limitOverrides`. Cada alteração comercial exige motivo e grava snapshot antes/depois no audit log, sem dados clínicos. `premium_demo` é alias Premium, não plano pago; a demo usa dados fictícios, banner permanente e somente leitura.
 
-Nesta v01 somente a proposta comercial e metadados opcionais foram adicionados. O resolver efetivo de entitlement e a validação de backend permanecem `NEXT`.
+Criação/ativação de profissionais, memberships não-owner e recursos físicos passa pelo Worker existente. Contadores por tenant são inicializados e atualizados na mesma transação Firestore; as Rules negam gravação direta do navegador e acesso aos contadores. Desativação continua permitida quando o tenant está acima da nova quota. Pacientes, agendamentos e histórico clínico não têm limites artificiais; downgrade não apaga registros.
+
+Storage é exceção operacional: `getLimit(storageBytes)` retorna `null`, não há quota anunciada ou aplicada até existir medição confiável de bytes e custo R2. Billing automático, checkout e gateway permanecem DEFERRED.

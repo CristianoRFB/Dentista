@@ -16,10 +16,11 @@ Categorias: PLATFORM, TENANT ADMIN, CLINICAL, RECEPTION, PATIENT e PUBLIC. Wiref
 | Recursos | `/{tenantSlug}/app/recursos` | CRUD mínimo | Não arquivada |
 | Cadastros | `/{tenantSlug}/app/cadastros` | profissionais/procedimentos/equipe | Não arquivada |
 | Site público do tenant | `/{tenantSlug}` | perfil público real; agendamento e intake para tenants reais indisponíveis | Não arquivada |
+| Preços | `/precos` | preços, limites, disponibilidade e contratação manual | Inspecionada em Vite local com configuração fictícia; screenshot exibido nesta sessão, não arquivado |
 
 ## Limitação de captura
 
-O Vite foi executado em modo demo de desenvolvimento com dados fictícios e a interface do tenant foi inspecionada no navegador. A captura foi exibida na sessão, porém a política do navegador bloqueou exportá-la para o workspace e proibiu tentativas equivalentes. Por isso, não há screenshot arquivado nesta versão; esta limitação não é tratada como evidência visual concluída. A tela Platform Owner também não foi inspecionada visualmente por falta de uma sessão autenticada correspondente.
+O Vite foi executado em modo demo de desenvolvimento com dados fictícios. Nesta atualização, a página `/precos` foi inspecionada visualmente no navegador local e a captura foi exibida nesta sessão. A ferramenta de navegador não disponibilizou uma operação para salvar essa imagem no workspace; não há screenshot arquivado nesta versão. As demais capturas continuam pendentes. A tela Platform Owner também não foi inspecionada visualmente por falta de uma sessão autenticada correspondente.
 
 Não referenciar wireframe ou imagem conceitual como screenshot real. Os visuais em `generated/` são materiais de conceito separados.
 

@@ -2,7 +2,7 @@
 
 > Status: **APROVADO PELO PRODUTO em 2026-10-06**.  
 > Estas decisões estão travadas para a vertical Dentista até revisão explícita.  
-> A aprovação comercial **não significa implementação técnica de entitlements, limits ou cobrança**.
+> A aprovação comercial não ativa billing. Runtime de entitlements e quotas está implementado; cobrança automática continua DEFERRED.
 
 ## A. PREÇOS — APROVADO
 
@@ -15,7 +15,7 @@
   - Premium: R$ 2.050,92/ano.
 - **Implantação padrão na fase de validação:** R$ 0.
 - **Migração complexa:** Add-on sob orçamento.
-- **Trial futuro:** 14 dias sem cartão quando o lifecycle de assinatura existir; antes disso, usar demo.
+- **Trial:** até 14 dias sem cartão, ativado manualmente pelo Platform Owner com `trialUntil` explícito; sem conversão automática.
 - **Add-ons externos:** sem preço até provedor/custo real estarem definidos.
 - **Storage excedente:** sem preço público até existir medição confiável de uso/custo.
 
@@ -149,26 +149,27 @@ Não colocar na comparação comercial:
 
 - downgrade nunca apaga prontuário, pacientes, fotos ou histórico;
 - se o tenant estiver acima do novo limite, preservar dados e bloquear apenas nova capacidade quando necessário;
-- limites de profissionais/recursos devem ser validados em camada confiável quando implementados;
+- limites de profissionais, memberships adicionais e recursos físicos são validados transacionalmente pelo Worker;
+- atribuição manual de plano/status/trial/overrides pelo Platform Owner exige motivo e snapshot antes/depois em auditoria sem PHI;
+- acesso clínico necessário à continuidade não é bloqueado por plano ou estado comercial; demo é somente leitura;
 - cota de mídia deve usar consumo real do R2 antes de virar cobrança pública;
 - segurança clínica nunca depende do plano;
 - não criar fork de código por plano ou tenant.
 
-## CANDIDATOS A PADRÃO GLOBAL — NÃO DEFINIR NESTA VERTICAL
+## GLOBAL STANDARD v01 — IMPLEMENTADO NESTA VERTICAL
 
-A vertical Dentista declara necessidade, mas **não define sozinha o contrato global** para:
+Esta vertical implementa o contrato de Plans & Entitlements v01 com adaptação aos limites e funcionalidades aprovados para Dentista:
 
-- `PlanCatalog`;
-- `EntitlementService`;
-- `DemoMode`;
-- `SubscriptionStatus`;
-- feature gating;
-- limits;
-- usage;
-- `tenant.entitlementOverrides`;
-- trial lifecycle;
-- upgrade/downgrade;
-- atribuição manual de plano pelo Platform Owner.
+- `src/commercial/planCatalog.ts` é a fonte de preços, plano e limites;
+- `src/commercial/entitlementService.ts` resolve feature e quota efetivas;
+- feature gates protegem navegação/rotas, Firestore Rules e operações do Worker;
+- quotas de capacidade contam profissionais, memberships ativos exceto `tenant_owner`, e recursos;
+- `tenant.entitlementOverrides` e `tenant.limitOverrides` são mudanças manuais auditadas;
+- trial exige data final explícita de até 14 dias, sem conversão automática;
+- upgrade/downgrade preservam dados e bloqueiam apenas novas capacidades acima da quota;
+- `premium_demo` permanece alias read-only com conteúdo fictício.
+
+O padrão continua sujeito a sincronização explícita quando o Project Core fornecer versão posterior. Esta implementação não adiciona checkout, gateway, cobrança automática ou serviço pago.
 
 ## DECISÕES DE BAIXO RISCO TAMBÉM APROVADAS
 

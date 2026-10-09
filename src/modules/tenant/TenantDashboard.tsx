@@ -6,6 +6,7 @@ import { demoAppointments, demoPatients, demoRecalls, demoResources } from '../.
 import { listTenantRecords } from '../../lib/tenantData';
 import { db } from '../../lib/firebase';
 import { useReadyTenantAccess } from './TenantContext';
+import { canUse } from '../../commercial/entitlementService';
 
 export function TenantDashboard() {
   const { tenantSlug = 'demo-clinica' } = useParams();
@@ -36,7 +37,7 @@ export function TenantDashboard() {
         const [allAppointments, allPatients, allRecalls, allResources] = await Promise.all([
           session.permissions.includes('appointments.read') ? getDocs(appointmentQuery).then(snapshot => snapshot.docs.map(item => ({ ...item.data(), id: item.id }) as Appointment)) : Promise.resolve([]),
           session.permissions.includes('patients.read') ? listTenantRecords<Patient>(session, 'patients') : Promise.resolve([]),
-          session.permissions.includes('recalls.read') ? listTenantRecords<Recall>(session, 'recalls') : Promise.resolve([]),
+          session.permissions.includes('recalls.read') && canUse(session.tenant, 'recall_center') ? listTenantRecords<Recall>(session, 'recalls') : Promise.resolve([]),
           session.permissions.includes('resources.read') ? listTenantRecords<ScheduleResource>(session, 'scheduleResources') : Promise.resolve([]),
         ]);
         if (cancelled) return;
@@ -68,7 +69,7 @@ export function TenantDashboard() {
     <div className="grid cols-4">
       {session.permissions.includes('appointments.read') && <div className="metric-card"><b>{appointments.length}</b><span>consultas hoje</span></div>}
       {session.permissions.includes('patients.read') && <div className="metric-card"><b>{patients.length}</b><span>pacientes ativos</span></div>}
-      {session.permissions.includes('recalls.read') && <div className="metric-card"><b>{recalls.length}</b><span>retornos pendentes</span></div>}
+      {session.permissions.includes('recalls.read') && canUse(session.tenant, 'recall_center') && <div className="metric-card"><b>{recalls.length}</b><span>retornos pendentes</span></div>}
       {session.permissions.includes('resources.read') && <div className="metric-card"><b>{resources.length}</b><span>recursos ativos</span></div>}
     </div>
     {session.permissions.includes('appointments.read') && <div className="dashboard-layout">
@@ -80,7 +81,7 @@ export function TenantDashboard() {
       </div>
       <div className="card"><div className="card-title"><h2>Atalhos</h2></div><div className="shortcut-grid">
         {session.permissions.includes('patients.read') && <Link to={base + '/pacientes'}>Pacientes <span>→</span></Link>}
-        {session.permissions.includes('recalls.read') && <Link to={base + '/retornos'}>Central de retorno <span>→</span></Link>}
+        {session.permissions.includes('recalls.read') && canUse(session.tenant, 'recall_center') && <Link to={base + '/retornos'}>Central de retorno <span>→</span></Link>}
         {session.permissions.includes('resources.read') && <Link to={base + '/recursos'}>Cadeiras e salas <span>→</span></Link>}
         {(session.permissions.includes('professionals.manage') || session.permissions.includes('procedures.manage')) && <Link to={base + '/cadastros'}>Cadastros <span>→</span></Link>}
       </div></div>

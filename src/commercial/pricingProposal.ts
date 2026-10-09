@@ -1,6 +1,6 @@
 import { annualMonthlyEquivalentCents, PLAN_CATALOG, type PlanDefinition } from './planCatalog';
 
-export type FeatureState = 'IMPLEMENTADA' | 'PLANEJADA' | 'DEFERRED';
+export type FeatureState = 'IMPLEMENTADA' | 'EM_IMPLEMENTACAO' | 'PLANEJADA' | 'DEFERRED';
 export type CommercialPlanProposal = PlanDefinition & {
   highlights: Array<{ label: string; state: FeatureState }>;
 };
@@ -18,7 +18,7 @@ const planHighlights: Record<PlanDefinition['id'], CommercialPlanProposal['highl
   pro: [
     { label: 'Tudo do Essencial', state: 'IMPLEMENTADA' },
     { label: 'Até 3 profissionais e 5 recursos físicos', state: 'IMPLEMENTADA' },
-    { label: 'Central de retorno', state: 'IMPLEMENTADA' },
+    { label: 'Central de retorno', state: 'EM_IMPLEMENTACAO' },
     { label: 'Pré-cadastro por link', state: 'PLANEJADA' },
     { label: 'Orçamentos, financeiro e relatórios básicos', state: 'PLANEJADA' },
   ],

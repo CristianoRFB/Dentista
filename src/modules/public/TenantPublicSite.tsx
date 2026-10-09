@@ -8,6 +8,11 @@ import { demoModeEnabled } from '../auth/AuthRoutes';
 
 interface PublicTenantProfile extends TenantBranding { tenantId: string; }
 
+function demoTenantForSlug(slug: string) {
+  const tenant = demoTenants.find(item => item.slug === slug);
+  return tenant?.planId === 'premium_demo' && tenant.subscriptionStatus === 'demo' ? tenant : null;
+}
+
 export function TenantPublicSite() {
   const { tenantSlug = '' } = useParams();
   const [profile, setProfile] = useState<PublicTenantProfile | null>(null);
@@ -17,8 +22,8 @@ export function TenantPublicSite() {
     let cancelled = false;
     async function load() {
       setState('loading'); setProfile(null);
-      if (demoModeEnabled() && tenantSlug === 'demo-clinica') {
-        const demo = demoTenants.find(item => item.slug === tenantSlug);
+      if (demoModeEnabled()) {
+        const demo = demoTenantForSlug(tenantSlug);
         if (!cancelled && demo) {
           setProfile({ tenantId: demo.id, ...(demo.branding ?? {}) });
           setState('ready');
@@ -50,7 +55,7 @@ export function TenantPublicSite() {
   const style = { '--brand': profile.primaryColor || '#163d3a', '--accent': profile.accentColor || '#72b9ad' } as React.CSSProperties;
   const hasContact = !!(profile.phone || profile.email || profile.address);
   return <main className="tenant-public" style={style}>
-    {demoModeEnabled() && tenantSlug === 'demo-clinica' && <p className="demo-banner public-demo-banner">Modo demonstrativo · conteúdo fictício.</p>}
+    {demoModeEnabled() && demoTenantForSlug(tenantSlug) && <p className="demo-banner public-demo-banner">Modo demonstrativo · conteúdo fictício.</p>}
     <header className="tenant-public-nav marketing-container"><Link className="brand" to={'/' + tenantSlug}><span className="brand-mark">{publicName.slice(0, 1).toUpperCase()}</span><span>{publicName}</span></Link>
       <nav aria-label="Navegação pública"><a href="#sobre">Sobre</a>{hasContact && <a href="#contato">Contato</a>}</nav>
       {profile.email ? <a className="btn primary" href={'mailto:' + profile.email}>Fale com a clínica</a> : profile.phone ? <a className="btn primary" href={'tel:' + profile.phone}>Ligar</a> : <Link className="btn secondary" to="/login">Acesso da equipe</Link>}
