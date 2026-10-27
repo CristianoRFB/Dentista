@@ -250,6 +250,14 @@ function documentWrite(env: Env, path: string, value: Record<string, unknown>, c
   return write;
 }
 
+/** Write only the changed metadata fields; original Firestore timestamps and R2 pointers stay intact. */
+function documentPatch(env: Env, path: string, fields: Record<string, unknown>) {
+  return {
+    update: { name: firestoreDocumentName(env, path), fields: encodeFields(fields) },
+    updateMask: { fieldPaths: Object.keys(fields) },
+  };
+}
+
 function appointmentPermission(membership: Record<string, any>) {
   return hasRolePermission(membership, 'appointments.manage')
     && typeof membership.tenantId === 'string'
@@ -857,7 +865,6 @@ async function reviewMedia(request: Request,env:Env,uid:string,photoId:string) {
       const now=new Date(),auditId=crypto.randomUUID();
       const revision=Number.isSafeInteger(photo.revision)?Number(photo.revision)+1:1;
       const updated={
-        ...photo,
         status:next.status,lifecycleStatus:next.lifecycleStatus,revision,
         tags:input.tags,updatedAt:now,updatedBy:uid,lastAuditLogId:auditId,
         ...(input.action==='archive'?{archivedAt:now,archivedBy:uid}:{}),
@@ -869,7 +876,7 @@ async function reviewMedia(request: Request,env:Env,uid:string,photoId:string) {
         reason:input.reason,timestamp:now,
       };
       await commitTransaction(env,token,transaction,[
-        documentWrite(env,photoPath,updated),
+        documentPatch(env,photoPath,updated),
         documentWrite(env,'tenants/'+input.tenantId+'/auditLogs/'+auditId,audit,true),
       ]);
       return {photoId,status:next.status,lifecycleStatus:next.lifecycleStatus,revision};
