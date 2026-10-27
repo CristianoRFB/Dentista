@@ -64,3 +64,11 @@ Checkout, gateway, webhook e billing automático continuam inexistentes por deci
 Na branch de continuação `chore/global-standard-v01-ci-20261027`, o endpoint Worker emite tokens opacos individuais de 7 dias para equipes com `intake.manage` em planos Pro/Premium. `POST /v1/public/intake` consome cada token uma única vez em transação e grava solicitação `pending_review`. Firestore Rules impedem acesso ao segredo, escrita pública direta e aprovação sem audit log. `/app/pre-cadastros` permite a recepção aprovar/rejeitar, sem criação automática de prontuário ou cadastro definitivo. Testes no Worker e no Firestore Emulator cobrem replay, expiração, acesso entre tenants, negativa no Essencial e auditoria. A demo permanece somente leitura.
 
 Pendentes: agendamento aberto sem convite e proteção antiabuso, telas hospedadas e screenshots reais, provisionamento Firebase/Worker/R2 e deploy de produção. Não adicionar billing automático ou alterar preços comerciais.
+
+## Checkpoint D5 — mídia clínica (2026-10-27)
+
+Na branch `chore/global-standard-v01-ci-20261027`, fotos privadas mantêm seu objeto R2 original. O Worker autenticado acrescentou revisão `verify/reject` e ciclo lógico `archive/restore`, com autor, motivo e audit log transacional; a atualização Firestore usa `updateMask`, preservando campos históricos originais. A galeria oferece ações por profissional autorizado, busca/filtragem de arquivadas e limpeza de `blob:` URLs ao atualizar ou desmontar a tela. A demo permanece somente leitura.
+
+Os testes `tests/mediaLifecycle.test.ts` e `tests/mediaWorker.test.ts` exercitam a transição reversível, RBAC, negativa entre tenants, ausência de exclusão do bucket e preservação dos campos históricos. O Core, D1–D4 e os contratos de pricing/limites continuam intactos.
+
+**Ainda não realizado:** provisionamento real de R2/Worker/Firebase, política operacional de backup/retention, reconciliação de objetos órfãos, captura de screenshots reais e homologação hospedada. Não confundir arquivamento lógico com exclusão definitiva ou restauração de disaster recovery.
