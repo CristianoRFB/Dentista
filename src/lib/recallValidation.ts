@@ -33,3 +33,8 @@ export function requireRecallAccess(session: TenantAccessState, writing: boolean
   if (!canUse(ready.tenant, 'recall_center')) throw new Error('Central de Retorno disponível apenas nos planos habilitados.');
   return ready;
 }
+
+export function recallDisplayStatus(recall: { status: RecallStatus; dueAt: string }, now = Date.now()): RecallStatus {
+  if (recall.status === 'planned' && Date.parse(recall.dueAt) < now) return 'due';
+  return recall.status;
+}
