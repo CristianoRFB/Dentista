@@ -5,8 +5,8 @@ Não usar esta tabela como prova de homologação hospedada. Sem pacientes reais
 
 | Módulo GOAL | Código principal | Teste verificável | Estado deste checkpoint |
 |---|---|---|---|
-| D1 Odontograma | `src/domain/odontogram.ts`, `src/lib/odontogramData.ts`, `src/modules/clinical/PatientOdontogramPage.tsx`, `firestore.rules` | `tests/odontogram.test.ts`, `tests/firestoreRules.test.ts` | CODE_COMPLETE_CI_PENDING — eventos imutáveis, correções e UI; ambiente real não testado |
-| D2 Tratamento/orçamento | `src/domain/types.ts` (somente conceitos) | Sem teste operacional | MISSING |
+| D1 Odontograma | `src/domain/odontogram.ts`, `src/lib/odontogramData.ts`, `src/modules/clinical/PatientOdontogramPage.tsx`, `firestore.rules` | `tests/odontogram.test.ts`, `tests/firestoreRules.test.ts` | CODE_COMPLETE — CI `aaa6580106` verde; ambiente real pendente |
+| D2 Tratamento/orçamento | `src/domain/treatmentPlan.ts`, `src/lib/treatmentPlanData.ts`, `src/modules/clinical/PatientTreatmentPage.tsx`, `firestore.rules` | `tests/treatmentPlan.test.ts`, `tests/firestoreRules.test.ts` | CODE_COMPLETE — CI `b06af554` verde, versões append-only e orçamento Pro; ambiente real pendente |
 | D3 Central de Retorno | `src/lib/recallData.ts`, `src/lib/recallValidation.ts`, `src/modules/recalls/RecallCenterPage.tsx`, `firestore.rules` | `tests/recallValidation.test.ts`, `tests/firestoreRules.test.ts` | CODE_COMPLETE — CI `7108c582` verde; ambiente real pendente |
 | D4 Intake + booking público | `src/modules/public/PublicIntakePage.tsx`, `PublicBookingPage.tsx` | Fluxos públicos reais ainda sem prova | PARTIAL / MISSING_BACKEND |
 | D5 Segurança + mídia | `workers/media-api/src/index.ts`, `firestore.rules` | `tests/mediaWorker.test.ts`, `tests/firestoreRules.test.ts` | PARTIAL — núcleo protegido; ciclo de vida completo/restauração pendentes |
