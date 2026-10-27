@@ -106,6 +106,7 @@ beforeEach(() => {
   storedObjects.clear();
   vi.mocked(env.CLINICAL_MEDIA.put).mockClear();
   vi.mocked(env.CLINICAL_MEDIA.get).mockClear();
+  vi.mocked(env.CLINICAL_MEDIA.delete).mockClear();
   vi.mocked(verifyFirebaseIdToken).mockReset().mockResolvedValue({ uid: 'dentist-a' });
 });
 
