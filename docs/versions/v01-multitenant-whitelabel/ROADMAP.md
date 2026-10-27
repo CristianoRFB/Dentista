@@ -12,8 +12,8 @@ Antes de produção, o ambiente único da vertical precisa ter credenciais de Wo
 
 ## Fase 2 — Experiência clínica
 - odontograma interativo: código da visualização FDI + persistência append-only auditada concluído na branch; homologação hospedada pendente;
-- plano de tratamento;
-- orçamento;
+- plano de tratamento: versões imutáveis e etapas operacionais no branch de desenvolvimento; CI/Emulator aprovados;
+- orçamento: cotação Pro/Premium estruturada e exportável, sem gateway/assinatura; CI/Emulator aprovados;
 - central de retorno persistida: implementação interna P0 concluída na branch de desenvolvimento; sem lembretes externos;
 - pré-cadastro tokenizado + revisão;
 - documentos e templates.
