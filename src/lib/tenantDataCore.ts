@@ -4,7 +4,7 @@ import {
 } from 'firebase/firestore';
 import type { TenantAccessState } from '../modules/tenant/tenantResolver';
 
-export type TenantRecordCollection = 'patients' | 'professionals' | 'procedures' | 'scheduleResources' | 'recalls' | 'appointments';
+export type TenantRecordCollection = 'patients' | 'professionals' | 'procedures' | 'scheduleResources' | 'recalls' | 'appointments' | 'treatmentPlans';
 
 export function requireReady(session: TenantAccessState) {
   if (session.status !== 'ready') throw new Error('Acesso ao tenant indisponível');
