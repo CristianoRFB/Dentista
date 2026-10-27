@@ -56,7 +56,7 @@
 | Fotos | Upload R2 privado | IMPLEMENTADA | Essencial | entitlement e permissão clínica no Worker; acesso a mídia existente preservado; produção sem binding/segredos confirmados |
 | Fotos | Timeline/comparação antes/depois | PLANEJADA | Pro | — |
 | Retorno | Central de retorno | IMPLEMENTADA | Pro | CRUD interno auditado e acesso restrito, CI/Emulator; sem lembretes automáticos |
-| Intake | Pré-cadastro por link | EM IMPLEMENTAÇÃO | Pro | página demonstrativa sem envio persistente; endpoint seguro pendente; entitlement indisponível |
+| Intake | Pré-cadastro por link | IMPLEMENTADA | Pro | token opaco de uso único e 7 dias, contato público pendente de revisão, Worker e Rules tenant-aware; produção não homologada |
 | Site público | Mini-site white-label do tenant | IMPLEMENTADA | Essencial | perfil público configurável; agendamento público ainda não persiste |
 | Documentos | Receitas/atestados/templates básicos | PLANEJADA | Essencial | — |
 | Financeiro | Financeiro básico | PLANEJADA | Pro | — |
