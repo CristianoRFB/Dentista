@@ -4,7 +4,7 @@ import {
   assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
-  collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch,
+  collection, deleteDoc, doc, getDoc, getDocs, query, where, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch,
   runTransaction,
 } from 'firebase/firestore';
 import { permissionTemplates } from '../src/domain/permissions';
@@ -637,6 +637,49 @@ describe('Firestore Rules — isolamento e autorização', () => {
         resourceId: cross.id, patientId: 'patient-a', timestamp: serverTimestamp(),
       });
     }));
+  });
+
+
+  it('D4: token privado e fila de pré-cadastros isolada entre tenants e papéis', async () => {
+    await env.withSecurityRulesDisabled(async context => {
+      const db=context.firestore();
+      await updateDoc(doc(db,'tenants/A'),{planId:'pro'});
+      await setDoc(doc(db,'tenants/A/intakeTokens/hash-do-token'), {
+        tenantId:'A',createdBy:'reception-a',usedAt:null,
+        createdAt:serverTimestamp(),expiresAt:Timestamp.fromMillis(Date.now()+86400000),
+      });
+      await setDoc(doc(db,'tenants/A/patientIntakeSubmissions/intake-a'),{
+        id:'intake-a',tenantId:'A',tokenId:'hash-do-token',status:'pending_review',
+        name:'Pessoa Fictícia',phone:'(17) 99999-9999',email:'fake@example.test',submittedAt:serverTimestamp(),
+      });
+    });
+    const reception=env.authenticatedContext('reception-a').firestore();
+    const dentist=env.authenticatedContext('dentist-a').firestore();
+    const b=env.authenticatedContext('dentist-b').firestore();
+    const queue=doc(reception,'tenants/A/patientIntakeSubmissions/intake-a');
+    await assertSucceeds(getDoc(queue));
+    await assertSucceeds(getDocs(query(collection(reception,'tenants/A/patientIntakeSubmissions'),where('tenantId','==','A'))));
+    await assertFails(getDoc(doc(dentist,'tenants/A/patientIntakeSubmissions/intake-a')));
+    await assertFails(getDoc(doc(b,'tenants/A/patientIntakeSubmissions/intake-a')));
+    await assertFails(getDoc(doc(reception,'tenants/A/intakeTokens/hash-do-token')));
+    await assertFails(setDoc(doc(reception,'tenants/A/intakeTokens/forged'),{tenantId:'A'}));
+    await assertFails(setDoc(doc(reception,'tenants/A/patientIntakeSubmissions/forged'),{tenantId:'A',status:'approved'}));
+    await assertFails(updateDoc(queue,{status:'approved',name:'Alteração sem autorização'}));
+
+    const audit=doc(reception,'tenants/A/auditLogs/intake-review-audit');
+    const batch=writeBatch(reception);
+    batch.update(queue,{status:'approved',reviewedBy:'reception-a',reviewedAt:serverTimestamp(),lastAuditLogId:audit.id});
+    batch.set(audit,{tenantId:'A',actorId:'reception-a',actorRole:'receptionist',action:'intake.review',
+      resourceType:'intakeSubmission',resourceId:'intake-a',timestamp:serverTimestamp()});
+    await assertSucceeds(batch.commit());
+    expect((await getDoc(queue)).data()?.status).toBe('approved');
+    await assertFails(updateDoc(queue,{status:'pending_review'}));
+    await assertFails(deleteDoc(queue));
+  });
+
+  it('D4: Essencial não lê fila de pré-cadastro por link',async()=>{
+    const reception=env.authenticatedContext('reception-a').firestore();
+    await assertFails(getDocs(query(collection(reception,'tenants/A/patientIntakeSubmissions'),where('tenantId','==','A'))));
   });
 
   it('Central de Retorno Pro: cria/atualiza com auditoria, nega forgery e acesso cruzado', async () => {
