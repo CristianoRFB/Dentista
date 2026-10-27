@@ -83,4 +83,6 @@
 - Galeria privada: estados ativos/arquivados, tags limitadas, motivo de revisão, limpeza de object URLs no navegador. Leitura/download permanecem autenticados.
 - Evidência técnica: `tests/mediaLifecycle.test.ts`, `tests/mediaWorker.test.ts`, CI TypeScript/Vitest/Rules/Build aprovado. Nenhuma screenshot real arquivada.
 - Upload compensa falha ao iniciar a transação Firestore após R2.put, removendo o objeto recém-criado; teste negativo automatizado verifica ausência de bytes órfãos nesse cenário.
-- **Ainda pendente:** reconciliar objetos órfãos de falhas não compensadas/metadados inconsistentes, política operacional de retenção/restauração, provisionamento de R2/Worker/Firebase e testes hospedados. Não anunciar retenção automatizada ou recuperação de desastres como concluída.
+- Diagnóstico de integridade por paciente disponível em `GET /v1/media/integrity` (identidade clínica autenticada, escopo de tenant/paciente, modo exclusivamente leitura). Relatório detecta mídia R2 sem referência e registros sem objeto; nega resultados parciais acima de 200 itens e não executa exclusões.
+- Galeria carrega oito imagens inicialmente, com opção de exibir mais; diagnóstico é separado das ações clínicas.
+- **Ainda pendente:** reconciliação paginada para volumes acima do limite, política operacional de retenção/backup/restauração de desastre, provisionamento de R2/Worker/Firebase e testes hospedados. Não anunciar retenção automatizada ou recuperação de desastres como concluída.
