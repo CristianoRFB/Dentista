@@ -101,7 +101,7 @@ export async function updateTreatmentPlan(session:TenantAccessState,plan:Treatme
     if (plan.status!=='draft') {
       if(was.quoteEnabled!==values.quoteEnabled||was.items.length!==values.items.length||
         was.items.some((item,i)=>['procedureId','description','toothId','quantity','unitPriceCents'].some(key=>
-          item[key as keyof TreatmentItem]!==values.items[i][key as keyof TreatmentItem])) throw new Error('Itens aprovados são imutáveis; registre novo plano para rever valores.');
+          item[key as keyof TreatmentItem]!==values.items[i][key as keyof TreatmentItem]))) throw new Error('Itens aprovados são imutáveis; registre novo plano para rever valores.');
     }
     const version=plan.currentVersion+1;
     const nextRef=doc(collection(db,'tenants',tenantId,'treatmentPlans',plan.id,'versions'));
