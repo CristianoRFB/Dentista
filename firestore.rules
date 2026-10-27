@@ -343,6 +343,14 @@ service cloud.firestore {
           : false);
     }
 
+    function intakeReviewAuditMutationMatches(tenantId, auditId, resourceId, data) {
+      let path = /databases/$(database)/documents/tenants/$(tenantId)/patientIntakeSubmissions/$(resourceId);
+      return data.action == 'intake.review' && exists(path) && existsAfter(path)
+        && get(path).data.status == 'pending_review'
+        && getAfter(path).data.status in ['approved','rejected']
+        && getAfter(path).data.lastAuditLogId == auditId;
+    }
+
     function recallAuditMutationMatches(tenantId, auditId, resourceId, data) {
       let path = /databases/$(database)/documents/tenants/$(tenantId)/recalls/$(resourceId);
       return existsAfter(path) && getAfter(path).data.lastAuditLogId == auditId
@@ -467,6 +475,7 @@ service cloud.firestore {
         : data.resourceType == 'professional' ? professionalAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'procedure' ? procedureAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'scheduleResource' ? scheduleResourceAuditMutationMatches(tenantId, auditId, resourceId, data)
+        : data.resourceType == 'intakeSubmission' ? intakeReviewAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'recall' ? recallAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'treatmentPlan' ? treatmentPlanAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'clinicalRecord' ? clinicalRecordAuditMutationMatches(tenantId, auditId, resourceId, data)
@@ -826,10 +835,32 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      match /intakeTokens/{tokenHash} {
+        // Tokens are created/consumed only through the authorized Worker using Admin credentials.
+        allow read, write: if false;
+      }
+
       match /patientIntakeSubmissions/{submissionId} {
-        allow get, list: if hasPermission(tenantId, 'intake.read') && resource.data.tenantId == tenantId;
-        allow create: if false;
-        allow update, delete: if false;
+        allow get, list: if hasPermission(tenantId, 'intake.read')
+          && hasCommercialFeature(tenantId, 'intake_link', 'pro')
+          && resource.data.tenantId == tenantId;
+        // Public submission is Worker-only; no unauthenticated Firestore client writes.
+        allow create, delete: if false;
+        allow update: if !isPremiumDemoTenant(tenantId)
+          && hasPermission(tenantId, 'intake.manage')
+          && hasCommercialFeature(tenantId, 'intake_link', 'pro')
+          && resource.data.tenantId == tenantId
+          && resource.data.status == 'pending_review'
+          && request.resource.data.tenantId == tenantId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'reviewedAt', 'reviewedBy', 'lastAuditLogId'
+          ])
+          && request.resource.data.status in ['approved', 'rejected']
+          && request.resource.data.reviewedBy == request.auth.uid
+          && request.resource.data.reviewedAt == request.time
+          && request.resource.data.lastAuditLogId is string
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId,
+            'intake.review', 'intakeSubmission', submissionId);
       }
 
       match /usageCounters/{counterId} {
