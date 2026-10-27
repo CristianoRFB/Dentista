@@ -9,7 +9,7 @@ A revisão atual também inclui:
 - landing comercial inspirada em boas práticas de apresentação de produto, sem copiar identidade externa;
 - páginas públicas de recursos e estrutura de planos;
 - mini-site white-label do tenant;
-- fluxo demonstrativo de agendamento público;
+- fluxo demonstrativo de agendamento aberto sem convite; reserva real por convite individual com paciente existente usa Worker e locks transacionais;
 - pré-cadastro público com revisão obrigatória como decisão arquitetural;
 - Central de Retorno;
 - cadeira/sala como recurso físico da agenda;
@@ -20,7 +20,7 @@ A revisão atual também inclui:
 ## O que NÃO deve ser assumido pronto
 
 - o CRUD completo de todos os domínios; pacientes, profissionais, procedimentos e recursos têm fluxos persistidos, mas há áreas ainda em scaffold;
-- agendamento público confirmado e persistido para visitantes ainda indisponível; Central de Retorno e pré-cadastro por link de uso único com revisão interna já têm código e testes em CI, mas dependem de provisionamento e homologação hospedada;
+- agendamento aberto e anônimo sem convite continua indisponível; agendamento persistente por convite pessoal Essencial e pré-cadastro Pro já têm Worker, UI e testes. Provisionamento e homologação hospedada pendentes;
 - odontograma, plano de tratamento, financeiro e relatórios, que permanecem planejados;
 - cobrança automática, checkout, gateway ou conversão automática de trial; todos estão fora do escopo atual;
 - medição de bytes e quota de storage R2; 10/50/200 GB é hipótese interna e não pode ser anunciada ou aplicada;
@@ -63,4 +63,4 @@ Checkout, gateway, webhook e billing automático continuam inexistentes por deci
 
 Na branch de continuação `chore/global-standard-v01-ci-20261027`, o endpoint Worker emite tokens opacos individuais de 7 dias para equipes com `intake.manage` em planos Pro/Premium. `POST /v1/public/intake` consome cada token uma única vez em transação e grava solicitação `pending_review`. Firestore Rules impedem acesso ao segredo, escrita pública direta e aprovação sem audit log. `/app/pre-cadastros` permite a recepção aprovar/rejeitar, sem criação automática de prontuário ou cadastro definitivo. Testes no Worker e no Firestore Emulator cobrem replay, expiração, acesso entre tenants, negativa no Essencial e auditoria. A demo permanece somente leitura.
 
-Pendentes: agendamento público real com anti-double-booking, telas hospedadas e screenshots reais, provisionamento Firebase/Worker/R2 e deploy de produção. Não adicionar billing automático ou alterar preços comerciais.
+Pendentes: agendamento aberto sem convite e proteção antiabuso, telas hospedadas e screenshots reais, provisionamento Firebase/Worker/R2 e deploy de produção. Não adicionar billing automático ou alterar preços comerciais.
