@@ -107,7 +107,7 @@ export function PatientTreatmentPage() {
     }
     void load();
     return ()=>{cancelled=true;};
-  },[selectedId,session]);
+  },[selectedId,session,active?.currentVersion]);
 
   function openPlan(plan:TreatmentPlan) {
     setSelectedId(plan.id);setEdit(false);setError('');setMessage('');
