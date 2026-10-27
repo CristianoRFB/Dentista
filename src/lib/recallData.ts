@@ -8,10 +8,9 @@ type RecallDraft = { patientId: string; reason: string; dueAt: string };
 type RecallUpdate = { reason: string; dueAt: string; status: RecallStatus; appointmentId?: string };
 
 function recallRefs(session: Extract<TenantAccessState, { status: 'ready' }>, id: string) {
-  const parent = ['tenants', session.tenant.id];
   return {
-    recall: doc(db, ...parent, 'recalls', id),
-    audit: doc(collection(db, ...parent, 'auditLogs')),
+    recall: doc(db, 'tenants', session.tenant.id, 'recalls', id),
+    audit: doc(collection(db, 'tenants', session.tenant.id, 'auditLogs')),
   };
 }
 
