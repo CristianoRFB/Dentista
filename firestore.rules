@@ -70,7 +70,7 @@ service cloud.firestore {
     function featureImplemented(featureKey) {
       return featureKey in [
         'agenda','patients','professionals','procedures','physical_resources',
-        'clinical_records','clinical_photos','mini_site'
+        'clinical_records','clinical_photos','mini_site','recall_center'
       ];
     }
 
@@ -342,6 +342,14 @@ service cloud.firestore {
           : false);
     }
 
+    function recallAuditMutationMatches(tenantId, auditId, resourceId, data) {
+      let path = /databases/$(database)/documents/tenants/$(tenantId)/recalls/$(resourceId);
+      return existsAfter(path) && getAfter(path).data.lastAuditLogId == auditId
+        && (data.action == 'recall.create' ? !exists(path)
+          : data.action == 'recall.update' ? exists(path) && get(path).data.lastAuditLogId != auditId
+          : false);
+    }
+
     function clinicalRecordAuditMutationMatches(tenantId, auditId, resourceId, data) {
       let path = /databases/$(database)/documents/tenants/$(tenantId)/patients/$(data.patientId)/clinicalRecords/$(resourceId);
       return data.action == 'clinical_record.create'
@@ -375,6 +383,7 @@ service cloud.firestore {
         : data.resourceType == 'professional' ? professionalAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'procedure' ? procedureAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'scheduleResource' ? scheduleResourceAuditMutationMatches(tenantId, auditId, resourceId, data)
+        : data.resourceType == 'recall' ? recallAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'clinicalRecord' ? clinicalRecordAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'clinicalAmendment' ? clinicalAmendmentAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'publicProfile' ? publicProfileAuditMutationMatches(tenantId, auditId, resourceId, data)
@@ -652,14 +661,88 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      function validRecall(tenantId, recallId, data) {
+        let patientPath = /databases/$(database)/documents/tenants/$(tenantId)/patients/$(data.patientId);
+        let appointmentId = data.get('appointmentId', null);
+        return data.keys().hasOnly([
+            'id','tenantId','patientId','reason','dueAt','status','appointmentId',
+            'lastContactAt','createdAt','createdBy','updatedAt','lastAuditLogId'
+          ])
+          && data.id == recallId
+          && data.tenantId == tenantId
+          && data.patientId is string
+          && exists(patientPath)
+          && get(patientPath).data.tenantId == tenantId
+          && get(patientPath).data.status == 'active'
+          && data.reason is string && data.reason.size() >= 3 && data.reason.size() <= 500
+          && data.dueAt is string && data.dueAt.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T12:00:00[.]000Z
+
+      match /patientIntakeSubmissions/{submissionId} {
+        allow get, list: if hasPermission(tenantId, 'intake.read') && resource.data.tenantId == tenantId;
+        allow create: if false;
+        allow update, delete: if false;
+      }
+
+      match /usageCounters/{counterId} {
+        allow get, list: if isPlatformOwner() || hasPermission(tenantId, 'usage.read');
+        allow create, update, delete: if false;
+      }
+
+      match /limitCounters/{counterId} {
+        allow read, write: if false;
+      }
+
+      match /treatmentPlans/{planId} {
+        allow get, list: if hasPermission(tenantId, 'treatment.read') || clinicalRead(tenantId);
+        allow create, update, delete: if false;
+      }
+
+      match /quotes/{quoteId} {
+        allow get, list: if hasPermission(tenantId, 'billing.read');
+        allow create, update, delete: if false;
+      }
+
+      match /auditLogs/{auditId} {
+        allow get, list: if isPlatformOwner() || hasPermission(tenantId, 'audit.read');
+        allow create: if auditEnvelopeValid(tenantId, auditId, request.resource.data);
+        allow update, delete: if false;
+      }
+    }
+  }
+}
+)
+          && data.status in ['planned','due','contacted','scheduled','dismissed']
+          && (data.get('lastContactAt', null) == null || data.lastContactAt is timestamp)
+          && (appointmentId == null || (
+            appointmentId is string
+            && exists(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(appointmentId))
+            && get(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(appointmentId)).data.patientId == data.patientId
+            && get(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(appointmentId)).data.tenantId == tenantId
+            && !(get(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(appointmentId)).data.status in ['cancelled','no_show'])
+          ))
+          && (data.status != 'scheduled' || appointmentId != null);
+      }
+
       match /recalls/{recallId} {
         allow get, list: if hasPermission(tenantId, 'recalls.read') && hasCommercialFeature(tenantId, 'recall_center', 'pro');
-        allow create, update: if !isPremiumDemoTenant(tenantId)
+        allow create: if !isPremiumDemoTenant(tenantId)
           && hasPermission(tenantId, 'recalls.manage') && hasCommercialFeature(tenantId, 'recall_center', 'pro')
-          && request.resource.data.tenantId == tenantId
-          && request.resource.data.patientId is string
-          && exists(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(request.resource.data.patientId))
-          && get(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(request.resource.data.patientId)).data.tenantId == tenantId;
+          && validRecall(tenantId, recallId, request.resource.data)
+          && request.resource.data.status == 'planned'
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.get('lastContactAt', null) == null
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'recall.create', 'recall', recallId);
+        allow update: if !isPremiumDemoTenant(tenantId)
+          && hasPermission(tenantId, 'recalls.manage') && hasCommercialFeature(tenantId, 'recall_center', 'pro')
+          && validRecall(tenantId, recallId, request.resource.data)
+          && resource.data.tenantId == tenantId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'reason','dueAt','status','appointmentId','lastContactAt','updatedAt','lastAuditLogId'
+          ])
+          && resource.data.status != 'dismissed'
+          && request.resource.data.updatedAt == request.time
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'recall.update', 'recall', recallId);
         allow delete: if false;
       }
 
