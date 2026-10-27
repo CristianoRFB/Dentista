@@ -1,7 +1,7 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { ClinicalPhoto } from '../../domain/types';
-import { fetchClinicalPhoto, reviewClinicalPhoto, uploadClinicalPhoto } from './r2Client';
+import { fetchClinicalPhoto, inspectClinicalPhotoIntegrity, reviewClinicalPhoto, uploadClinicalPhoto, type MediaIntegrityReport } from './r2Client';
 import { searchPhotoTags } from './catalog';
 import { listPatientRecords } from '../../lib/tenantData';
 import { useTenantAccess } from '../tenant/TenantContext';
@@ -24,6 +24,9 @@ export function ClinicalPhotosPage() {
   const [photos, setPhotos] = useState<ClinicalPhoto[]>([]);
   const [previews,setPreviews] = useState<Record<string,string>>({});
   const [files, setFiles] = useState<File[]>([]);
+  const [visibleLimit,setVisibleLimit] = useState(8);
+  const [integrity,setIntegrity] = useState<MediaIntegrityReport|null>(null);
+  const [checkingIntegrity,setCheckingIntegrity] = useState(false);
   const [visibility,setVisibility] = useState<'active'|'archived'|'all'>('active');
   const [reviewId,setReviewId] = useState('');
   const [reason,setReason] = useState('');
@@ -53,8 +56,10 @@ export function ClinicalPhotosPage() {
     if (session.status !== 'ready' || session.isDemo || !session.permissions.includes('clinical.read')) return;
     let disposed = false;
     const urls: string[] = [];
-    const pending = photos.filter(photo => visibility === 'all' ||
-      (visibility === 'archived' ? photo.lifecycleStatus === 'archived' : photo.lifecycleStatus !== 'archived'));
+    const pending = photos.filter(photo => (visibility === 'all' ||
+      (visibility === 'archived' ? photo.lifecycleStatus === 'archived' : photo.lifecycleStatus !== 'archived'))
+      && (!q.trim() || (photo.originalName+' '+(photo.tags??[]).join(' ')).toLowerCase().includes(q.trim().toLowerCase())))
+      .slice(0,visibleLimit);
     setPreviews({});
     void Promise.all(pending.map(async photo => {
       try {
@@ -71,7 +76,7 @@ export function ClinicalPhotosPage() {
       disposed=true;
       urls.forEach(url=>URL.revokeObjectURL(url));
     };
-  }, [session, patientId, photos, visibility]);
+  }, [session, patientId, photos, visibility, q, visibleLimit]);
 
   async function uploadSelected() {
     if (!files.length || session.status !== 'ready' || session.isDemo) return;
@@ -100,9 +105,18 @@ export function ClinicalPhotosPage() {
     } catch(e) {setError(e instanceof Error?e.message:'Falha ao revisar imagem clínica.');}
     finally {setBusy(false);}
   }
+  async function inspectIntegrity(){
+    if(session.status!=='ready'||session.isDemo||!session.permissions.includes('clinical.write'))return;
+    setCheckingIntegrity(true);setError('');setIntegrity(null);
+    try{setIntegrity(await inspectClinicalPhotoIntegrity(session.tenant.id,patientId));}
+    catch(e){setError(e instanceof Error?e.message:'Não foi possível verificar o inventário.');}
+    finally{setCheckingIntegrity(false);}
+  }
   const writable = session.status === 'ready' && !session.isDemo && session.permissions.includes('clinical.write');
-  const displayed=photos.filter(photo=>visibility==='all' ||
-    (visibility==='archived'?photo.lifecycleStatus==='archived':photo.lifecycleStatus!=='archived'));
+  const displayed=photos.filter(photo=>(visibility==='all' ||
+    (visibility==='archived'?photo.lifecycleStatus==='archived':photo.lifecycleStatus!=='archived'))
+    && (!q.trim() || (photo.originalName+' '+(photo.tags??[]).join(' ')).toLowerCase().includes(q.trim().toLowerCase())));
+  const visiblePhotos=displayed.slice(0,visibleLimit);
   const selected=photos.find(photo=>photo.id===reviewId);
 
   if(session.status !== 'ready' || !session.permissions.includes('clinical.read')) {
@@ -129,17 +143,28 @@ export function ClinicalPhotosPage() {
       <section className="card"><h2>Integridade e privacidade</h2>
         <p>Armazenamento privado R2. Metadados e auditoria no Firestore. Sem link público permanente.</p>
         <p>Verificação, rejeição e arquivamento são ações auditadas, não exclusões clínicas.</p>
+        {writable&&<button type="button" className="btn secondary" disabled={checkingIntegrity||busy}
+          onClick={()=>void inspectIntegrity()}>{checkingIntegrity?'Conferindo arquivos…':'Verificar integridade R2 × Firestore'}</button>}
+        {integrity&&<div role="status">
+          <p>Verificados: {integrity.checkedMetadata} metadados e {integrity.checkedObjects} objetos privados.</p>
+          <p><strong>{integrity.findings.length} ocorrência(s) para revisão manual.</strong> Nenhum arquivo foi modificado.</p>
+          {integrity.findings.length>0&&<ul>{integrity.findings.map((f,i)=><li key={i}>
+            {f.kind==='missing_r2_object'?'Arquivo ausente do R2':f.kind==='unreferenced_r2_candidate'
+              ?'Possível objeto sem referência':'Referência fora do escopo'}
+            {f.photoId?' · ID '+f.photoId:''}
+          </li>)}</ul>}
+        </div>}
       </section>
     </div>
     <div className="card agenda-toolbar">
       <label>Exibição<select value={visibility} onChange={e=>setVisibility(e.target.value as typeof visibility)}>
         <option value="active">Ativas</option><option value="archived">Arquivadas</option><option value="all">Todas</option>
       </select></label>
-      <span className="muted">{displayed.length} imagens nesta seleção</span>
+      <span className="muted">{Math.min(displayed.length,visibleLimit)} de {displayed.length} imagens nesta seleção</span>
     </div>
     <section className="media-gallery" aria-label="Fotos do prontuário">
       {loading?<p role="status">Carregando imagens…</p>:displayed.length===0?<div className="card">
-        <p>Nenhuma imagem clínica nesta seleção.</p></div>:displayed.map(photo=><article className="card media-card" key={photo.id}>
+        <p>Nenhuma imagem clínica nesta seleção.</p></div>:visiblePhotos.map(photo=><article className="card media-card" key={photo.id}>
         {previews[photo.id]?<img src={previews[photo.id]} alt={'Foto clínica '+(photo.originalName||photo.id)}/>:
           <div className="media-placeholder">Imagem privada indisponível nesta sessão</div>}
         <b>{photo.originalName}</b>
@@ -152,6 +177,8 @@ export function ClinicalPhotosPage() {
         }}>Revisar imagem</button>}
       </article>)}
     </section>
+    {displayed.length>visibleLimit&&<button type="button" className="btn secondary"
+      onClick={()=>setVisibleLimit(old=>old+8)}>Mostrar mais 8 imagens</button>}
     {writable&&selected&&<section className="card data-form" aria-label="Revisão de imagem" style={{marginTop:16}}>
       <h2>Revisão: {selected.originalName}</h2><p className="muted">O histórico e o arquivo original são preservados.</p>
       <label>Motivo administrativo da ação<textarea value={reason} maxLength={500} minLength={12}
