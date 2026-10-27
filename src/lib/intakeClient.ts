@@ -1,4 +1,4 @@
-import { collection, doc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, runTransaction, serverTimestamp, where } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import type { PatientIntakeSubmission } from '../domain/types';
 import { listTenantRecords } from './tenantData';
@@ -49,9 +49,9 @@ export async function submitIntake(tenantSlug: string, token: string, data: {nam
 }
 
 export async function listIntakeSubmissions(session: TenantAccessState): Promise<IntakeSubmission[]> {
+  if (session.status === 'ready' && session.isDemo) return [];
   const ready = requireIntake(session, 'intake.read');
-  if (ready.isDemo) return [];
-  const rows = await listTenantRecords<IntakeSubmission>(ready,'patientIntakeSubmissions');
+  const rows = await listTenantRecords<IntakeSubmission>(ready,'patientIntakeSubmissions',where('tenantId','==',ready.tenant.id));
   return rows.filter(row=>row.tenantId===ready.tenant.id)
     .sort((a,b)=>String(b.submittedAt).localeCompare(String(a.submittedAt)));
 }
