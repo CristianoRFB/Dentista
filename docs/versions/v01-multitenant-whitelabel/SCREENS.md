@@ -24,4 +24,4 @@ O Vite foi executado em modo demo de desenvolvimento com dados fictícios. Nesta
 
 Não referenciar wireframe ou imagem conceitual como screenshot real. Os visuais em `generated/` são materiais de conceito separados.
 
-Central de Retorno possui fluxo interno de criação/atualização por equipe autorizada na branch de implementação; captura de screenshot real ainda pendente. `/agendar` e `/cadastro` não persistem dados para tenants reais. Portal do paciente, odontograma e tratamento não são fluxos operacionais.
+Central de Retorno possui fluxo interno de criação/atualização por equipe autorizada na branch de implementação; captura de screenshot real ainda pendente. `/agendar` e `/cadastro` não persistem dados para tenants reais. Portal do paciente e planejamento de tratamento ainda não são fluxos operacionais. O odontograma FDI tem tela clínica e persistência append-only na branch de desenvolvimento, com screenshot real ainda não arquivada.
