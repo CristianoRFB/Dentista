@@ -26,7 +26,7 @@ Odontograma e plano de tratamento permanecem nesta fase; suas fontes de diagrama
 - Central de Retorno persistida: implementação interna P0 concluída na branch de desenvolvimento; validação hospedada pendente;
 - pré-cadastro tokenizado com revisão: implementado e auditado na branch, com validação hospedada pendente;
 - documentos e templates;
-- agendamento público persistente;
+- agendamento por convite pessoal: persistência confirmada com locks transacionais em CI/Worker; agenda pública aberta sem convite deliberadamente não liberada sem proteção antifraude/antispam;
 - medição confiável de armazenamento R2 antes de qualquer quota pública.
 
 ## Depois, apenas com demanda real
