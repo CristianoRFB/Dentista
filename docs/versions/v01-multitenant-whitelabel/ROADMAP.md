@@ -11,7 +11,7 @@ PlanCatalog com preços e limites aprovados, entitlement service, gates de featu
 Antes de produção, o ambiente único da vertical precisa ter credenciais de Worker, projeto Auth/Firestore e binding R2 provisionados, além da origem exata da aplicação. Nenhum serviço pago ou ambiente por tenant é criado por este roadmap.
 
 ## Fase 2 — Experiência clínica
-- odontograma interativo;
+- odontograma interativo: código da visualização FDI + persistência append-only auditada concluído na branch; homologação hospedada pendente;
 - plano de tratamento;
 - orçamento;
 - central de retorno persistida: implementação interna P0 concluída na branch de desenvolvimento; sem lembretes externos;
