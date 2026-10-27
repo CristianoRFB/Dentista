@@ -74,8 +74,3 @@ export async function updateRecall(session: TenantAccessState, current: Recall, 
     });
   });
 }
-
-export function recallDisplayStatus(recall: Recall, now = Date.now()): RecallStatus {
-  if (recall.status === 'planned' && Date.parse(recall.dueAt) < now) return 'due';
-  return recall.status;
-}
