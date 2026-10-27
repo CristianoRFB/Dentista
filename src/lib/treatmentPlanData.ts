@@ -67,7 +67,7 @@ export async function createTreatmentPlan(session:TenantAccessState, patientId:s
     for (let i=2;i<refs.length;i++) if(!snapshots[i].exists()||snapshots[i].data().tenantId!==tenantId||snapshots[i].data().active!==true) throw new Error('Procedimento inativo ou de outra clínica.');
     if(appointmentRef) {
       const appt=snapshots.at(-1);
-      if(!appt?.exists()||appt.data().tenantId!==tenantId||appt.data().patientId!==patientId||appt.data().professionalId!==professionalId) throw new Error('Agendamento não pertence ao paciente/profissional.');
+      if(!appt || !appt.exists()||appt.data().tenantId!==tenantId||appt.data().patientId!==patientId||appt.data().professionalId!==professionalId) throw new Error('Agendamento não pertence ao paciente/profissional.');
     }
     tx.set(planRef,{id:planRef.id,tenantId,patientId,professionalId,currentVersion:1,versionId:versionRef.id,status:'draft',
       createdBy:actorId,createdAt:serverTimestamp(),lastAuditLogId:auditRef.id});
