@@ -806,7 +806,14 @@ async function uploadMedia(request: Request, env: Env, uid: string) {
     customMetadata: { tenantId, patientId, uploaderId: uid },
   });
 
-  const transaction = await beginTransaction(env, token);
+  // R2 already accepted the bytes. A failed transaction start must also clean up that orphan.
+  let transaction: string;
+  try {
+    transaction = await beginTransaction(env, token);
+  } catch (error) {
+    await env.CLINICAL_MEDIA.delete(objectKey).catch(() => undefined);
+    throw error;
+  }
   try {
     const access = await verifyClinicalAccess(env, token, uid, tenantId, patientId, 'clinical.write', transaction);
     const photoPath = 'tenants/' + tenantId + '/patients/' + patientId + '/clinicalPhotos/' + id;
