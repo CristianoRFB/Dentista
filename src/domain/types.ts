@@ -141,6 +141,9 @@ export interface PatientIntakeSubmission {
   phone?: string;
   email?: string;
   submittedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  lastAuditLogId?: string;
 }
 
 export interface UsageCounter {
