@@ -3,6 +3,7 @@ import { createIntakeSecret, intakeTokenHash, validatePublicIntake } from './int
 import { BOOKING_TTL_MS, validateBookingInvite, validatePublicBooking } from './publicBooking';
 import { verifyFirebaseIdToken } from './firebaseAuth';
 import { validatePhotoReview, photoTransition } from './mediaLifecycle';
+import { comparePatientMediaInventory } from './mediaIntegrity';
 import { canCreateCommercialCapacity, canUse, getLimit } from '../../../src/commercial/entitlementService';
 import {
   findScheduleConflict, isValidAppointmentWindow, MAX_CONFLICT_LOOKBACK_MS,
@@ -899,6 +900,41 @@ async function reviewMedia(request: Request,env:Env,uid:string,photoId:string) {
   throw new HttpError(409,'media_changed_retry');
 }
 
+/**
+ * Read-only diagnostic for a single patient. Deliberately capped: partial R2/Firestore
+ * scans are rejected rather than presenting false "orphan" findings.
+ * Does not delete, repair, copy, expose image bytes or generate public URLs.
+ */
+async function diagnosePatientMedia(request: Request,env:Env,uid:string) {
+  const url=new URL(request.url);
+  const tenantId=url.searchParams.get('tenantId') ?? '';
+  const patientId=url.searchParams.get('patientId') ?? '';
+  const idPattern=/^[A-Za-z0-9_-]{1,128}$/;
+  if(!idPattern.test(tenantId)||!idPattern.test(patientId))throw new HttpError(400,'invalid_scope');
+  const token=await serviceAccountToken(env);
+  const transaction=await beginTransaction(env,token);
+  let records:Record<string,any>[]=[];
+  try {
+    // Inspection of clinical inventory requires an active clinician, not a public booking token.
+    const access=await verifyClinicalAccess(env,token,uid,tenantId,patientId,'clinical.read',transaction);
+    if(access.membership && !hasRolePermission(access.membership,'clinical.write'))
+      throw new HttpError(403,'media_inventory_permission_required');
+    const parent='tenants/'+tenantId+'/patients/'+patientId;
+    // A bounded query; queryCollection rejects equal-to-limit results to avoid incomplete comparisons.
+    records=await queryCollection(env,token,parent,'clinicalPhotos',
+      [{fieldPath:'tenantId',op:'EQUAL',value:tenantId}],transaction,201);
+  }finally{
+    await rollbackTransaction(env,token,transaction);
+  }
+  const prefix='tenants/'+tenantId+'/patients/'+patientId+'/';
+  const listing=await env.CLINICAL_MEDIA.list({prefix,limit:201});
+  if(listing.truncated || listing.objects.length>=201)
+    throw new HttpError(409,'media_inventory_too_large_for_bounded_scan');
+  const findings=comparePatientMediaInventory(tenantId,patientId,records,listing.objects.map(item=>item.key));
+  return {tenantId,patientId,checkedMetadata:records.length,checkedObjects:listing.objects.length,
+    findings,complete:true,mode:'read_only',noFilesModified:true};
+}
+
 async function downloadMedia(request: Request, env: Env, uid: string, photoId: string) {
   const url = new URL(request.url);
   const tenantId = url.searchParams.get('tenantId') ?? '';
@@ -1103,6 +1139,11 @@ async function handle(request: Request, env: Env) {
     const tenantId = url.searchParams.get('tenantId') ?? '';
     const result = await cancelAppointment(env, user.uid, tenantId, cancelMatch[1]);
     return json(request, env, 200, result);
+  }
+
+  if(request.method==='GET' && url.pathname==='/v1/media/integrity') {
+    return response(request,env,200,JSON.stringify(await diagnosePatientMedia(request,env,user.uid)),
+      {'Content-Type':'application/json; charset=utf-8','Cache-Control':'private, no-store'});
   }
 
   const mediaReviewMatch=url.pathname.match(/^\/v1\/media\/([A-Za-z0-9_-]{1,128})\/review$/);
