@@ -125,6 +125,11 @@ export interface Recall {
   dueAt: string;
   status: RecallStatus;
   lastContactAt?: string;
+  appointmentId?: string;
+  createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  lastAuditLogId?: string;
 }
 
 export interface PatientIntakeSubmission {
