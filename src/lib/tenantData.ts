@@ -15,7 +15,7 @@ export type { TenantRecordCollection } from './tenantDataCore';
 
 function normalizeDocument<T extends DocumentData>(data: T, id: string) {
   const normalized: Record<string, unknown> = { ...data, id };
-  for (const field of ['createdAt', 'updatedAt', 'dueAt', 'startsAt', 'endsAt', 'expiresAt', 'lastContactAt', 'revokedAt', 'capturedAt']) {
+  for (const field of ['createdAt', 'updatedAt', 'dueAt', 'startsAt', 'endsAt', 'expiresAt', 'lastContactAt', 'revokedAt', 'capturedAt', 'submittedAt', 'reviewedAt']) {
     const value = normalized[field];
     if (value instanceof Timestamp) normalized[field] = value.toDate().toISOString();
   }
