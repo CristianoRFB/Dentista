@@ -20,7 +20,7 @@ export interface PlanDefinition {
 }
 
 const sharedCore = ['agenda', 'patients', 'professionals', 'procedures', 'physical_resources', 'clinical_records', 'clinical_photos', 'mini_site', 'treatment_plans'] as const satisfies readonly EntitlementFeature[];
-const proFeatures = [...sharedCore, 'recall_center', 'quotes'] as const satisfies readonly EntitlementFeature[];
+const proFeatures = [...sharedCore, 'recall_center', 'quotes', 'intake_link'] as const satisfies readonly EntitlementFeature[];
 
 /** Approved vertical prices and plan limits. Keep this as the only runtime source. */
 export const PLAN_CATALOG: Readonly<Record<PaidPlanId, PlanDefinition>> = {
@@ -44,7 +44,7 @@ export const PLAN_CATALOG: Readonly<Record<PaidPlanId, PlanDefinition>> = {
 /** Features with a real, usable implementation in this checkout. Planned/demo-only items stay unavailable. */
 export const IMPLEMENTED_FEATURES: ReadonlySet<EntitlementFeature> = new Set([
   'agenda', 'patients', 'professionals', 'procedures', 'physical_resources',
-  'clinical_records', 'clinical_photos', 'mini_site', 'recall_center', 'treatment_plans', 'quotes',
+  'clinical_records', 'clinical_photos', 'mini_site', 'recall_center', 'treatment_plans', 'quotes', 'intake_link',
 ]);
 
 export function canonicalPlanId(planId: PlanId | undefined): PaidPlanId | null {
