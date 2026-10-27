@@ -498,6 +498,91 @@ describe('Firestore Rules — isolamento e autorização', () => {
     expect((await assertSucceeds(getDoc(doc(platformDb, 'tenants/A')))).data()?.planId).toBe('essential');
   });
 
+
+  it('D2: exige criação em lote, trilha de versões imutável e nega acesso A×B', async () => {
+    const dentist = env.authenticatedContext('dentist-a').firestore();
+    const other = env.authenticatedContext('dentist-b').firestore();
+    const receptionist = env.authenticatedContext('reception-a').firestore();
+    const root = doc(dentist,'tenants/A/treatmentPlans/plan-a');
+    const v1 = doc(dentist,'tenants/A/treatmentPlans/plan-a/versions/version-a1');
+    const log = doc(dentist,'tenants/A/auditLogs/plan-a-audit-1');
+    const item = {procedureId:'proc-a',description:'Consulta clínica',toothId:'16',stage:'planned',quantity:1,unitPriceCents:0};
+    const plan = {
+      id:'plan-a',tenantId:'A',patientId:'patient-a',professionalId:'prof-a',status:'draft',
+      currentVersion:1,versionId:v1.id,createdBy:'dentist-a',createdAt:serverTimestamp(),lastAuditLogId:log.id,
+    };
+    const version = {
+      id:v1.id,planId:root.id,tenantId:'A',patientId:'patient-a',version:1,status:'draft',
+      items:[item],quoteEnabled:false,note:'Plano clínico básico',appointmentId:'',
+      createdBy:'dentist-a',createdAt:serverTimestamp(),auditLogId:log.id,
+    };
+    await assertFails(setDoc(root,plan));
+    await assertSucceeds(runTransaction(dentist,async tx=>{
+      tx.set(root,plan);
+      tx.set(v1,version);
+      tx.set(log,{tenantId:'A',actorId:'dentist-a',actorRole:'dentist',action:'treatment_plan.create',
+        resourceType:'treatmentPlan',resourceId:root.id,timestamp:serverTimestamp()});
+    }));
+    expect((await assertSucceeds(getDoc(root))).data()?.currentVersion).toBe(1);
+    expect((await assertSucceeds(getDoc(v1))).data()?.items[0].unitPriceCents).toBe(0);
+    await assertFails(getDoc(doc(other,'tenants/A/treatmentPlans/plan-a')));
+    await assertFails(getDoc(doc(receptionist,'tenants/A/treatmentPlans/plan-a')));
+    await assertFails(updateDoc(v1,{note:'Mudar versão histórica'}));
+    await assertFails(deleteDoc(v1));
+    await assertFails(deleteDoc(root));
+
+    const v2 = doc(dentist,'tenants/A/treatmentPlans/plan-a/versions/version-a2');
+    const log2 = doc(dentist,'tenants/A/auditLogs/plan-a-audit-2');
+    const update = writeBatch(dentist);
+    update.update(root,{currentVersion:2,versionId:v2.id,status:'approved',lastAuditLogId:log2.id,updatedAt:serverTimestamp()});
+    update.set(v2,{...version,id:v2.id,version:2,status:'approved',auditLogId:log2.id});
+    update.set(log2,{tenantId:'A',actorId:'dentist-a',actorRole:'dentist',action:'treatment_plan.revise',
+      resourceType:'treatmentPlan',resourceId:root.id,timestamp:serverTimestamp()});
+    await assertSucceeds(update.commit());
+    expect((await getDoc(v1)).data()?.status).toBe('draft');
+    expect((await getDoc(root)).data()?.status).toBe('approved');
+
+    const v3 = doc(dentist,'tenants/A/treatmentPlans/plan-a/versions/version-a3');
+    const log3 = doc(dentist,'tenants/A/auditLogs/plan-a-audit-3');
+    const forged = writeBatch(dentist);
+    forged.update(root,{currentVersion:3,versionId:v3.id,status:'in_progress',lastAuditLogId:log3.id,updatedAt:serverTimestamp()});
+    forged.set(v3,{...version,id:v3.id,version:3,status:'in_progress',
+      items:[{...item,quantity:10}],auditLogId:log3.id});
+    forged.set(log3,{tenantId:'A',actorId:'dentist-a',actorRole:'dentist',action:'treatment_plan.revise',
+      resourceType:'treatmentPlan',resourceId:root.id,timestamp:serverTimestamp()});
+    await assertFails(forged.commit());
+    expect((await getDoc(root)).data()?.currentVersion).toBe(2);
+  });
+
+  it('D2: orçamento não pode ser criado no Essencial e exige Pro', async () => {
+    const dentist=env.authenticatedContext('dentist-a').firestore();
+    const submit=()=> {
+      const root=doc(dentist,'tenants/A/treatmentPlans/plan-quoted');
+      const rev=doc(dentist,'tenants/A/treatmentPlans/plan-quoted/versions/quote-v1');
+      const audit=doc(dentist,'tenants/A/auditLogs/quote-audit');
+      const batch=writeBatch(dentist);
+      batch.set(root,{id:root.id,tenantId:'A',patientId:'patient-a',professionalId:'prof-a',
+        currentVersion:1,versionId:rev.id,status:'draft',createdBy:'dentist-a',createdAt:serverTimestamp(),
+        lastAuditLogId:audit.id});
+      batch.set(rev,{id:rev.id,planId:root.id,tenantId:'A',patientId:'patient-a',
+        version:1,status:'draft',items:[{
+          procedureId:'proc-a',description:'Consulta clínica',toothId:'16',stage:'planned',quantity:1,unitPriceCents:12000,
+        }],quoteEnabled:true,note:'Proposta, sem cobrança',appointmentId:'',
+        createdBy:'dentist-a',createdAt:serverTimestamp(),auditLogId:audit.id});
+      batch.set(audit,{tenantId:'A',actorId:'dentist-a',actorRole:'dentist',action:'treatment_plan.create',
+        resourceType:'treatmentPlan',resourceId:root.id,timestamp:serverTimestamp()});
+      return batch.commit();
+    };
+    await assertFails(submit());
+    await env.withSecurityRulesDisabled(async context=>{
+      await updateDoc(doc(context.firestore(),'tenants/A'),{planId:'pro'});
+    });
+    await assertSucceeds(submit());
+    const quote=await assertSucceeds(getDoc(doc(dentist,'tenants/A/treatmentPlans/plan-quoted/versions/quote-v1')));
+    expect(quote.data()?.items[0].unitPriceCents).toBe(12000);
+    await assertFails(getDoc(doc(env.authenticatedContext('dentist-b').firestore(),'tenants/A/treatmentPlans/plan-quoted')));
+  });
+
   it('odontograma cria somente evento clínico auditado e proíbe mutações ou acesso transversal', async () => {
     const dentist = env.authenticatedContext('dentist-a').firestore();
     const b = env.authenticatedContext('dentist-b').firestore();
