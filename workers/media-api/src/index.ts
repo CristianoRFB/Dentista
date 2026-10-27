@@ -913,7 +913,7 @@ async function diagnosePatientMedia(request: Request,env:Env,uid:string) {
   if(!idPattern.test(tenantId)||!idPattern.test(patientId))throw new HttpError(400,'invalid_scope');
   const token=await serviceAccountToken(env);
   const transaction=await beginTransaction(env,token);
-  let records:Record<string,any>[]=[];
+  let records:(Record<string,any> & {id:string})[]=[];
   try {
     // Inspection of clinical inventory requires an active clinician, not a public booking token.
     const access=await verifyClinicalAccess(env,token,uid,tenantId,patientId,'clinical.read',transaction);
@@ -921,8 +921,9 @@ async function diagnosePatientMedia(request: Request,env:Env,uid:string) {
       throw new HttpError(403,'media_inventory_permission_required');
     const parent='tenants/'+tenantId+'/patients/'+patientId;
     // A bounded query; queryCollection rejects equal-to-limit results to avoid incomplete comparisons.
-    records=await queryCollection(env,token,parent,'clinicalPhotos',
+    const rows=await queryCollection(env,token,parent,'clinicalPhotos',
       [{fieldPath:'tenantId',op:'EQUAL',value:tenantId}],transaction,201);
+    records=rows.map(item=>({...item,id:String(item.id??'')}));
   }finally{
     await rollbackTransaction(env,token,transaction);
   }
