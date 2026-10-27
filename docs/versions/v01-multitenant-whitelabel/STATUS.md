@@ -11,7 +11,7 @@
 - Wireframes/mockups: base anterior + novos fluxos comerciais
 - Agenda por recursos físicos: modelagem inicial
 - Central de Retorno: criação/atualização interna por equipe autorizada, auditoria e vínculo opcional com agendamento (Pro/Premium); validação em produção pendente
-- Pré-cadastro por link: scaffold demonstrativo
+- Pré-cadastro por link: implementação de convite privado, token de uso único e revisão com audit log em CI/Emulator; sem prontuário criado automaticamente; ambiente real pendente
 - Medição de custos variáveis: modelagem inicial
 - Produção: não configurada
 - Seed real: não há cliente real comprovado nem migração
