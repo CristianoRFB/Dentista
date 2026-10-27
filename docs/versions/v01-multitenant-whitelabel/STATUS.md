@@ -10,7 +10,7 @@
 - Diagramas: 22 fontes + renders
 - Wireframes/mockups: base anterior + novos fluxos comerciais
 - Agenda por recursos físicos: modelagem inicial
-- Central de retorno: scaffold inicial
+- Central de Retorno: criação/atualização interna por equipe autorizada, auditoria e vínculo opcional com agendamento (Pro/Premium); validação em produção pendente
 - Pré-cadastro por link: scaffold demonstrativo
 - Medição de custos variáveis: modelagem inicial
 - Produção: não configurada
@@ -36,7 +36,7 @@
 
 ## Fora do estado operacional
 
-- Central de Retorno: tela de leitura sem escrita persistente; entitlement indisponível até a feature estar completa;
+- Central de Retorno: fluxo interno persistido, auditado e protegido por Rules/entitlements; sem envio automático de mensagens ou consentimento presumido;
 - pré-cadastro/agendamento público para tenants reais: indisponíveis neste estágio;
 - odontograma e plano de tratamento: modelagem/documentação, sem fluxo operacional;
 - billing, checkout e cobrança automática: DEFERRED;
@@ -61,3 +61,10 @@
 - pacientes, agendamentos e histórico clínico sem limite artificial;
 - storage 10/50/200 GB continua hipótese interna, sem quota pública ou enforcement;
 - gateway, checkout e billing automático continuam DEFERRED.
+
+## Implementação incremental — retornos (27/10/2026)
+
+- Implementado na branch de continuação: formulário de retorno, estados, busca/paginação local, gravação transacional auditada e associação opcional com agendamento do paciente.
+- Autorização: `recalls.read`/`recalls.manage`, recurso `recall_center` a partir do Pro ou override explícito; demo Premium só leitura; Essencial padrão sem acesso.
+- Integridade: paciente/agenda tenant-scoped, rastreio `lastAuditLogId`, sem exclusão física; testes assertivos de Firestore Emulator e negativos A/B.
+- Limite conhecido: paginação ainda client-side, sem paginação de consulta no Firestore para bases muito grandes; não há envio externo nem captura de screenshot real arquivada.
