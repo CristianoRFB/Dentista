@@ -37,7 +37,7 @@
 ## Fora do estado operacional
 
 - Central de Retorno: fluxo interno persistido, auditado e protegido por Rules/entitlements; sem envio automático de mensagens ou consentimento presumido;
-- pré-cadastro/agendamento público para tenants reais: indisponíveis neste estágio;
+- pré-cadastro Pro persistido e agendamento por convite individual de paciente existente disponíveis no código (Worker, locks e testes); agendamento aberto anônimo e homologação hospedada ainda indisponíveis;
 - odontograma: mapa FDI com eventos append-only, correção auditada e tela clínica na branch; tratamento e propostas com versões clínicas imutáveis e orçamento Pro/Premium implementados em CI; validação hospedada pendente;
 - billing, checkout e cobrança automática: DEFERRED;
 - quota/storage R2: não medidos, não anunciados e não aplicados;
