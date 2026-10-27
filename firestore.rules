@@ -213,7 +213,7 @@ service cloud.firestore {
       return overrides is map
         && overrides.keys().hasOnly([
           'agenda','patients','professionals','procedures','physical_resources','clinical_records','clinical_photos',
-          'recall_center','mini_site','intake_link','treatment_plans','financial_reports','advanced_reports',
+          'recall_center','mini_site','intake_link','treatment_plans','quotes','financial_reports','advanced_reports',
           'patient_portal','automations','multi_unit'
         ])
         && (!('agenda' in overrides) || overrides.agenda is bool)
@@ -227,6 +227,7 @@ service cloud.firestore {
         && (!('mini_site' in overrides) || overrides.mini_site is bool)
         && (!('intake_link' in overrides) || overrides.intake_link is bool)
         && (!('treatment_plans' in overrides) || overrides.treatment_plans is bool)
+        && (!('quotes' in overrides) || overrides.quotes is bool)
         && (!('financial_reports' in overrides) || overrides.financial_reports is bool)
         && (!('advanced_reports' in overrides) || overrides.advanced_reports is bool)
         && (!('patient_portal' in overrides) || overrides.patient_portal is bool)
