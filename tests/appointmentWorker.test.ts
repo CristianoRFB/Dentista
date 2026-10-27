@@ -327,3 +327,71 @@ describe('Worker de limites comerciais', () => {
     expect(documents.get('tenants/A/limitCounters/memberships')?.count).toBe(6);
   });
 });
+
+
+describe('D4 — pré-cadastro público com token de uso único', () => {
+  function setup() {
+    const a = documents.get('tenants/A')!;
+    documents.set('tenants/A',{...a,slug:'clinica-a'});
+    const b = documents.get('tenants/B')!;
+    documents.set('tenants/B',{...b,slug:'clinica-b'});
+    documents.set('tenantSlugs/clinica-a',{slug:'clinica-a',tenantId:'A',status:'active'});
+    documents.set('tenantSlugs/clinica-b',{slug:'clinica-b',tenantId:'B',status:'active'});
+    const member = documents.get('tenants/A/memberships/dentist-a')!;
+    documents.set('tenants/A/memberships/dentist-a',{
+      ...member,permissions:[...member.permissions as string[],'intake.manage','intake.read'],
+    });
+  }
+  async function call(path: string, body: Record<string,unknown>, authenticated = false) {
+    return appointmentWorker.fetch(new Request('https://worker.test'+path,{
+      method:'POST',headers:{Origin:'https://app.test','Content-Type':'application/json',
+        ...(authenticated?{'Authorization':'Bearer mock'}:{})}, body:JSON.stringify(body),
+    }),workerEnv);
+  }
+  it('emite link para a equipe e cria uma única solicitação pendente sem autenticação pública',async()=>{
+    setup();
+    const minted=await call('/v1/intake/tokens',{tenantId:'A'},true);
+    expect(minted.status,await minted.clone().text()).toBe(201);
+    const {token}=await minted.json() as {token:string};
+    expect(token).toMatch(/^[a-zA-Z0-9_-]{43}$/);
+    expect([...documents.keys()].some(path=>path.includes('/intakeTokens/') && !path.includes(token))).toBe(true);
+    const payload={tenantSlug:'clinica-a',token,name:'Paciente Fictício',phone:'(17) 99999-9999',email:'fake@example.test'};
+    const first=await call('/v1/public/intake',payload);
+    expect(first.status,await first.clone().text()).toBe(202);
+    expect([...documents.values()].filter(d=>d.status==='pending_review' && d.name==='Paciente Fictício')).toHaveLength(1);
+    const second=await call('/v1/public/intake',payload);
+    expect(second.status).toBe(404);
+    expect([...documents.values()].filter(d=>d.status==='pending_review' && d.name==='Paciente Fictício')).toHaveLength(1);
+  });
+  it('nega criação anônima de links, token do tenant errado e submissão sem contato válido',async()=>{
+    setup();
+    expect((await call('/v1/intake/tokens',{tenantId:'A'})).status).toBe(401);
+    const minted=await call('/v1/intake/tokens',{tenantId:'A'},true);
+    expect(minted.status).toBe(201);
+    const {token}=await minted.json() as {token:string};
+    expect((await call('/v1/public/intake',{
+      tenantSlug:'clinica-b',token,name:'Paciente Fictício',phone:'(17) 99999-9999',email:'',
+    })).status).toBe(404);
+    expect((await call('/v1/public/intake',{
+      tenantSlug:'clinica-a',token,name:'A',phone:'desconhecido',email:'',
+    })).status).toBe(400);
+    expect((await call('/v1/public/intake',{
+      tenantSlug:'clinica-a',token,name:'Paciente Válido',phone:'(17) 99999-9999',email:'',
+    })).status).toBe(202);
+  });
+  it('nega tokens expirados, demo e origens externas',async()=>{
+    setup();
+    const minted=await call('/v1/intake/tokens',{tenantId:'A'},true);
+    const {token}=await minted.json() as {token:string};
+    const path=[...documents.keys()].find(p=>p.includes('/intakeTokens/'))!;
+    const current=documents.get(path)!;
+    documents.set(path,{...current,expiresAt:'2020-01-01T00:00:00.000Z'});
+    expect((await call('/v1/public/intake',{tenantSlug:'clinica-a',token,name:'Paciente Teste',phone:'(17) 99999-9999',email:''})).status).toBe(404);
+    documents.set('tenants/A',{...documents.get('tenants/A')!,planId:'premium_demo',subscriptionStatus:'demo'});
+    expect((await call('/v1/intake/tokens',{tenantId:'A'},true)).status).toBe(404);
+    const external=await appointmentWorker.fetch(new Request('https://worker.test/v1/public/intake',{
+      method:'POST',headers:{Origin:'https://malicious.test','Content-Type':'application/json'},body:'{}',
+    }),workerEnv);
+    expect(external.status).toBe(403);
+  });
+});
