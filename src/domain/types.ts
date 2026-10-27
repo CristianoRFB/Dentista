@@ -204,3 +204,18 @@ export interface ClinicalPhoto {
   originalName: string;
   createdBy?: string;
 }
+
+/** Immutable odontogram event for one patient and FDI tooth; corrections reference earlier events. */
+export interface OdontogramEvent {
+  id: string;
+  tenantId: string;
+  patientId: string;
+  toothId: string;
+  surface: string;
+  finding: string;
+  note: string;
+  supersedesEventId?: string;
+  createdBy: string;
+  createdAt: string;
+  auditLogId: string;
+}
