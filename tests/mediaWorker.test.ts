@@ -347,6 +347,11 @@ describe('D5 — revisão, arquivamento e restauração auditada', () => {
   it('nega edição de outro tenant, recepção, usuário inativo e demo',async()=>{
     seedPhoto();
     expect((await act('verify',{tenantId:'B'})).status).toBe(404);
+    seedAccess();
+    seedPhoto();
+    documents.set('tenants/A',{...documents.get('tenants/A')!,features:{clinical_photos:false}});
+    expect((await act('verify')).status).toBe(403);
+
     seedAccess({role:'receptionist',permissions:['clinical.write']});
     expect((await act('verify')).status).toBe(403);
     seedAccess({status:'inactive'});
