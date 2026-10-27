@@ -356,6 +356,13 @@ service cloud.firestore {
         && existsAfter(path) && getAfter(path).data.auditLogId == auditId && !exists(path);
     }
 
+    function odontogramAuditMutationMatches(tenantId, auditId, resourceId, data) {
+      let path = /databases/$(database)/documents/tenants/$(tenantId)/patients/$(data.patientId)/odontogramEvents/$(resourceId);
+      return data.action == 'odontogram_event.create'
+        && existsAfter(path) && !exists(path)
+        && getAfter(path).data.auditLogId == auditId;
+    }
+
     function clinicalAmendmentAuditMutationMatches(tenantId, auditId, resourceId, data) {
       let path = /databases/$(database)/documents/tenants/$(tenantId)/patients/$(data.patientId)/clinicalRecordAmendments/$(resourceId);
       return data.action == 'clinical_amendment.create'
@@ -385,6 +392,7 @@ service cloud.firestore {
         : data.resourceType == 'scheduleResource' ? scheduleResourceAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'recall' ? recallAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'clinicalRecord' ? clinicalRecordAuditMutationMatches(tenantId, auditId, resourceId, data)
+        : data.resourceType == 'odontogramEvent' ? odontogramAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'clinicalAmendment' ? clinicalAmendmentAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'publicProfile' ? publicProfileAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'supportAccess' ? supportAccessAuditMutationMatches(tenantId, auditId, resourceId)
@@ -608,6 +616,35 @@ service cloud.firestore {
                 && get(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(request.resource.data.appointmentId)).data.patientId == patientId
                 && get(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(request.resource.data.appointmentId)).data.tenantId == tenantId))
             && auditAfterMatches(tenantId, request.resource.data.auditLogId, 'clinical_record.create', 'clinicalRecord', recordId);
+          allow update, delete: if false;
+        }
+
+        match /odontogramEvents/{eventId} {
+          allow get, list: if clinicalRead(tenantId) && patientBelongsToTenant(tenantId, patientId);
+          allow create: if !isPremiumDemoTenant(tenantId) && clinicalWrite(tenantId)
+            && patientBelongsToTenant(tenantId, patientId)
+            && get(tenantPatientPath(tenantId, patientId)).data.status == 'active'
+            && request.resource.data.keys().hasOnly([
+              'id','tenantId','patientId','toothId','surface','finding','note',
+              'supersedesEventId','createdBy','createdAt','auditLogId'
+            ])
+            && request.resource.data.id == eventId
+            && request.resource.data.tenantId == tenantId
+            && request.resource.data.patientId == patientId
+            && request.resource.data.toothId is string
+            && request.resource.data.toothId.matches('^([1-4][1-8]|[5-8][1-5])$')
+            && request.resource.data.surface in ['whole','mesial','distal','occlusal','incisal','buccal','lingual','palatal']
+            && request.resource.data.finding in ['observed','caries','restoration','missing','endodontic','prosthetic','other']
+            && request.resource.data.note is string && request.resource.data.note.size() <= 4000
+            && (!('supersedesEventId' in request.resource.data) || (
+              request.resource.data.supersedesEventId is string
+              && request.resource.data.note.size() >= 5
+              && exists(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(patientId)/odontogramEvents/$(request.resource.data.supersedesEventId))
+              && get(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(patientId)/odontogramEvents/$(request.resource.data.supersedesEventId)).data.toothId == request.resource.data.toothId
+            ))
+            && request.resource.data.createdBy == request.auth.uid
+            && request.resource.data.createdAt == request.time
+            && auditAfterMatches(tenantId, request.resource.data.auditLogId, 'odontogram_event.create', 'odontogramEvent', eventId);
           allow update, delete: if false;
         }
 
