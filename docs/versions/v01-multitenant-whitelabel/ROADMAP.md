@@ -14,7 +14,7 @@ Antes de produção, o ambiente único da vertical precisa ter credenciais de Wo
 - odontograma interativo;
 - plano de tratamento;
 - orçamento;
-- central de retorno persistida;
+- central de retorno persistida: implementação interna P0 concluída na branch de desenvolvimento; sem lembretes externos;
 - pré-cadastro tokenizado + revisão;
 - documentos e templates.
 
@@ -23,7 +23,7 @@ Odontograma e plano de tratamento permanecem nesta fase; suas fontes de diagrama
 ## Próxima fase — Experiência clínica e onboarding
 - odontograma interativo;
 - plano de tratamento e orçamento;
-- Central de Retorno persistida;
+- Central de Retorno persistida: implementação interna P0 concluída na branch de desenvolvimento; validação hospedada pendente;
 - pré-cadastro tokenizado com revisão;
 - documentos e templates;
 - agendamento público persistente;
