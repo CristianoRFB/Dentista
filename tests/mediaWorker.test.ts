@@ -218,3 +218,71 @@ describe('Worker de mídia clínica', () => {
     expect(fetchCalls).toEqual([]);
   });
 });
+
+
+describe('D5 — ciclo de revisão e arquivamento sem exclusão clínica',()=>{
+  function seedPhoto() {
+    const key='tenants/A/patients/patient-a/photo-a.jpg';
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a',{
+      id:'photo-a',tenantId:'A',patientId:'patient-a',objectKey:key,status:'unverified',
+      lifecycleStatus:'active',tags:[],createdBy:'dentist-a',
+    });
+    storedObjects.set(key,{bytes:new Uint8Array([0xff,0xd8,0xff]),contentType:'image/jpeg'});
+    return key;
+  }
+  function review(action:'verify'|'reject'|'archive'|'restore',overrides:Record<string,unknown>={}){
+    return mediaWorker.fetch(new Request('https://worker.test/v1/media/photo-a/review',{
+      method:'POST',headers:{Authorization:'Bearer test-token',Origin:'https://app.test','Content-Type':'application/json'},
+      body:JSON.stringify({tenantId:'A',patientId:'patient-a',action,reason:'Registro operacional para auditoria',tags:['frontal'],...overrides}),
+    }),env);
+  }
+  it('classifica uma foto sem tocar no bucket R2 e gera auditoria com identidade',async()=>{
+    const key=seedPhoto();
+    const r=await review('verify');
+    expect(r.status,await r.clone().text()).toBe(200);
+    expect(await r.json()).toMatchObject({photoId:'photo-a',status:'verified',lifecycleStatus:'active',revision:1});
+    expect(JSON.stringify(writes)).toContain('clinical_photo.verify');
+    expect(JSON.stringify(writes)).toContain('lastAuditLogId');
+    expect(JSON.stringify(writes)).toContain('frontal');
+    expect(storedObjects.has(key)).toBe(true);
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+  });
+  it('arquiva sem apagar nem impedir restauração autorizada',async()=>{
+    const key=seedPhoto();
+    const first=await review('archive');
+    expect(first.status).toBe(200);
+    expect(await first.json()).toMatchObject({lifecycleStatus:'archived'});
+    expect(JSON.stringify(writes)).toContain('clinical_photo.archive');
+    expect(storedObjects.has(key)).toBe(true);
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a',{
+      ...documents.get('tenants/A/patients/patient-a/clinicalPhotos/photo-a')!,
+      lifecycleStatus:'archived',archivedAt:new Date().toISOString(),
+    });
+    writes.length=0;
+    const second=await review('restore');
+    expect(second.status).toBe(200);
+    expect(await second.json()).toMatchObject({lifecycleStatus:'active'});
+    expect(JSON.stringify(writes)).toContain('clinical_photo.restore');
+    expect(storedObjects.has(key)).toBe(true);
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+  });
+  it('nega revisão para leitor sem escrita, membership inativa e ID de outro tenant',async()=>{
+    seedPhoto();
+    seedAccess({permissions:['clinical.read']});
+    expect((await review('verify')).status).toBe(403);
+    seedAccess({status:'inactive'});
+    expect((await review('verify')).status).toBe(403);
+    seedAccess();
+    expect((await review('verify',{tenantId:'B',patientId:'patient-b'})).status).toBe(403);
+    expect(writes).toHaveLength(0);
+  });
+  it('nega demo, texto insuficiente e transições inválidas sem alterar objeto R2',async()=>{
+    const key=seedPhoto();
+    expect((await review('reject',{reason:'curto'})).status).toBe(400);
+    expect((await review('restore')).status).toBe(409);
+    documents.set('tenants/A',{...documents.get('tenants/A')!,planId:'premium_demo',subscriptionStatus:'demo'});
+    expect((await review('archive')).status).toBe(409);
+    expect(writes).toHaveLength(0);
+    expect(storedObjects.has(key)).toBe(true);
+  });
+});
