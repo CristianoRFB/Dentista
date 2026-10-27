@@ -662,6 +662,8 @@ describe('Firestore Rules — isolamento e autorização', () => {
     await assertFails(getDoc(doc(dentist,'tenants/A/patientIntakeSubmissions/intake-a')));
     await assertFails(getDoc(doc(b,'tenants/A/patientIntakeSubmissions/intake-a')));
     await assertFails(getDoc(doc(reception,'tenants/A/intakeTokens/hash-do-token')));
+    await assertFails(getDoc(doc(reception,'tenants/A/bookingTokens/secret-hash')));
+    await assertFails(setDoc(doc(reception,'tenants/A/bookingTokens/forged'),{tenantId:'A'}));
     await assertFails(setDoc(doc(reception,'tenants/A/intakeTokens/forged'),{tenantId:'A'}));
     await assertFails(setDoc(doc(reception,'tenants/A/patientIntakeSubmissions/forged'),{tenantId:'A',status:'approved'}));
     await assertFails(updateDoc(queue,{status:'approved',name:'Alteração sem autorização'}));
