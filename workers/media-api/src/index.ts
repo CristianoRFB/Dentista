@@ -2,6 +2,7 @@ import { importPKCS8, SignJWT } from 'jose';
 import { createIntakeSecret, intakeTokenHash, validatePublicIntake } from './intakeValidation';
 import { BOOKING_TTL_MS, validateBookingInvite, validatePublicBooking } from './publicBooking';
 import { verifyFirebaseIdToken } from './firebaseAuth';
+import { validatePhotoReview, photoTransition } from './mediaLifecycle';
 import { canCreateCommercialCapacity, canUse, getLimit } from '../../../src/commercial/entitlementService';
 import {
   findScheduleConflict, isValidAppointmentWindow, MAX_CONFLICT_LOOKBACK_MS,
@@ -823,6 +824,66 @@ async function uploadMedia(request: Request, env: Env, uid: string) {
   }
 }
 
+
+async function reviewMedia(request: Request,env:Env,uid:string,photoId:string) {
+  let input:ReturnType<typeof validatePhotoReview>;
+  try {
+    const raw=await request.text();
+    if(raw.length>4096)throw new HttpError(413,'request_too_large');
+    input=validatePhotoReview(JSON.parse(raw));
+  } catch(e) {
+    if(e instanceof HttpError)throw e;
+    throw new HttpError(400,'invalid_photo_review');
+  }
+  const token=await serviceAccountToken(env);
+  const photoPath='tenants/'+input.tenantId+'/patients/'+input.patientId+'/clinicalPhotos/'+photoId;
+  for(let attempt=0;attempt<4;attempt++) {
+    const transaction=await beginTransaction(env,token);
+    try {
+      const [access,photo]=await Promise.all([
+        verifyClinicalAccess(env,token,uid,input.tenantId,input.patientId,'clinical.write',transaction),
+        getDocument(env,token,photoPath,transaction),
+      ]);
+      if(access.tenant.planId==='premium_demo'||access.tenant.subscriptionStatus==='demo')
+        throw new HttpError(409,'demo_read_only');
+      if(!photo||photo.id!==photoId||photo.tenantId!==input.tenantId
+        ||photo.patientId!==input.patientId
+        ||typeof photo.objectKey!=='string'
+        ||!photo.objectKey.startsWith('tenants/'+input.tenantId+'/patients/'+input.patientId+'/'))
+        throw new HttpError(404,'media_unavailable');
+      let next:ReturnType<typeof photoTransition>;
+      try {next=photoTransition(photo,input.action);}
+      catch {throw new HttpError(409,'invalid_photo_transition');}
+      const now=new Date(),auditId=crypto.randomUUID();
+      const revision=Number.isSafeInteger(photo.revision)?Number(photo.revision)+1:1;
+      const updated={
+        ...photo,
+        status:next.status,lifecycleStatus:next.lifecycleStatus,revision,
+        tags:input.tags,updatedAt:now,updatedBy:uid,lastAuditLogId:auditId,
+        ...(input.action==='archive'?{archivedAt:now,archivedBy:uid}:{}),
+        ...(input.action==='restore'?{archivedAt:null,archivedBy:null}:{}),
+      };
+      const audit={
+        tenantId:input.tenantId,patientId:input.patientId,actorId:uid,actorRole:access.actorRole,
+        action:'clinical_photo.'+input.action,resourceType:'clinicalPhoto',resourceId:photoId,
+        reason:input.reason,timestamp:now,
+      };
+      await commitTransaction(env,token,transaction,[
+        documentWrite(env,photoPath,updated),
+        documentWrite(env,'tenants/'+input.tenantId+'/auditLogs/'+auditId,audit,true),
+      ]);
+      return {photoId,status:next.status,lifecycleStatus:next.lifecycleStatus,revision};
+    } catch(error) {
+      await rollbackTransaction(env,token,transaction);
+      if(error instanceof FirestoreError && fsStatus(error) && attempt<3)continue;
+      if(error instanceof HttpError)throw error;
+      if(error instanceof FirestoreError)throw new HttpError(error.status===400?409:503,'media_review_conflict');
+      throw new HttpError(503,'media_review_failed');
+    }
+  }
+  throw new HttpError(409,'media_changed_retry');
+}
+
 async function downloadMedia(request: Request, env: Env, uid: string, photoId: string) {
   const url = new URL(request.url);
   const tenantId = url.searchParams.get('tenantId') ?? '';
@@ -1029,6 +1090,10 @@ async function handle(request: Request, env: Env) {
     return json(request, env, 200, result);
   }
 
+  const mediaReviewMatch=url.pathname.match(/^\\/v1\\/media\\/([A-Za-z0-9_-]{1,128})\\/review$/);
+  if(request.method==='POST' && mediaReviewMatch) {
+    return json(request,env,200,await reviewMedia(request,env,user.uid,mediaReviewMatch[1]));
+  }
   if (request.method === 'POST' && url.pathname === '/v1/media') {
     const uploaded = await uploadMedia(request, env, user.uid);
     return json(request, env, 201, uploaded);
