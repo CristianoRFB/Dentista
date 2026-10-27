@@ -498,6 +498,62 @@ describe('Firestore Rules — isolamento e autorização', () => {
     expect((await assertSucceeds(getDoc(doc(platformDb, 'tenants/A')))).data()?.planId).toBe('essential');
   });
 
+  it('odontograma cria somente evento clínico auditado e proíbe mutações ou acesso transversal', async () => {
+    const dentist = env.authenticatedContext('dentist-a').firestore();
+    const b = env.authenticatedContext('dentist-b').firestore();
+    const reception = env.authenticatedContext('reception-a').firestore();
+    const entry = doc(dentist, 'tenants/A/patients/patient-a/odontogramEvents/event-a');
+    const audit = doc(dentist, 'tenants/A/auditLogs/odontogram-event-a');
+    const input = {
+      id: 'event-a', tenantId: 'A', patientId: 'patient-a',
+      toothId: '16', surface: 'occlusal', finding: 'restoration',
+      note: 'Restauração previamente observada', createdBy: 'dentist-a',
+      createdAt: serverTimestamp(), auditLogId: audit.id,
+    };
+    await assertFails(setDoc(entry, input));
+    await assertSucceeds(runTransaction(dentist, async tx => {
+      tx.set(entry, input);
+      tx.set(audit, {
+        tenantId: 'A', actorId: 'dentist-a', actorRole: 'dentist',
+        action: 'odontogram_event.create', resourceType: 'odontogramEvent',
+        resourceId: entry.id, patientId: 'patient-a', timestamp: serverTimestamp(),
+      });
+    }));
+    expect((await assertSucceeds(getDoc(entry))).data()?.toothId).toBe('16');
+    await assertFails(getDoc(doc(b, 'tenants/A/patients/patient-a/odontogramEvents/event-a')));
+    await assertFails(getDoc(doc(reception, 'tenants/A/patients/patient-a/odontogramEvents/event-a')));
+    await assertFails(updateDoc(entry, { note: 'sobrescrever histórico' }));
+    await assertFails(deleteDoc(entry));
+    const correction = doc(dentist, 'tenants/A/patients/patient-a/odontogramEvents/event-correction');
+    const correctionAudit = doc(dentist, 'tenants/A/auditLogs/odontogram-correction');
+    await assertSucceeds(runTransaction(dentist, async tx => {
+      tx.set(correction, {
+        ...input, id: correction.id, supersedesEventId: entry.id,
+        note: 'Correção de descrição após revisão clínica', auditLogId: correctionAudit.id,
+      });
+      tx.set(correctionAudit, {
+        tenantId: 'A', actorId: 'dentist-a', actorRole: 'dentist',
+        action: 'odontogram_event.create', resourceType: 'odontogramEvent',
+        resourceId: correction.id, patientId: 'patient-a', timestamp: serverTimestamp(),
+      });
+    }));
+    expect((await getDoc(entry)).data()?.note).toBe('Restauração previamente observada');
+    expect((await getDoc(correction)).data()?.supersedesEventId).toBe(entry.id);
+    const cross = doc(dentist, 'tenants/A/patients/patient-a/odontogramEvents/cross-patient-event');
+    const crossAudit = doc(dentist, 'tenants/A/auditLogs/cross-patient-audit');
+    await assertFails(runTransaction(dentist, async tx => {
+      tx.set(cross, {
+        ...input, id: cross.id, toothId: '19',
+        supersedesEventId: 'event-from-other-tenant', auditLogId: crossAudit.id,
+      });
+      tx.set(crossAudit, {
+        tenantId: 'A', actorId: 'dentist-a', actorRole: 'dentist',
+        action: 'odontogram_event.create', resourceType: 'odontogramEvent',
+        resourceId: cross.id, patientId: 'patient-a', timestamp: serverTimestamp(),
+      });
+    }));
+  });
+
   it('Central de Retorno Pro: cria/atualiza com auditoria, nega forgery e acesso cruzado', async () => {
     await env.withSecurityRulesDisabled(async context => {
       const db = context.firestore();
