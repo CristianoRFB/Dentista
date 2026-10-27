@@ -75,3 +75,11 @@
 - `odontogramEvents` dentro do paciente, sem update/delete e com correção por novo evento; audit log transacional.
 - Firestore Rules restringem por `clinical.read`/`clinical.write`, paciente do tenant, paciente ativo na escrita, demonstração somente leitura e auditoria obrigatória.
 - Não há diagnóstico automático. Capturas reais/QA em navegador hospedado e infraestrutura de produção continuam pendentes.
+
+## D5 — mídia clínica / ciclo de vida (27/10/2026)
+
+- Revisão de fotos com permissão `clinical.write`: verificar, rejeitar, arquivar e restaurar; entradas limitadas e audit log transacional; sem exclusão física no R2.
+- Arquivamento é lógico e reversível: status clínico e metadados originais preservados; o Worker altera apenas campos da revisão via `updateMask` (evita converter timestamps existentes em strings).
+- Galeria privada: estados ativos/arquivados, tags limitadas, motivo de revisão, limpeza de object URLs no navegador. Leitura/download permanecem autenticados.
+- Evidência técnica: `tests/mediaLifecycle.test.ts`, `tests/mediaWorker.test.ts`, CI TypeScript/Vitest/Rules/Build aprovado. Nenhuma screenshot real arquivada.
+- **Ainda pendente:** reconciliar objetos órfãos/metadados inconsistentes, política operacional de retenção/restauração, provisionamento de R2/Worker/Firebase e testes hospedados. Não anunciar retenção automatizada ou recuperação de desastres como concluída.
