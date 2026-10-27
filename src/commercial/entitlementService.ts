@@ -13,7 +13,7 @@ export interface EffectiveEntitlements {
 
 const FEATURE_KEYS: readonly EntitlementFeature[] = [
   'agenda', 'patients', 'professionals', 'procedures', 'physical_resources', 'clinical_records',
-  'clinical_photos', 'recall_center', 'mini_site', 'intake_link', 'treatment_plans', 'financial_reports',
+  'clinical_photos', 'recall_center', 'mini_site', 'intake_link', 'treatment_plans', 'quotes', 'financial_reports',
   'advanced_reports', 'patient_portal', 'automations', 'multi_unit',
 ];
 const LIMIT_KEYS: readonly PlanLimit[] = ['professionals', 'adminUsers', 'resources', 'units', 'patients', 'appointments', 'clinicalHistory', 'storageBytes'];
