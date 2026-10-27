@@ -21,9 +21,8 @@ export async function addOdontogramEvent(session: TenantAccessState, patientId: 
   const values = validateOdontogramInput(input);
   const actorId = ready.membership?.userId ?? (ready.isPlatformOwner ? auth.currentUser?.uid : undefined);
   if (!actorId) throw new Error('Sessão clínica autenticada obrigatória.');
-  const base = ['tenants', ready.tenant.id, 'patients', patientId];
   const patientRef = doc(db, 'tenants', ready.tenant.id, 'patients', patientId);
-  const eventRef = doc(collection(db, ...base, 'odontogramEvents'));
+  const eventRef = doc(collection(db, 'tenants', ready.tenant.id, 'patients', patientId, 'odontogramEvents'));
   const auditRef = doc(collection(db, 'tenants', ready.tenant.id, 'auditLogs'));
   await runTransaction(db, async tx => {
     const patient = await tx.get(patientRef);
@@ -31,7 +30,7 @@ export async function addOdontogramEvent(session: TenantAccessState, patientId: 
       throw new Error('Paciente não está ativo nesta clínica.');
     }
     if (input.supersedesEventId) {
-      const earlier = await tx.get(doc(db, ...base, 'odontogramEvents', input.supersedesEventId));
+      const earlier = await tx.get(doc(db, 'tenants', ready.tenant.id, 'patients', patientId, 'odontogramEvents', input.supersedesEventId));
       if (!earlier.exists() || earlier.data().tenantId !== ready.tenant.id
         || earlier.data().patientId !== patientId || earlier.data().toothId !== values.toothId) {
         throw new Error('Evento anterior inválido para correção.');
