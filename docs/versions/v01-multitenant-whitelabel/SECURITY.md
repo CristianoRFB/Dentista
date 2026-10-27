@@ -21,3 +21,12 @@ Menor privilégio. `permissions[]` é a base das regras. Dados clínicos exigem 
 ## Verificação
 
 `npm run test:rules` executa as Rules no Firestore Emulator; `tests/firestoreRules.test.ts` contém dados fictícios Tenant A/B. Os testes do Worker cobrem autorização de mídia com identidade verificada injetada e verificação criptográfica Firebase com assinatura/issuer/audience válidos; a bateria de agenda cobre concorrência de locks. Não há teste contra dados de produção nem migração.
+
+## D5 — mídia clínica: revisão, arquivamento e restauração (2026-10-27)
+
+- `POST /v1/media/{photoId}/review` exige Firebase ID token válido, tenant/patient correspondente, `clinical.write` efetivo ou suporte de plataforma temporário e ativo, além do gating operacional de fotos clínicas. `premium_demo` não grava.
+- Payload permite apenas ações `verify/reject/archive/restore`, tags do catálogo conhecido e motivo de 12 a 500 caracteres. O motivo entra no audit log, sem copiar dados clínicos detalhados.
+- Mudança feita por transação Firestore, alterando **somente metadados de revisão** por `updateMask` e criando audit log vinculado. `revision` permite rastrear sequência; leituras existentes permanecem protegidas.
+- Arquivar é lógico: `lifecycleStatus=archived`, preservando objeto no R2 e chaves clínicas. Restaurar remove a marcação de arquivamento, sem recriar nem apagar o objeto. Rejeitar não remove evidências.
+- Browser não tem permissão para criar, editar ou deletar `clinicalPhotos` diretamente; regras permanecem deny-write e leitura clínica tenant-aware.
+- **Não comprovado:** política legal/institucional de retenção, reconciliação automática de órfãos Firestore↔R2, restore de backups, homologação hospedada e captura real da UI. `test:rules` + testes de Worker fornecem apenas evidência automatizada.
