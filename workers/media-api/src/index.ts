@@ -902,7 +902,7 @@ async function handle(request: Request, env: Env) {
     let body: Record<string, unknown>;
     try { body = await request.json() as Record<string, unknown>; }
     catch { throw new HttpError(400, 'invalid_json'); }
-    return json(request, env, 201, await issueIntakeToken(env, user.uid, body));
+    return response(request, env, 201, JSON.stringify(await issueIntakeToken(env, user.uid, body)), {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
   }
   if (request.method === 'POST' && url.pathname === '/v1/tenants/capacity') {
     let payload: Record<string, unknown>;
