@@ -43,7 +43,7 @@ export async function listTenantRecords<T extends DocumentData>(
 export async function listPatientRecords<T extends DocumentData>(
   session: TenantAccessState,
   patientId: string,
-  subcollection: 'clinicalRecords' | 'clinicalRecordAmendments' | 'clinicalPhotos',
+  subcollection: 'clinicalRecords' | 'clinicalRecordAmendments' | 'clinicalPhotos' | 'odontogramEvents',
 ): Promise<(T & { id: string })[]> {
   const ready = requireReady(session);
   const snapshot = await getDocs(collection(db, 'tenants', ready.tenant.id, 'patients', patientId, subcollection));
