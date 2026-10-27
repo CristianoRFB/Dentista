@@ -83,6 +83,7 @@ export function PatientsPage() {
         <td className="row-actions">
           {session.permissions.includes('clinical.read') && <Link to={'/' + tenantSlug + '/app/pacientes/' + patient.id + '/clinico'}>Prontuário</Link>}
           {session.permissions.includes('clinical.read') && <Link to={'/' + tenantSlug + '/app/pacientes/' + patient.id + '/odontograma'}>Odontograma</Link>}
+          {session.permissions.includes('clinical.read') && <Link to={'/' + tenantSlug + '/app/pacientes/' + patient.id + '/tratamento'}>Tratamento</Link>}
           {patient.status === 'active' && session.permissions.includes('patients.manage') && !session.isDemo && <button className="text-button" type="button" onClick={() => void deactivate(patient)}>Inativar</button>}
         </td>
       </tr>)}
