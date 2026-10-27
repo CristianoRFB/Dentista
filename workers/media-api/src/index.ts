@@ -1,4 +1,5 @@
 import { importPKCS8, SignJWT } from 'jose';
+import { createIntakeSecret, intakeTokenHash, validatePublicIntake } from './intakeValidation';
 import { verifyFirebaseIdToken } from './firebaseAuth';
 import { canCreateCommercialCapacity, canUse, getLimit } from '../../../src/commercial/entitlementService';
 import {
@@ -807,13 +808,102 @@ async function downloadMedia(request: Request, env: Env, uid: string, photoId: s
   });
 }
 
+
+const INTAKE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+async function issueIntakeToken(env: Env, uid: string, input: Record<string, unknown>) {
+  const tenantId = typeof input.tenantId === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(input.tenantId)
+    ? input.tenantId : '';
+  if (!tenantId || Object.keys(input).some(key => key !== 'tenantId')) throw new HttpError(400, 'invalid_request');
+  const token = await serviceAccountToken(env);
+  const transaction = await beginTransaction(env, token);
+  try {
+    const [tenant, member] = await Promise.all([
+      getDocument(env, token, 'tenants/' + tenantId, transaction),
+      getDocument(env, token, 'tenants/' + tenantId + '/memberships/' + uid, transaction),
+    ]);
+    if (!tenant || tenant.id !== tenantId || tenant.status !== 'active' || tenant.planId === 'premium_demo') throw new HttpError(404, 'tenant_unavailable');
+    if (!member || member.tenantId !== tenantId || member.userId !== uid
+      || member.status !== 'active' || !hasRolePermission(member, 'intake.manage')) throw new HttpError(403, 'intake_permission_required');
+    if (!canUse(tenant as any, 'intake_link')) throw new HttpError(403, 'feature_not_available');
+    const raw = createIntakeSecret();
+    const hash = await intakeTokenHash(raw);
+    const issuedAt = new Date();
+    const expiresAt = new Date(issuedAt.getTime() + INTAKE_TTL_MS);
+    const path = 'tenants/' + tenantId + '/intakeTokens/' + hash;
+    await commitTransaction(env, token, transaction, [
+      documentWrite(env, path, {
+        tenantId, createdBy: uid, createdAt: issuedAt, expiresAt, usedAt: null,
+      }, true),
+    ]);
+    return { token: raw, expiresAt: expiresAt.toISOString() };
+  } catch (e) {
+    await rollbackTransaction(env, token, transaction);
+    throw e;
+  }
+}
+
+async function submitPublicIntake(env: Env, payload: unknown) {
+  let input: ReturnType<typeof validatePublicIntake>;
+  try { input = validatePublicIntake(payload); } catch { throw new HttpError(400, 'invalid_contact_details'); }
+  const token = await serviceAccountToken(env);
+  const transaction = await beginTransaction(env, token);
+  try {
+    const slug = await getDocument(env, token, 'tenantSlugs/' + input.tenantSlug, transaction);
+    if (!slug || slug.slug !== input.tenantSlug || slug.status !== 'active'
+      || typeof slug.tenantId !== 'string') throw new HttpError(404, 'invalid_or_expired_link');
+    const tenantId = slug.tenantId;
+    const [tenant, linkHash] = await Promise.all([
+      getDocument(env, token, 'tenants/' + tenantId, transaction),
+      intakeTokenHash(input.token),
+    ]);
+    if (!tenant || tenant.status !== 'active' || tenant.slug !== input.tenantSlug
+      || !canUse(tenant as any, 'intake_link')) throw new HttpError(404, 'invalid_or_expired_link');
+    const tokenPath = 'tenants/' + tenantId + '/intakeTokens/' + linkHash;
+    const issued = await getDocument(env, token, tokenPath, transaction);
+    const expiresAt = typeof issued?.expiresAt === 'string' ? Date.parse(issued.expiresAt) : NaN;
+    if (!issued || issued.tenantId !== tenantId || issued.usedAt !== null
+      || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) throw new HttpError(404, 'invalid_or_expired_link');
+    const now = new Date();
+    const submissionId = crypto.randomUUID();
+    const submissionPath = 'tenants/' + tenantId + '/patientIntakeSubmissions/' + submissionId;
+    await commitTransaction(env, token, transaction, [
+      documentWrite(env, tokenPath, { ...issued, id: undefined, usedAt: now }),
+      documentWrite(env, submissionPath, {
+        id: submissionId, tenantId, tokenId: linkHash, status: 'pending_review',
+        name: input.name, phone: input.phone, email: input.email, submittedAt: now,
+      }, true),
+    ]);
+    return { submitted: true };
+  } catch(e) {
+    await rollbackTransaction(env, token, transaction);
+    throw e;
+  }
+}
+
 async function handle(request: Request, env: Env) {
   validateOrigin(request, env);
   if (request.method === 'OPTIONS') return response(request, env, 204, null);
   const url = new URL(request.url);
   if (request.method === 'GET' && url.pathname === '/health') return json(request, env, 200, { ok: true });
+  if (request.method === 'POST' && url.pathname === '/v1/public/intake') {
+    if (Number(request.headers.get('Content-Length') ?? '0') > 4096) throw new HttpError(413, 'request_too_large');
+    let body: unknown;
+    try {
+      const raw = await request.text();
+      if (raw.length > 4096) throw new HttpError(413, 'request_too_large');
+      body = JSON.parse(raw);
+    } catch(e) { if(e instanceof HttpError) throw e; throw new HttpError(400, 'invalid_json'); }
+    return json(request, env, 202, await submitPublicIntake(env, body));
+  }
 
   const user = await authenticate(request, env);
+  if (request.method === 'POST' && url.pathname === '/v1/intake/tokens') {
+    let body: Record<string, unknown>;
+    try { body = await request.json() as Record<string, unknown>; }
+    catch { throw new HttpError(400, 'invalid_json'); }
+    return json(request, env, 201, await issueIntakeToken(env, user.uid, body));
+  }
   if (request.method === 'POST' && url.pathname === '/v1/tenants/capacity') {
     let payload: Record<string, unknown>;
     try { payload = await request.json() as Record<string, unknown>; }
