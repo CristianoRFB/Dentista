@@ -70,7 +70,7 @@ service cloud.firestore {
     function featureImplemented(featureKey) {
       return featureKey in [
         'agenda','patients','professionals','procedures','physical_resources',
-        'clinical_records','clinical_photos','mini_site','recall_center','treatment_plans','quotes'
+        'clinical_records','clinical_photos','mini_site','recall_center','treatment_plans','quotes','intake_link'
       ];
     }
 
