@@ -54,6 +54,7 @@
 | Fotos | Catálogo/busca de classificações clínicas | IMPLEMENTADA | Essencial | — |
 | Fotos | Cache local IndexedDB | IMPLEMENTADA | Interna | detalhe técnico, não diferencial |
 | Fotos | Upload R2 privado | IMPLEMENTADA | Essencial | entitlement e permissão clínica no Worker; acesso a mídia existente preservado; produção sem binding/segredos confirmados |
+| Fotos | Revisão e arquivamento reversível | IMPLEMENTADA | Essencial | verificar/rejeitar + arquivar/restaurar apenas metadata, com audit log; R2 original preservado; CI/Emulator sem homologação hospedada |
 | Fotos | Timeline/comparação antes/depois | PLANEJADA | Pro | — |
 | Retorno | Central de retorno | IMPLEMENTADA | Pro | CRUD interno auditado e acesso restrito, CI/Emulator; sem lembretes automáticos |
 | Intake | Pré-cadastro por link | IMPLEMENTADA | Pro | token opaco de uso único e 7 dias, contato público pendente de revisão, Worker e Rules tenant-aware; produção não homologada |
