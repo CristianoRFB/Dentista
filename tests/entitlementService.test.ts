@@ -34,7 +34,7 @@ describe('PlanCatalog e EntitlementService', () => {
     expect(canUse(demoB, 'recall_center')).toBe(true);
     expect(canUse(premiumB, 'patient_portal')).toBe(false);
     expect(canUse({ ...proA, features: { recall_center: false } }, 'recall_center')).toBe(false);
-    expect(canUse({ ...essentialA, entitlementOverrides: { recall_center: true } }, 'recall_center')).toBe(false);
+    expect(canUse({ ...essentialA, entitlementOverrides: { recall_center: true } }, 'recall_center')).toBe(true); // override manual explícito permite recurso efetivamente implementado
     expect(canUse({ ...premiumB, entitlementOverrides: { patient_portal: true } }, 'patient_portal')).toBe(false);
     expect(canUse({ ...proA, entitlementOverrides: { recall_center: false } }, 'recall_center')).toBe(false);
     expect(canUse({ ...premiumB, planId: 'premium_demo', subscriptionStatus: 'active' }, 'agenda')).toBe(false);
