@@ -868,7 +868,7 @@ async function submitPublicIntake(env: Env, payload: unknown) {
     const submissionId = crypto.randomUUID();
     const submissionPath = 'tenants/' + tenantId + '/patientIntakeSubmissions/' + submissionId;
     await commitTransaction(env, token, transaction, [
-      documentWrite(env, tokenPath, { ...issued, id: undefined, usedAt: now }),
+      documentWrite(env, tokenPath, { ...issued, id: undefined, createdAt: new Date(String(issued.createdAt)), expiresAt: new Date(String(issued.expiresAt)), usedAt: now }),
       documentWrite(env, submissionPath, {
         id: submissionId, tenantId, tokenId: linkHash, status: 'pending_review',
         name: input.name, phone: input.phone, email: input.email, submittedAt: now,
