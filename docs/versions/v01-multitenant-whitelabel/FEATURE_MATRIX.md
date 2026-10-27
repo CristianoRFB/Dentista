@@ -48,14 +48,14 @@
 | Agenda | Lembretes automáticos | DEFERRED | Add-on | provedor/custo/consentimento pendentes |
 | Clínica | Prontuário append-only | IMPLEMENTADA | Essencial | registros imutáveis com autoria e auditoria; histórico completo, sem corte por plano |
 | Clínica | Adendos de prontuário | IMPLEMENTADA | Essencial | correção auditável por novo registro; integridade sem diferenciação |
-| Clínica | Odontograma orientado a eventos | PLANEJADA | Essencial | — |
-| Clínica | Plano de tratamento básico | PLANEJADA | Essencial | — |
-| Comercial clínica | Orçamentos | PLANEJADA | Pro | — |
+| Clínica | Odontograma orientado a eventos | IMPLEMENTADA | Essencial | FDI interativo, registros append-only e correções auditadas em CI/Emulator |
+| Clínica | Plano de tratamento básico | IMPLEMENTADA | Essencial | criação/versões imutáveis, etapas e transições auditadas; CI/Emulator verificado; validação hospedada pendente |
+| Comercial clínica | Orçamentos | IMPLEMENTADA | Pro | propostas estruturadas em centavos, histórico versionado, exportação JSON; sem cobrança ou assinatura digital |
 | Fotos | Catálogo/busca de classificações clínicas | IMPLEMENTADA | Essencial | — |
 | Fotos | Cache local IndexedDB | IMPLEMENTADA | Interna | detalhe técnico, não diferencial |
 | Fotos | Upload R2 privado | IMPLEMENTADA | Essencial | entitlement e permissão clínica no Worker; acesso a mídia existente preservado; produção sem binding/segredos confirmados |
 | Fotos | Timeline/comparação antes/depois | PLANEJADA | Pro | — |
-| Retorno | Central de retorno | EM IMPLEMENTAÇÃO | Pro | tela apenas de leitura; entitlement fica indisponível até a rotina operacional estar pronta |
+| Retorno | Central de retorno | IMPLEMENTADA | Pro | CRUD interno auditado e acesso restrito, CI/Emulator; sem lembretes automáticos |
 | Intake | Pré-cadastro por link | EM IMPLEMENTAÇÃO | Pro | página demonstrativa sem envio persistente; endpoint seguro pendente; entitlement indisponível |
 | Site público | Mini-site white-label do tenant | IMPLEMENTADA | Essencial | perfil público configurável; agendamento público ainda não persiste |
 | Documentos | Receitas/atestados/templates básicos | PLANEJADA | Essencial | — |
