@@ -19,6 +19,7 @@ export async function addOdontogramEvent(session: TenantAccessState, patientId: 
   requirePermission(ready, 'clinical.write');
   if (!canUse(ready.tenant, 'clinical_records')) throw new Error('Registro clínico indisponível.');
   const values = validateOdontogramInput(input);
+  if (input.supersedesEventId && values.note.length < 5) throw new Error('Descreva a correção clínica (mínimo 5 caracteres).');
   const actorId = ready.membership?.userId ?? (ready.isPlatformOwner ? auth.currentUser?.uid : undefined);
   if (!actorId) throw new Error('Sessão clínica autenticada obrigatória.');
   const patientRef = doc(db, 'tenants', ready.tenant.id, 'patients', patientId);
