@@ -5,7 +5,7 @@ import { auth, db } from './firebase';
 import { listTenantRecords } from './tenantData';
 import { requirePermission, requireReady } from './tenantDataCore';
 import {
-  canTransitionTreatment, planVersionId, treatmentTotalCents, validateTreatmentVersion,
+  canTransitionTreatment, treatmentTotalCents, validateTreatmentVersion,
   type TreatmentItem, type TreatmentPlan, type TreatmentPlanVersion, type TreatmentStatus,
 } from '../domain/treatmentPlan';
 
@@ -54,7 +54,7 @@ export async function createTreatmentPlan(session:TenantAccessState, patientId:s
   const {actorId,actorRole}=actor(ready);
   const tenantId=ready.tenant.id;
   const planRef=doc(collection(db,'tenants',tenantId,'treatmentPlans'));
-  const versionRef=doc(db,'tenants',tenantId,'treatmentPlans',planRef.id,'versions',planVersionId(1));
+  const versionRef=doc(collection(db,'tenants',tenantId,'treatmentPlans',planRef.id,'versions'));
   const auditRef=doc(collection(db,'tenants',tenantId,'auditLogs'));
   await runTransaction(db,async tx=>{
     const patientRef=doc(db,'tenants',tenantId,'patients',patientId);
@@ -69,7 +69,7 @@ export async function createTreatmentPlan(session:TenantAccessState, patientId:s
       const appt=snapshots.at(-1);
       if(!appt?.exists()||appt.data().tenantId!==tenantId||appt.data().patientId!==patientId||appt.data().professionalId!==professionalId) throw new Error('Agendamento não pertence ao paciente/profissional.');
     }
-    tx.set(planRef,{id:planRef.id,tenantId,patientId,professionalId,currentVersion:1,status:'draft',
+    tx.set(planRef,{id:planRef.id,tenantId,patientId,professionalId,currentVersion:1,versionId:versionRef.id,status:'draft',
       createdBy:actorId,createdAt:serverTimestamp(),lastAuditLogId:auditRef.id});
     tx.set(versionRef,{...values,id:versionRef.id,planId:planRef.id,tenantId,patientId,version:1,
       status:'draft',createdBy:actorId,createdAt:serverTimestamp(),auditLogId:auditRef.id});
@@ -94,7 +94,7 @@ export async function updateTreatmentPlan(session:TenantAccessState,plan:Treatme
     const current=await tx.get(root);
     if(!current.exists()||current.data().tenantId!==tenantId||current.data().patientId!==plan.patientId||
       current.data().currentVersion!==plan.currentVersion||current.data().status!==plan.status) throw new Error('Plano alterado. Atualize antes de editar.');
-    const priorRef=doc(db,'tenants',tenantId,'treatmentPlans',plan.id,'versions',planVersionId(plan.currentVersion));
+    const priorRef=doc(db,'tenants',tenantId,'treatmentPlans',plan.id,'versions',plan.versionId);
     const previous=await tx.get(priorRef);
     if(!previous.exists()) throw new Error('Histórico do plano indisponível.');
     const was=previous.data() as TreatmentPlanVersion;
@@ -104,8 +104,8 @@ export async function updateTreatmentPlan(session:TenantAccessState,plan:Treatme
           item[key as keyof TreatmentItem]!==values.items[i][key as keyof TreatmentItem])) throw new Error('Itens aprovados são imutáveis; registre novo plano para rever valores.');
     }
     const version=plan.currentVersion+1;
-    const nextRef=doc(db,'tenants',tenantId,'treatmentPlans',plan.id,'versions',planVersionId(version));
-    tx.update(root,{currentVersion:version,status,lastAuditLogId:audit.id,updatedAt:serverTimestamp()});
+    const nextRef=doc(collection(db,'tenants',tenantId,'treatmentPlans',plan.id,'versions'));
+    tx.update(root,{currentVersion:version,versionId:nextRef.id,status,lastAuditLogId:audit.id,updatedAt:serverTimestamp()});
     tx.set(nextRef,{...values,id:nextRef.id,planId:plan.id,tenantId,patientId:plan.patientId,
       version,status,createdBy:actorId,createdAt:serverTimestamp(),auditLogId:audit.id});
     tx.set(audit,{tenantId,actorId,actorRole,action:'treatment_plan.revise',resourceType:'treatmentPlan',
