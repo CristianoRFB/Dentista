@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateRecallForm, validateRecallTransition } from '../src/lib/recallValidation';
-import { recallDisplayStatus } from '../src/lib/recallData';
+import { recallDisplayStatus, validateRecallForm, validateRecallTransition } from '../src/lib/recallValidation';
 import type { Recall } from '../src/domain/types';
 
 describe('Fluxo de retornos', () => {
