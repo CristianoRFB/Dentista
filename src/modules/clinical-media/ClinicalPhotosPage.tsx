@@ -59,8 +59,12 @@ export function ClinicalPhotosPage() {
     void Promise.all(pending.map(async photo => {
       try {
         const url=await fetchClinicalPhoto({ tenantId:session.tenant.id, patientId, photoId:photo.id });
+        if (disposed) {
+          URL.revokeObjectURL(url);
+          return;
+        }
         urls.push(url);
-        if(!disposed) setPreviews(previous=>({...previous,[photo.id]:url}));
+        setPreviews(previous=>({...previous,[photo.id]:url}));
       } catch { /* metadata remains available even when R2 cannot be read */ }
     }));
     return () => {
