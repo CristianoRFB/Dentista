@@ -68,3 +68,14 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible 
 
 /* Pricing protocol v01 — proposal UI only; not runtime entitlement enforcement. */
 .proposal-notice{max-width:880px;margin:24px auto 0;padding:14px 16px;border:1px solid #d8e6e2;border-radius:14px;background:#f3f8f6;color:#49645f;font-size:13px;text-align:left}.annual-note{font-size:11px;color:var(--muted);margin-top:-16px;margin-bottom:20px}.price-card .clean-list li{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.feature-state{font-size:9px;text-transform:uppercase;letter-spacing:.05em;padding:4px 6px;border-radius:999px;background:#eef2f1;color:#64736f;white-space:nowrap}.feature-state.em_implementacao{background:#fff3d8;color:#80632f}.feature-state.planejada{background:#e9eef8;color:#51618e}.feature-state.deferred{background:#f1e8f3;color:#795a80}.feature-state.implementada{background:#e4f3ec;color:#336d55}.limits-box{display:grid;gap:5px;margin:20px 0;padding:13px;border-radius:12px;background:#f7f9f8;border:1px solid var(--line);font-size:11px}.limits-box b{margin-bottom:3px}.limits-box span{color:var(--muted)}
+
+/* Odontograma FDI acessível: botões reais com alvos >=44px e foco visível. */
+.tooth-grid { display:grid;grid-template-columns:repeat(16,minmax(42px,1fr));gap:5px;max-width:100%;overflow-x:auto;padding:6px 0 14px; }
+.tooth-grid:has(.tooth-button:nth-child(10):last-child) {grid-template-columns:repeat(10,minmax(42px,1fr));}
+.tooth-button { min-height:50px;border:1px solid #bdd0c9;border-radius:10px;background:#fff;color:#163d3a;cursor:pointer;font-weight:700; }
+.tooth-button small {display:block;font-size:11px;color:#819590;}
+.tooth-button.has-event {border-color:#679e91;background:#f0f8f5;}
+.tooth-button.selected,.tooth-button[aria-pressed='true'] {background:#163d3a;color:#fff;}
+.tooth-button:focus-visible {outline:3px solid #e9ac42;outline-offset:2px;}
+.odontogram-page .clinical-amendment {margin:12px 0;padding:14px;border-left:3px solid #679e91;background:#f5faf8;}
+@media(max-width:760px){.tooth-grid {grid-template-columns:repeat(16,42px);}.tooth-grid:has(.tooth-button:nth-child(10):last-child){grid-template-columns:repeat(10,42px);}}
