@@ -18,7 +18,7 @@ const planHighlights: Record<PlanDefinition['id'], CommercialPlanProposal['highl
   pro: [
     { label: 'Tudo do Essencial', state: 'IMPLEMENTADA' },
     { label: 'Até 3 profissionais e 5 recursos físicos', state: 'IMPLEMENTADA' },
-    { label: 'Central de retorno', state: 'EM_IMPLEMENTACAO' },
+    { label: 'Central de retorno', state: 'IMPLEMENTADA' },
     { label: 'Pré-cadastro por link', state: 'PLANEJADA' },
     { label: 'Orçamentos, financeiro e relatórios básicos', state: 'PLANEJADA' },
   ],
