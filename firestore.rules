@@ -675,42 +675,7 @@ service cloud.firestore {
           && get(patientPath).data.tenantId == tenantId
           && get(patientPath).data.status == 'active'
           && data.reason is string && data.reason.size() >= 3 && data.reason.size() <= 500
-          && data.dueAt is string && data.dueAt.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T12:00:00[.]000Z
-
-      match /patientIntakeSubmissions/{submissionId} {
-        allow get, list: if hasPermission(tenantId, 'intake.read') && resource.data.tenantId == tenantId;
-        allow create: if false;
-        allow update, delete: if false;
-      }
-
-      match /usageCounters/{counterId} {
-        allow get, list: if isPlatformOwner() || hasPermission(tenantId, 'usage.read');
-        allow create, update, delete: if false;
-      }
-
-      match /limitCounters/{counterId} {
-        allow read, write: if false;
-      }
-
-      match /treatmentPlans/{planId} {
-        allow get, list: if hasPermission(tenantId, 'treatment.read') || clinicalRead(tenantId);
-        allow create, update, delete: if false;
-      }
-
-      match /quotes/{quoteId} {
-        allow get, list: if hasPermission(tenantId, 'billing.read');
-        allow create, update, delete: if false;
-      }
-
-      match /auditLogs/{auditId} {
-        allow get, list: if isPlatformOwner() || hasPermission(tenantId, 'audit.read');
-        allow create: if auditEnvelopeValid(tenantId, auditId, request.resource.data);
-        allow update, delete: if false;
-      }
-    }
-  }
-}
-)
+          && data.dueAt is string && data.dueAt.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T12:00:00[.]000Z$')
           && data.status in ['planned','due','contacted','scheduled','dismissed']
           && (data.get('lastContactAt', null) == null || data.lastContactAt is timestamp)
           && (appointmentId == null || (
