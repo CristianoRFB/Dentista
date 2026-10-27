@@ -854,6 +854,7 @@ async function reviewMedia(request: Request,env:Env,uid:string,photoId:string) {
       ]);
       if(access.tenant.planId==='premium_demo'||access.tenant.subscriptionStatus==='demo')
         throw new HttpError(409,'demo_read_only');
+      if(!canUse(access.tenant as any,'clinical_photos')) throw new HttpError(403,'feature_not_available');
       if(!photo||photo.id!==photoId||photo.tenantId!==input.tenantId
         ||photo.patientId!==input.patientId
         ||typeof photo.objectKey!=='string'
