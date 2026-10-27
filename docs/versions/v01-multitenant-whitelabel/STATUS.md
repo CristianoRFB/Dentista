@@ -38,7 +38,7 @@
 
 - Central de Retorno: fluxo interno persistido, auditado e protegido por Rules/entitlements; sem envio automático de mensagens ou consentimento presumido;
 - pré-cadastro/agendamento público para tenants reais: indisponíveis neste estágio;
-- odontograma: mapa FDI com eventos append-only, correção auditada e tela clínica na branch; plano de tratamento ainda sem fluxo operacional;
+- odontograma: mapa FDI com eventos append-only, correção auditada e tela clínica na branch; tratamento e propostas com versões clínicas imutáveis e orçamento Pro/Premium implementados em CI; validação hospedada pendente;
 - billing, checkout e cobrança automática: DEFERRED;
 - quota/storage R2: não medidos, não anunciados e não aplicados;
 - produção: ainda depende de credenciais/configuração externa e validação de ambiente;
