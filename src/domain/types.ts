@@ -206,6 +206,13 @@ export interface ClinicalPhoto {
   contentType: string;
   originalName: string;
   createdBy?: string;
+  lifecycleStatus?: 'active' | 'archived';
+  archivedAt?: string | null;
+  archivedBy?: string | null;
+  updatedAt?: string;
+  updatedBy?: string;
+  lastAuditLogId?: string;
+  revision?: number;
 }
 
 /** Immutable odontogram event for one patient and FDI tooth; corrections reference earlier events. */
