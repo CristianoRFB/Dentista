@@ -38,7 +38,7 @@
 
 - Central de Retorno: fluxo interno persistido, auditado e protegido por Rules/entitlements; sem envio automático de mensagens ou consentimento presumido;
 - pré-cadastro/agendamento público para tenants reais: indisponíveis neste estágio;
-- odontograma e plano de tratamento: modelagem/documentação, sem fluxo operacional;
+- odontograma: mapa FDI com eventos append-only, correção auditada e tela clínica na branch; plano de tratamento ainda sem fluxo operacional;
 - billing, checkout e cobrança automática: DEFERRED;
 - quota/storage R2: não medidos, não anunciados e não aplicados;
 - produção: ainda depende de credenciais/configuração externa e validação de ambiente;
@@ -68,3 +68,10 @@
 - Autorização: `recalls.read`/`recalls.manage`, recurso `recall_center` a partir do Pro ou override explícito; demo Premium só leitura; Essencial padrão sem acesso.
 - Integridade: paciente/agenda tenant-scoped, rastreio `lastAuditLogId`, sem exclusão física; testes assertivos de Firestore Emulator e negativos A/B.
 - Limite conhecido: paginação ainda client-side, sem paginação de consulta no Firestore para bases muito grandes; não há envio externo nem captura de screenshot real arquivada.
+
+## Odontograma — implementação incremental (27/10/2026)
+
+- Mapa dentário FDI permanente/decíduo, seleção por teclado, histórico por dente/superfície e registro clínico atribuído ao usuário autenticado.
+- `odontogramEvents` dentro do paciente, sem update/delete e com correção por novo evento; audit log transacional.
+- Firestore Rules restringem por `clinical.read`/`clinical.write`, paciente do tenant, paciente ativo na escrita, demonstração somente leitura e auditoria obrigatória.
+- Não há diagnóstico automático. Capturas reais/QA em navegador hospedado e infraestrutura de produção continuam pendentes.
