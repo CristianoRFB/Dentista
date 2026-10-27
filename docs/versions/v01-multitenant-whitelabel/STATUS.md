@@ -82,4 +82,5 @@
 - Arquivamento é lógico e reversível: status clínico e metadados originais preservados; o Worker altera apenas campos da revisão via `updateMask` (evita converter timestamps existentes em strings).
 - Galeria privada: estados ativos/arquivados, tags limitadas, motivo de revisão, limpeza de object URLs no navegador. Leitura/download permanecem autenticados.
 - Evidência técnica: `tests/mediaLifecycle.test.ts`, `tests/mediaWorker.test.ts`, CI TypeScript/Vitest/Rules/Build aprovado. Nenhuma screenshot real arquivada.
-- **Ainda pendente:** reconciliar objetos órfãos/metadados inconsistentes, política operacional de retenção/restauração, provisionamento de R2/Worker/Firebase e testes hospedados. Não anunciar retenção automatizada ou recuperação de desastres como concluída.
+- Upload compensa falha ao iniciar a transação Firestore após R2.put, removendo o objeto recém-criado; teste negativo automatizado verifica ausência de bytes órfãos nesse cenário.
+- **Ainda pendente:** reconciliar objetos órfãos de falhas não compensadas/metadados inconsistentes, política operacional de retenção/restauração, provisionamento de R2/Worker/Firebase e testes hospedados. Não anunciar retenção automatizada ou recuperação de desastres como concluída.
