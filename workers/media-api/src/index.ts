@@ -1090,7 +1090,7 @@ async function handle(request: Request, env: Env) {
     return json(request, env, 200, result);
   }
 
-  const mediaReviewMatch=url.pathname.match(/^\\/v1\\/media\\/([A-Za-z0-9_-]{1,128})\\/review$/);
+  const mediaReviewMatch=url.pathname.match(/^\/v1\/media\/([A-Za-z0-9_-]{1,128})\/review$/);
   if(request.method==='POST' && mediaReviewMatch) {
     return json(request,env,200,await reviewMedia(request,env,user.uid,mediaReviewMatch[1]));
   }
