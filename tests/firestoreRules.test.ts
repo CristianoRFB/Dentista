@@ -498,6 +498,76 @@ describe('Firestore Rules — isolamento e autorização', () => {
     expect((await assertSucceeds(getDoc(doc(platformDb, 'tenants/A')))).data()?.planId).toBe('essential');
   });
 
+  it('Central de Retorno Pro: cria/atualiza com auditoria, nega forgery e acesso cruzado', async () => {
+    await env.withSecurityRulesDisabled(async context => {
+      const db = context.firestore();
+      await Promise.all([
+        updateDoc(doc(db, 'tenants/A'), { planId: 'pro' }),
+        updateDoc(doc(db, 'tenants/B'), { planId: 'pro' }),
+      ]);
+    });
+    const owner = env.authenticatedContext('tenant-owner-a').firestore();
+    const receptionist = env.authenticatedContext('reception-a').firestore();
+    const assistant = env.authenticatedContext('assistant-a').firestore();
+    const record = doc(owner, 'tenants/A/recalls/recall-a');
+    const createAudit = doc(owner, 'tenants/A/auditLogs/recall-create-audit');
+    const draft = {
+      id: 'recall-a', tenantId: 'A', patientId: 'patient-a', reason: 'Retorno clínico programado',
+      dueAt: '2026-12-20T12:00:00.000Z', status: 'planned',
+      createdBy: 'tenant-owner-a', createdAt: serverTimestamp(), lastAuditLogId: createAudit.id,
+    };
+    await assertFails(setDoc(record, draft));
+    const createBatch = writeBatch(owner);
+    createBatch.set(record, draft);
+    createBatch.set(createAudit, {
+      tenantId: 'A', actorId: 'tenant-owner-a', actorRole: 'tenant_owner', action: 'recall.create',
+      resourceType: 'recall', resourceId: record.id, timestamp: serverTimestamp(),
+    });
+    await assertSucceeds(createBatch.commit());
+    expect((await assertSucceeds(getDoc(record))).data()?.status).toBe('planned');
+    await assertSucceeds(getDoc(doc(receptionist, 'tenants/A/recalls/recall-a')));
+    await assertFails(getDoc(doc(assistant, 'tenants/A/recalls/recall-a')));
+    await assertFails(getDoc(doc(owner, 'tenants/B/recalls/recall-a')));
+    await assertFails(setDoc(doc(owner, 'tenants/B/recalls/forged'), { ...draft, id: 'forged', tenantId: 'B' }));
+    await assertFails(deleteDoc(record));
+
+    const updateAudit = doc(owner, 'tenants/A/auditLogs/recall-update-audit');
+    const updateBatch = writeBatch(owner);
+    updateBatch.update(record, {
+      status: 'contacted', lastContactAt: serverTimestamp(), updatedAt: serverTimestamp(), lastAuditLogId: updateAudit.id,
+    });
+    updateBatch.set(updateAudit, {
+      tenantId: 'A', actorId: 'tenant-owner-a', actorRole: 'tenant_owner', action: 'recall.update',
+      resourceType: 'recall', resourceId: record.id, timestamp: serverTimestamp(),
+    });
+    await assertSucceeds(updateBatch.commit());
+    expect((await getDoc(record)).data()?.status).toBe('contacted');
+    await assertFails(updateDoc(record, { patientId: 'patient-b' }));
+    await assertFails(updateDoc(record, { status: 'dismissed' }));
+
+    const crossPatient = doc(owner, 'tenants/A/recalls/recall-cross');
+    const crossAudit = doc(owner, 'tenants/A/auditLogs/recall-cross-audit');
+    const crossBatch = writeBatch(owner);
+    crossBatch.set(crossPatient, {
+      ...draft, id: 'recall-cross', patientId: 'patient-b', lastAuditLogId: crossAudit.id,
+    });
+    crossBatch.set(crossAudit, {
+      tenantId: 'A', actorId: 'tenant-owner-a', actorRole: 'tenant_owner',
+      action: 'recall.create', resourceType: 'recall', resourceId: crossPatient.id, timestamp: serverTimestamp(),
+    });
+    await assertFails(crossBatch.commit());
+  });
+
+  it('Central de Retorno não abre no Essencial, mesmo com permissão de recepção', async () => {
+    const receptionist = env.authenticatedContext('reception-a').firestore();
+    await assertFails(getDocs(collection(receptionist, 'tenants/A/recalls')));
+    await assertFails(setDoc(doc(receptionist, 'tenants/A/recalls/essential-write'), {
+      tenantId: 'A', id: 'essential-write', patientId: 'patient-a', reason: 'Revisão',
+      dueAt: '2026-12-20T12:00:00.000Z', status: 'planned',
+      createdBy: 'reception-a', createdAt: serverTimestamp(), lastAuditLogId: 'none',
+    }));
+  });
+
   it('mantém a demo somente leitura mesmo com membership ativa', async () => {
     await env.withSecurityRulesDisabled(async context => {
       const db = context.firestore();
