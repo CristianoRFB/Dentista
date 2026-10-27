@@ -4,7 +4,7 @@ export type PaidPlanId = Exclude<PlanId, 'premium_demo'>;
 export type EntitlementFeature =
   | 'agenda' | 'patients' | 'professionals' | 'procedures' | 'physical_resources'
   | 'clinical_records' | 'clinical_photos' | 'recall_center' | 'mini_site'
-  | 'intake_link' | 'treatment_plans' | 'financial_reports' | 'advanced_reports'
+  | 'intake_link' | 'treatment_plans' | 'quotes' | 'financial_reports' | 'advanced_reports'
   | 'patient_portal' | 'automations' | 'multi_unit';
 export type PlanLimit = 'professionals' | 'adminUsers' | 'resources' | 'units' | 'patients' | 'appointments' | 'clinicalHistory' | 'storageBytes';
 
@@ -19,8 +19,8 @@ export interface PlanDefinition {
   limits: Readonly<Record<PlanLimit, number | null>>;
 }
 
-const sharedCore = ['agenda', 'patients', 'professionals', 'procedures', 'physical_resources', 'clinical_records', 'clinical_photos', 'mini_site'] as const satisfies readonly EntitlementFeature[];
-const proFeatures = [...sharedCore, 'recall_center'] as const satisfies readonly EntitlementFeature[];
+const sharedCore = ['agenda', 'patients', 'professionals', 'procedures', 'physical_resources', 'clinical_records', 'clinical_photos', 'mini_site', 'treatment_plans'] as const satisfies readonly EntitlementFeature[];
+const proFeatures = [...sharedCore, 'recall_center', 'quotes'] as const satisfies readonly EntitlementFeature[];
 
 /** Approved vertical prices and plan limits. Keep this as the only runtime source. */
 export const PLAN_CATALOG: Readonly<Record<PaidPlanId, PlanDefinition>> = {
@@ -44,7 +44,7 @@ export const PLAN_CATALOG: Readonly<Record<PaidPlanId, PlanDefinition>> = {
 /** Features with a real, usable implementation in this checkout. Planned/demo-only items stay unavailable. */
 export const IMPLEMENTED_FEATURES: ReadonlySet<EntitlementFeature> = new Set([
   'agenda', 'patients', 'professionals', 'procedures', 'physical_resources',
-  'clinical_records', 'clinical_photos', 'mini_site', 'recall_center',
+  'clinical_records', 'clinical_photos', 'mini_site', 'recall_center', 'treatment_plans', 'quotes',
 ]);
 
 export function canonicalPlanId(planId: PlanId | undefined): PaidPlanId | null {
