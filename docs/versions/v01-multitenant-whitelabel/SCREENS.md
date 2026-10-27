@@ -12,7 +12,7 @@ Categorias: PLATFORM, TENANT ADMIN, CLINICAL, RECEPTION, PATIENT e PUBLIC. Wiref
 | Agenda | `/{tenantSlug}/app/agenda` | persistência e conflito tratados pelo Worker | Não arquivada |
 | Pacientes | `/{tenantSlug}/app/pacientes` | CRUD mínimo e inativação sem delete | Não arquivada |
 | Prontuário | `/{tenantSlug}/app/pacientes/{patientId}/clinico` | notas append-only e adendos | Não arquivada |
-| Fotos clínicas | `/{tenantSlug}/app/pacientes/{patientId}/fotos` | upload/preview autenticados via Worker e R2 privado | Não arquivada |
+| Fotos clínicas | `/{tenantSlug}/app/pacientes/{patientId}/fotos` | upload/preview privados + revisão clínica auditada e arquivamento/restauração lógica sem excluir R2 | Não arquivada; homologação hospedada pendente |
 | Recursos | `/{tenantSlug}/app/recursos` | CRUD mínimo | Não arquivada |
 | Cadastros | `/{tenantSlug}/app/cadastros` | profissionais/procedimentos/equipe | Não arquivada |
 | Site público do tenant | `/{tenantSlug}` | perfil público real; agendamento e intake para tenants reais indisponíveis | Não arquivada |
