@@ -930,10 +930,7 @@ service cloud.firestore {
             && hasCommercialFeature(tenantId,'treatment_plans','essential')
             && existsAfter(treatmentRootPath(tenantId,planId))
             && validVersion(request.resource.data)
-            && !exists(treatmentVersionPath(tenantId,planId,versionId))
-            && auditAfterMatches(tenantId,request.resource.data.auditLogId,
-              request.resource.data.version == 1 ? 'treatment_plan.create' : 'treatment_plan.revise',
-              'treatmentPlan',planId);
+            && !exists(treatmentVersionPath(tenantId,planId,versionId)); // Root requires the paired audit in the same atomic batch.
           allow update, delete: if false;
         }
       }
