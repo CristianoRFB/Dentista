@@ -12,6 +12,7 @@ const documents = new Map<string, Record<string, unknown>>();
 const writes: unknown[] = [];
 const storedObjects = new Map<string, { bytes: Uint8Array; contentType: string }>();
 const fetchCalls: string[] = [];
+let failNextMediaTransactionStart = false;
 
 function documentFields(value: Record<string, unknown>) {
   const encode = (item: unknown): Record<string, unknown> => {
@@ -79,7 +80,13 @@ beforeAll(async () => {
     const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
     fetchCalls.push(url.toString());
     if (url.hostname === '127.0.0.1' && url.port === '8081') {
-      if (url.pathname.endsWith(':beginTransaction')) return new Response(JSON.stringify({ transaction: 'media-test-transaction' }), { status: 200 });
+      if (url.pathname.endsWith(':beginTransaction')) {
+        if (failNextMediaTransactionStart) {
+          failNextMediaTransactionStart=false;
+          return new Response(JSON.stringify({error:{status:'UNAVAILABLE',message:'test transaction unavailable'}}),{status:503});
+        }
+        return new Response(JSON.stringify({ transaction: 'media-test-transaction' }), { status: 200 });
+      }
       if (url.pathname.endsWith(':commit')) {
         const body = init?.body ? JSON.parse(String(init.body)) as { writes?: unknown[] } : {};
         writes.push(...(body.writes ?? []));
@@ -104,6 +111,7 @@ beforeEach(() => {
   writes.length = 0;
   fetchCalls.length = 0;
   storedObjects.clear();
+  failNextMediaTransactionStart = false;
   vi.mocked(env.CLINICAL_MEDIA.put).mockClear();
   vi.mocked(env.CLINICAL_MEDIA.get).mockClear();
   vi.mocked(env.CLINICAL_MEDIA.delete).mockClear();
@@ -121,6 +129,16 @@ async function upload(token: string, file = new File([new Uint8Array([0xff, 0xd8
 }
 
 describe('Worker de mídia clínica', () => {
+  it('compensa upload R2 se Firestore falhar antes de iniciar a transação', async () => {
+    failNextMediaTransactionStart=true;
+    const result=await upload('verified-test-token');
+    expect(result.status).toBe(503);
+    expect(env.CLINICAL_MEDIA.put).toHaveBeenCalledOnce();
+    expect(env.CLINICAL_MEDIA.delete).toHaveBeenCalledOnce();
+    expect(storedObjects.size).toBe(0);
+    expect(writes).toHaveLength(0);
+  });
+
   it('autoriza upload, grava objeto privado tenant/patient-scoped e metadata auditável', async () => {
     const response = await upload('verified-test-token');
     const payload = await response.json() as { photoId: string; objectKey: string; url?: string };
