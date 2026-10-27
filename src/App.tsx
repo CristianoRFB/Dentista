@@ -13,6 +13,7 @@ import { ResourcesPage } from './modules/scheduling/ResourcesPage';
 import { RecallCenterPage } from './modules/recalls/RecallCenterPage';
 import { PatientsPage } from './modules/patients/PatientsPage';
 import { PatientClinicalPage } from './modules/clinical/PatientClinicalPage';
+import { PatientOdontogramPage } from './modules/clinical/PatientOdontogramPage';
 import { ClinicalPhotosPage } from './modules/clinical-media/ClinicalPhotosPage';
 import { LoginPage } from './modules/auth/LoginPage';
 import { AuthRequired, PlatformOwnerRequired } from './modules/auth/AuthRoutes';
@@ -44,7 +45,7 @@ export function App() {
             <Route element={<TenantPermissionGate anyOf={['professionals.read','procedures.read']} anyFeature={['professionals','procedures']} />}><Route path="cadastros" element={<CatalogsPage />} /></Route>
             <Route element={<TenantPermissionGate permission="recalls.read" feature="recall_center" />}><Route path="retornos" element={<RecallCenterPage />} /></Route>
             <Route element={<TenantPermissionGate permission="patients.read" feature="patients" />}><Route path="pacientes" element={<PatientsPage />} /></Route>
-            <Route element={<TenantPermissionGate permission="clinical.read" feature="clinical_records" />}><Route path="pacientes/:patientId/clinico" element={<PatientClinicalPage />} /></Route>
+            <Route element={<TenantPermissionGate permission="clinical.read" feature="clinical_records" />}><Route path="pacientes/:patientId/clinico" element={<PatientClinicalPage />} /><Route path="pacientes/:patientId/odontograma" element={<PatientOdontogramPage />} /></Route>
             <Route element={<TenantPermissionGate permission="clinical.read" feature="clinical_photos" />}><Route path="pacientes/:patientId/fotos" element={<ClinicalPhotosPage />} /></Route>
           </Route>
         </Route>
