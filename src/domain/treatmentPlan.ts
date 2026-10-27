@@ -19,6 +19,7 @@ export interface TreatmentPlan {
   patientId: string;
   professionalId: string;
   currentVersion: number;
+  versionId: string;
   status: TreatmentStatus;
   createdBy: string;
   createdAt: string;
