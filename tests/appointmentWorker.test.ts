@@ -395,3 +395,86 @@ describe('D4 — pré-cadastro público com token de uso único', () => {
     expect(external.status).toBe(403);
   });
 });
+
+
+describe('D4 — agendamento público protegido por convite de uso único', () => {
+  function seedBooking(){
+    documents.set('tenants/A',{...documents.get('tenants/A')!,slug:'clinica-a'});
+    documents.set('tenants/B',{...documents.get('tenants/B')!,slug:'clinica-b'});
+    documents.set('tenantSlugs/clinica-a',{tenantId:'A',slug:'clinica-a',status:'active'});
+    documents.set('tenantSlugs/clinica-b',{tenantId:'B',slug:'clinica-b',status:'active'});
+  }
+  async function request(path:string,body:Record<string,unknown>,authenticated=false) {
+    return appointmentWorker.fetch(new Request('https://worker.test'+path,{
+      method:'POST',headers:{Origin:'https://app.test','Content-Type':'application/json',
+        ...(authenticated?{Authorization:'Bearer test-token'}:{})},body:JSON.stringify(body),
+    }),workerEnv);
+  }
+  async function invite(){
+    const minted=await request('/v1/booking/tokens',{
+      tenantId:'A',patientId:'patient-a',professionalId:'prof-a',procedureId:'proc-a',
+      resourceId:'chair-a',durationMinutes:30,
+    },true);
+    expect(minted.status,await minted.clone().text()).toBe(201);
+    const result=await minted.json() as {token:string;expiresAt:string};
+    expect(result.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    return result.token;
+  }
+  const future=(minutes=0)=>new Date(Date.now()+24*60*60*1000+minutes*60*1000).toISOString();
+
+  it('reserva agenda de paciente cadastrado, consome token e recusa replay',async()=>{
+    seedBooking();
+    const token=await invite();
+    const input={tenantSlug:'clinica-a',token,startsAt:future()};
+    const created=await request('/v1/public/booking',input);
+    expect(created.status,await created.clone().text()).toBe(201);
+    expect((await created.json() as {booked:boolean}).booked).toBe(true);
+    const booking=[...documents.values()].find(value=>value.bookingSource==='invite_only');
+    expect(booking).toMatchObject({patientId:'patient-a',professionalId:'prof-a',resourceId:'chair-a',status:'confirmed'});
+    expect([...documents.values()].some(value=>value.action==='appointment.create'&&value.actorRole==='public_invite')).toBe(true);
+    expect([...documents.keys()].some(path=>path.includes('/bookingTokens/')&&path.includes(token))).toBe(false);
+    const replay=await request('/v1/public/booking',input);
+    expect(replay.status).toBe(404);
+    expect([...documents.values()].filter(value=>value.bookingSource==='invite_only')).toHaveLength(1);
+  });
+
+  it('impede dois convites concorrentes para o mesmo profissional/recurso',async()=>{
+    seedBooking();
+    const [a,b]=await Promise.all([invite(),invite()]);
+    const at=future(45);
+    const result=await Promise.all([
+      request('/v1/public/booking',{tenantSlug:'clinica-a',token:a,startsAt:at}),
+      request('/v1/public/booking',{tenantSlug:'clinica-a',token:b,startsAt:at}),
+    ]);
+    expect(result.map(x=>x.status).sort()).toEqual([201,409]);
+    expect([...documents.values()].filter(value=>value.bookingSource==='invite_only')).toHaveLength(1);
+  });
+
+  it('não reserva com token de outra clínica, token expirado, data passada ou demo',async()=>{
+    seedBooking();
+    const token=await invite();
+    expect((await request('/v1/public/booking',{tenantSlug:'clinica-b',token,startsAt:future()})).status).toBe(404);
+    expect((await request('/v1/public/booking',{tenantSlug:'clinica-a',token,startsAt:'2020-01-01T10:00:00.000Z'})).status).toBe(400);
+    const path=[...documents.keys()].find(x=>x.includes('/bookingTokens/'))!;
+    documents.set(path,{...documents.get(path)!,expiresAt:'2020-01-01T00:00:00.000Z'});
+    expect((await request('/v1/public/booking',{tenantSlug:'clinica-a',token,startsAt:future()})).status).toBe(404);
+    documents.set('tenants/A',{...documents.get('tenants/A')!,planId:'premium_demo',subscriptionStatus:'demo'});
+    const blocked=await request('/v1/booking/tokens',{
+      tenantId:'A',patientId:'patient-a',professionalId:'prof-a',procedureId:'proc-a',durationMinutes:30,
+    },true);
+    expect(blocked.status).toBe(404);
+    expect((await request('/v1/booking/tokens',{tenantId:'A'})).status).toBe(401);
+  });
+
+  it('rejeita agendamento com referências cruzadas e procedimento inexistente',async()=>{
+    seedBooking();
+    const forged=await request('/v1/booking/tokens',{
+      tenantId:'A',patientId:'patient-b',professionalId:'prof-a',procedureId:'proc-a',durationMinutes:30,
+    },true);
+    expect(forged.status).toBe(400);
+    const invalid=await request('/v1/booking/tokens',{
+      tenantId:'A',patientId:'patient-a',professionalId:'prof-a',procedureId:'unknown',durationMinutes:30,
+    },true);
+    expect(invalid.status).toBe(400);
+  });
+});
