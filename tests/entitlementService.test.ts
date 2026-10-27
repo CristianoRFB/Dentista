@@ -28,7 +28,10 @@ describe('PlanCatalog e EntitlementService', () => {
   it('aplica herança de plano, implementação real e configuração operacional', () => {
     expect(canUse(essentialA, 'agenda')).toBe(true);
     expect(canUse(essentialA, 'recall_center')).toBe(false);
-    expect(canUse(proA, 'recall_center')).toBe(false);
+    expect(canUse(essentialA, 'recall_center')).toBe(false);
+    expect(canUse(proA, 'recall_center')).toBe(true);
+    expect(canUse(premiumB, 'recall_center')).toBe(true);
+    expect(canUse(demoB, 'recall_center')).toBe(true);
     expect(canUse(premiumB, 'patient_portal')).toBe(false);
     expect(canUse({ ...proA, features: { recall_center: false } }, 'recall_center')).toBe(false);
     expect(canUse({ ...essentialA, entitlementOverrides: { recall_center: true } }, 'recall_center')).toBe(false);
