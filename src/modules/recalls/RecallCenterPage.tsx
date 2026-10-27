@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { demoPatients, demoRecalls } from '../../sample/demoData';
 import type { Appointment, Patient, Recall, RecallStatus } from '../../domain/types';
-import { createRecall, recallDisplayStatus, updateRecall } from '../../lib/recallData';
+import { createRecall, updateRecall } from '../../lib/recallData';
+import { recallDisplayStatus } from '../../lib/recallValidation';
 import { canManageRecalls } from '../../lib/recallValidation';
 import { listTenantRecords } from '../../lib/tenantData';
 import { useTenantAccess } from '../tenant/TenantContext';
