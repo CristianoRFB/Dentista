@@ -64,7 +64,10 @@ export async function createTreatmentPlan(session:TenantAccessState, patientId:s
     const snapshots=await Promise.all([...refs,...(appointmentRef?[appointmentRef]:[])].map(ref=>tx.get(ref)));
     if (!snapshots[0].exists()||snapshots[0].data().tenantId!==tenantId||snapshots[0].data().status!=='active') throw new Error('Paciente indisponível nesta clínica.');
     if (!snapshots[1].exists()||snapshots[1].data().tenantId!==tenantId||snapshots[1].data().status!=='active') throw new Error('Profissional indisponível nesta clínica.');
-    for (let i=2;i<refs.length;i++) if(!snapshots[i].exists()||snapshots[i].data().tenantId!==tenantId||snapshots[i].data().active!==true) throw new Error('Procedimento inativo ou de outra clínica.');
+    for (let i=2;i<refs.length;i++) {
+      const procedure = snapshots[i];
+      if(!procedure || !procedure.exists()||procedure.data().tenantId!==tenantId||procedure.data().active!==true) throw new Error('Procedimento inativo ou de outra clínica.');
+    }
     if(appointmentRef) {
       const appt=snapshots.at(-1);
       if(!appt || !appt.exists()||appt.data().tenantId!==tenantId||appt.data().patientId!==patientId||appt.data().professionalId!==professionalId) throw new Error('Agendamento não pertence ao paciente/profissional.');
