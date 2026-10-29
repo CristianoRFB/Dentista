@@ -123,14 +123,14 @@ export function RecallCenterPage() {
           <option value="all">Todos</option>{STATUS.map(s => <option value={s.value} key={s.value}>{s.label}</option>)}
         </select></label>
       </div>
-      <table className="table"><caption className="sr-only">Retornos da clínica atual</caption><thead><tr><th>Paciente</th><th>Motivo</th><th>Data prevista</th><th>Estado</th><th>Ação</th></tr></thead><tbody>
+      <table className="table clinical-stack-table"><caption className="sr-only">Retornos da clínica atual</caption><thead><tr><th>Paciente</th><th>Motivo</th><th>Data prevista</th><th>Estado</th><th>Ação</th></tr></thead><tbody>
         {loading ? <tr><td colSpan={5}>Carregando retornos…</td></tr>
           : !visible.length ? <tr><td colSpan={5}>Nenhum retorno neste filtro.</td></tr>
           : visible.map(recall => <tr key={recall.id}>
-            <td><b>{nameById.get(recall.patientId) ?? 'Paciente indisponível'}</b></td>
-            <td>{recall.reason}</td><td>{new Date(recall.dueAt).toLocaleDateString('pt-BR', {timeZone:'UTC'})}</td>
-            <td><span className={'status-pill ' + recallDisplayStatus(recall)}>{statusText(recallDisplayStatus(recall))}</span></td>
-            <td>{writable && recall.status !== 'dismissed' ? <button className="text-button" type="button" onClick={() => startEdit(recall)}>Atualizar</button> : '—'}</td>
+            <td data-label="Paciente"><b>{nameById.get(recall.patientId) ?? 'Paciente indisponível'}</b></td>
+            <td data-label="Motivo">{recall.reason}</td><td data-label="Data prevista">{new Date(recall.dueAt).toLocaleDateString('pt-BR', {timeZone:'UTC'})}</td>
+            <td data-label="Estado"><span className={'status-pill ' + recallDisplayStatus(recall)}>{statusText(recallDisplayStatus(recall))}</span></td>
+            <td data-label="Ação">{writable && recall.status !== 'dismissed' ? <button className="text-button" type="button" onClick={() => startEdit(recall)}>Atualizar</button> : '—'}</td>
           </tr>)}
       </tbody></table>
       <div className="agenda-toolbar">
