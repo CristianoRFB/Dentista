@@ -1,4 +1,5 @@
 import { auth } from './firebase';
+import { createPersonalInviteUrl } from './personalInviteUrl';
 import type { TenantAccessState } from '../modules/tenant/tenantResolver';
 import { requirePermission, requireReady } from './tenantDataCore';
 import { canUse } from '../commercial/entitlementService';
@@ -21,7 +22,7 @@ export async function issueBookingLink(session:TenantAccessState,data:{
   if(!response.ok)throw new Error('Não foi possível emitir o convite. Confira os cadastros e a API.');
   const result=await response.json() as {token:string;expiresAt:string};
   return {
-    url:window.location.origin+'/'+encodeURIComponent(ready.tenant.slug)+'/agendar?token='+encodeURIComponent(result.token),
+    url:createPersonalInviteUrl(window.location.origin,ready.tenant.slug,'agendar',result.token),
     expiresAt:result.expiresAt,
   };
 }
