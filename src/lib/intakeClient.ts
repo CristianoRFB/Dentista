@@ -1,6 +1,6 @@
 import { collection, doc, runTransaction, serverTimestamp, where } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import { createPersonalInviteUrl } from './personalInviteUrl';
+import { createPersonalInviteUrl, readInviteToken } from './personalInviteUrl';
 import type { PatientIntakeSubmission } from '../domain/types';
 import { listTenantRecords } from './tenantData';
 import { requirePermission, requireReady } from './tenantDataCore';
@@ -77,4 +77,27 @@ export async function reviewIntake(session:TenantAccessState, submissionId:strin
       timestamp:serverTimestamp(),
     });
   });
+}
+
+/** Revoke only unused contact-only invitations; does not modify a received submission. */
+export async function revokeIntakeLink(session:TenantAccessState,url:string) {
+  const ready=requireIntake(session,'intake.manage');
+  if(ready.isDemo)throw new Error('Ambiente demonstrativo somente leitura.');
+  if(!API)throw new Error('API clínica ainda não configurada.');
+  const parsed=new URL(url);
+  if(parsed.origin!==window.location.origin ||
+    parsed.pathname!=='/'+encodeURIComponent(ready.tenant.slug)+'/cadastro')
+    throw new Error('Link de outra clínica ou inválido.');
+  const personalToken=readInviteToken(parsed);
+  if(!personalToken)throw new Error('Convite sem token válido.');
+  const jwt=await auth.currentUser?.getIdToken();
+  if(!jwt)throw new Error('Autenticação necessária.');
+  const response=await fetch(API.replace(/\/$/,'')+'/v1/intake/tokens/revoke',{
+    method:'POST',headers:{Authorization:'Bearer '+jwt,'Content-Type':'application/json'},
+    body:JSON.stringify({tenantId:ready.tenant.id,token:personalToken}),
+  });
+  if(response.status===409)throw new Error('Convite já utilizado ou revogado. Consulte a fila de revisão.');
+  if(response.status===404)throw new Error('Convite não encontrado na clínica atual.');
+  if(!response.ok)throw new Error('Não foi possível revogar o convite de pré-cadastro.');
+  return true;
 }
