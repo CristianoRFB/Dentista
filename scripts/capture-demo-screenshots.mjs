@@ -111,6 +111,24 @@ try{
     }
     await context.close();
   }
+  // Verify that capability-bearing public URLs are cleaned without submitting clinical data.
+  const singleUseToken='A'.repeat(43);
+  const ephemeralContext=await browser.newContext({locale:'pt-BR'});
+  try {
+    for(const item of [
+      {route:'/clinica-qa/agendar#token='+singleUseToken,heading:/Selecione o horário/i},
+      {route:'/clinica-qa/cadastro?token='+singleUseToken,heading:/Pré-cadastro/i},
+    ]){
+      const page=await ephemeralContext.newPage();
+      try {
+        await page.goto(ORIGIN+item.route,{waitUntil:'domcontentloaded',timeout:25000});
+        await page.getByRole('heading',{level:1,name:item.heading}).waitFor({state:'visible',timeout:12000});
+        await page.waitForFunction(()=>!location.search.includes('token=')&&!location.hash.includes('token='));
+        const cleanUrl=page.url();
+        if(cleanUrl.includes(singleUseToken))throw new Error('Personal invite secret remained in browser address bar');
+      }finally{await page.close();}
+    }
+  }finally{await ephemeralContext.close();}
   await writeFile(path.join(OUT,'SCREENSHOTS_MANIFEST.json'),JSON.stringify({
     classification:'SCREENSHOT_REAL_DEMO',capturedAt:new Date().toISOString(),
     source:'running Vite development server with VITE_USE_DEMO_DATA=true',
