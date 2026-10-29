@@ -70,8 +70,19 @@ try{
           await page.waitForFunction(()=>document.querySelector('.app-menu-trigger')?.getAttribute('aria-expanded')==='true');
           const links=await page.locator('.sidebar-open nav a').allTextContents();
           if(!links.some(text=>text.includes('Pacientes')))throw new Error('Mobile drawer hides permitted patient navigation');
+          const modal=await page.locator('.sidebar-open').getAttribute('aria-modal');
+          if(modal!=='true')throw new Error('Open mobile drawer must be a modal navigation region');
+          const scrollLock=await page.evaluate(()=>document.body.style.overflow);
+          if(scrollLock!=='hidden')throw new Error('Background scroll remains enabled while drawer is open');
+          await page.keyboard.press('Shift+Tab');
+          const trapped=await page.evaluate(()=>document.querySelector('.sidebar-open')?.contains(document.activeElement));
+          if(!trapped)throw new Error('Keyboard focus escaped the open mobile drawer');
           await page.keyboard.press('Escape');
           await page.waitForFunction(()=>document.querySelector('.app-menu-trigger')?.getAttribute('aria-expanded')==='false');
+          const restored=await page.evaluate(()=>document.activeElement?.classList.contains('app-menu-trigger'));
+          if(!restored)throw new Error('Escape did not return focus to the menu trigger');
+          if(await page.evaluate(()=>document.body.style.overflow==='hidden'))
+            throw new Error('Mobile background scroll remained locked after closing the drawer');
         }
         if(route.id==='patients'){
           const search=page.locator('input[type="search"][aria-label="Buscar paciente pelo nome ou contato"]');
