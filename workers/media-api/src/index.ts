@@ -3,7 +3,7 @@ import { createIntakeSecret, intakeTokenHash, validatePublicIntake } from './int
 import { BOOKING_TTL_MS, validateBookingInvite, validatePublicBooking } from './publicBooking';
 import { verifyFirebaseIdToken } from './firebaseAuth';
 import { validatePhotoReview, photoTransition } from './mediaLifecycle';
-import { comparePatientMediaInventory } from './mediaIntegrity';
+import { comparePatientMediaInventory, collectMediaInventoryPages, MEDIA_METADATA_PAGE_SIZE, MEDIA_R2_PAGE_SIZE, MAX_MEDIA_INVENTORY_ITEMS } from './mediaIntegrity';
 import { canCreateCommercialCapacity, canUse, getLimit } from '../../../src/commercial/entitlementService';
 import {
   findScheduleConflict, isValidAppointmentWindow, MAX_CONFLICT_LOOKBACK_MS,
@@ -901,39 +901,63 @@ async function reviewMedia(request: Request,env:Env,uid:string,photoId:string) {
 }
 
 /**
- * Read-only diagnostic for a single patient. Deliberately capped: partial R2/Firestore
- * scans are rejected rather than presenting false "orphan" findings.
- * Does not delete, repair, copy, expose image bytes or generate public URLs.
+ * Bounded multi-page inventory: read-only and tenant/patient scoped.
+ * Not transactional across R2 and Firestore. Findings are for manual review,
+ * never evidence sufficient for deletion or a guarantee of atomic consistency.
  */
-async function diagnosePatientMedia(request: Request,env:Env,uid:string) {
+async function diagnosePatientMedia(request: Request,env: Env,uid: string) {
   const url=new URL(request.url);
-  const tenantId=url.searchParams.get('tenantId') ?? '';
-  const patientId=url.searchParams.get('patientId') ?? '';
-  const idPattern=/^[A-Za-z0-9_-]{1,128}$/;
-  if(!idPattern.test(tenantId)||!idPattern.test(patientId))throw new HttpError(400,'invalid_scope');
+  const tenantId=url.searchParams.get('tenantId')??'';
+  const patientId=url.searchParams.get('patientId')??'';
+  const valid=/^[A-Za-z0-9_-]{1,128}$/;
+  if(!valid.test(tenantId)||!valid.test(patientId))throw new HttpError(400,'invalid_scope');
+
   const token=await serviceAccountToken(env);
-  const transaction=await beginTransaction(env,token);
-  let records:(Record<string,any> & {id:string})[]=[];
+  const access=await verifyClinicalAccess(env,token,uid,tenantId,patientId,'clinical.read');
+  if(access.membership && !hasRolePermission(access.membership,'clinical.write'))
+    throw new HttpError(403,'media_inventory_permission_required');
+
+  const parent='tenants/'+tenantId+'/patients/'+patientId;
+  const queryUrl=firestoreRoot(env)+'/'+encodedDocumentPath(parent)+':runQuery';
+  const prefix=parent+'/';
+  let records:(Record<string,any>&{id:string})[];
+  let r2Keys:string[];
   try {
-    // Inspection of clinical inventory requires an active clinician, not a public booking token.
-    const access=await verifyClinicalAccess(env,token,uid,tenantId,patientId,'clinical.read',transaction);
-    if(access.membership && !hasRolePermission(access.membership,'clinical.write'))
-      throw new HttpError(403,'media_inventory_permission_required');
-    const parent='tenants/'+tenantId+'/patients/'+patientId;
-    // A bounded query; queryCollection rejects equal-to-limit results to avoid incomplete comparisons.
-    const rows=await queryCollection(env,token,parent,'clinicalPhotos',
-      [{fieldPath:'tenantId',op:'EQUAL',value:tenantId}],transaction,201);
-    records=rows.map(item=>({...item,id:String(item.id??'')}));
-  }finally{
-    await rollbackTransaction(env,token,transaction);
+    records=await collectMediaInventoryPages(async(cursor)=>{
+      const structuredQuery:Record<string,unknown>={
+        from:[{collectionId:'clinicalPhotos'}],
+        orderBy:[{field:{fieldPath:'__name__'},direction:'ASCENDING'}],
+        limit:MEDIA_METADATA_PAGE_SIZE,
+      };
+      if(cursor) structuredQuery.startAt={values:[{referenceValue:cursor}],before:false};
+      const result=await firestoreRequest<Array<{document?:FsDocument}>>(queryUrl,token,{
+        method:'POST',body:JSON.stringify({structuredQuery}),
+      });
+      const docs=(result??[]).flatMap(item=>item.document?[item.document]:[]);
+      if(docs.length>MEDIA_METADATA_PAGE_SIZE)throw new Error('firestore_page_overflow');
+      const items=docs.map(doc=>decodeDocument(doc) as Record<string,any>&{id:string});
+      return {items,nextCursor:docs.length===MEDIA_METADATA_PAGE_SIZE?docs.at(-1)?.name:undefined};
+    });
+    r2Keys=await collectMediaInventoryPages(async(cursor)=>{
+      const listing=await env.CLINICAL_MEDIA.list({
+        prefix,limit:MEDIA_R2_PAGE_SIZE,...(cursor?{cursor}:{}),
+      });
+      if(listing.truncated&&!listing.cursor)throw new Error('r2_cursor_unavailable');
+      return {
+        items:listing.objects.map(item=>item.key),
+        nextCursor:listing.truncated?listing.cursor:undefined,
+      };
+    });
+  }catch(err){
+    if(err instanceof Error && err.message==='inventory_exceeds_safe_limit')
+      throw new HttpError(409,'media_inventory_exceeds_safe_limit');
+    throw new HttpError(503,'media_inventory_unavailable');
   }
-  const prefix='tenants/'+tenantId+'/patients/'+patientId+'/';
-  const listing=await env.CLINICAL_MEDIA.list({prefix,limit:201});
-  if(listing.truncated || listing.objects.length>=201)
-    throw new HttpError(409,'media_inventory_too_large_for_bounded_scan');
-  const findings=comparePatientMediaInventory(tenantId,patientId,records,listing.objects.map(item=>item.key));
-  return {tenantId,patientId,checkedMetadata:records.length,checkedObjects:listing.objects.length,
-    findings,complete:true,mode:'read_only',noFilesModified:true};
+  const findings=comparePatientMediaInventory(tenantId,patientId,records,r2Keys);
+  return {tenantId,patientId,checkedMetadata:records.length,checkedObjects:r2Keys.length,
+    findings,complete:true,mode:'read_only',noFilesModified:true,
+    snapshotConsistent:false,limit:MAX_MEDIA_INVENTORY_ITEMS,
+    warning:'Resultados nao atomicos entre R2 e Firestore. Confirmar divergencias antes de qualquer intervencao.'};
 }
 
 async function downloadMedia(request: Request, env: Env, uid: string, photoId: string) {
