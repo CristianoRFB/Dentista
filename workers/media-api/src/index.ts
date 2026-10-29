@@ -1020,6 +1020,42 @@ async function issueIntakeToken(env: Env, uid: string, input: Record<string, unk
   }
 }
 
+async function revokeIntakeInvite(env:Env,uid:string,payload:unknown) {
+  if(!payload||typeof payload!=='object'||Array.isArray(payload))throw new HttpError(400,'invalid_revocation');
+  const data=payload as Record<string,unknown>;
+  if(Object.keys(data).some(key=>!['tenantId','token'].includes(key))
+    ||typeof data.tenantId!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(data.tenantId)
+    ||typeof data.token!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(data.token))
+    throw new HttpError(400,'invalid_revocation');
+  const tenantId=data.tenantId,hash=await intakeTokenHash(data.token);
+  const token=await serviceAccountToken(env);
+  const transaction=await beginTransaction(env,token);
+  try{
+    const path='tenants/'+tenantId+'/intakeTokens/'+hash;
+    const [tenant,member,issued]=await Promise.all([
+      getDocument(env,token,'tenants/'+tenantId,transaction),
+      getDocument(env,token,'tenants/'+tenantId+'/memberships/'+uid,transaction),
+      getDocument(env,token,path,transaction),
+    ]);
+    if(!tenant||tenant.id!==tenantId||tenant.status!=='active')throw new HttpError(404,'tenant_unavailable');
+    if(!member||member.tenantId!==tenantId||member.userId!==uid||member.status!=='active'
+      ||!hasRolePermission(member,'intake.manage'))throw new HttpError(403,'intake_permission_required');
+    if(tenant.planId==='premium_demo'||tenant.subscriptionStatus==='demo')
+      throw new HttpError(409,'demo_read_only');
+    if(!issued||issued.tenantId!==tenantId)throw new HttpError(404,'invitation_unavailable');
+    if(issued.usedAt!==null || issued.revokedAt)throw new HttpError(409,'invitation_already_used_or_revoked');
+    const now=new Date(),auditId=crypto.randomUUID();
+    await commitTransaction(env,token,transaction,[
+      documentPatch(env,path,{revokedAt:now,revokedBy:uid,lastAuditLogId:auditId}),
+      documentWrite(env,'tenants/'+tenantId+'/auditLogs/'+auditId,{
+        tenantId,actorId:uid,actorRole:member.role,
+        action:'intake_invite.revoke',resourceType:'intakeInvite',resourceId:hash,timestamp:now,
+      },true),
+    ]);
+    return {revoked:true};
+  }catch(e){await rollbackTransaction(env,token,transaction);throw e;}
+}
+
 async function submitPublicIntake(env: Env, payload: unknown) {
   let input: ReturnType<typeof validatePublicIntake>;
   try { input = validatePublicIntake(payload); } catch { throw new HttpError(400, 'invalid_contact_details'); }
@@ -1039,7 +1075,7 @@ async function submitPublicIntake(env: Env, payload: unknown) {
     const tokenPath = 'tenants/' + tenantId + '/intakeTokens/' + linkHash;
     const issued = await getDocument(env, token, tokenPath, transaction);
     const expiresAt = typeof issued?.expiresAt === 'string' ? Date.parse(issued.expiresAt) : NaN;
-    if (!issued || issued.tenantId !== tenantId || issued.usedAt !== null
+    if (!issued || issued.tenantId !== tenantId || issued.usedAt !== null || Boolean(issued.revokedAt)
       || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) throw new HttpError(404, 'invalid_or_expired_link');
     const now = new Date();
     const submissionId = crypto.randomUUID();
@@ -1187,6 +1223,12 @@ async function handle(request: Request, env: Env) {
     catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,'invalid_json');}
     return response(request,env,201,JSON.stringify(await issuePublicBookingInvite(env,user.uid,body)),
       {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
+  }
+  if(request.method==='POST' && url.pathname==='/v1/intake/tokens/revoke') {
+    let body:unknown;
+    try{const raw=await request.text();if(raw.length>4096)throw new HttpError(413,'request_too_large');body=JSON.parse(raw);}
+    catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,'invalid_json');}
+    return json(request,env,200,await revokeIntakeInvite(env,user.uid,body));
   }
   if (request.method === 'POST' && url.pathname === '/v1/intake/tokens') {
     let body: Record<string, unknown>;
