@@ -379,6 +379,35 @@ describe('D4 — pré-cadastro público com token de uso único', () => {
       tenantSlug:'clinica-a',token,name:'Paciente Válido',phone:'(17) 99999-9999',email:'',
     })).status).toBe(202);
   });
+  it('revoga convite de pré-cadastro não utilizado e bloqueia futuros envios',async()=>{
+    setup();
+    const minted=await call('/v1/intake/tokens',{tenantId:'A'},true);
+    expect(minted.status).toBe(201);
+    const {token}=await minted.json() as {token:string};
+    const revoked=await call('/v1/intake/tokens/revoke',{tenantId:'A',token},true);
+    expect(revoked.status,await revoked.clone().text()).toBe(200);
+    expect((await revoked.json() as {revoked:boolean}).revoked).toBe(true);
+    expect([...documents.values()].some(v=>v.action==='intake_invite.revoke'&&v.actorRole==='tenant_owner')).toBe(true);
+    const submitted=await call('/v1/public/intake',{
+      tenantSlug:'clinica-a',token,name:'Contato Fictício',phone:'(17) 99999-9999',email:'',
+    });
+    expect(submitted.status).toBe(404);
+    expect((await call('/v1/intake/tokens/revoke',{tenantId:'A',token},true)).status).toBe(409);
+    expect([...documents.values()].filter(v=>v.status==='pending_review')).toHaveLength(0);
+  });
+  it('recusa revogação anônima, cruzada ou de convite já utilizado sem apagar a solicitação',async()=>{
+    setup();
+    const minted=await call('/v1/intake/tokens',{tenantId:'A'},true);
+    const {token}=await minted.json() as {token:string};
+    expect((await call('/v1/intake/tokens/revoke',{tenantId:'A',token})).status).toBe(401);
+    expect((await call('/v1/intake/tokens/revoke',{tenantId:'B',token},true)).status).toBe(403);
+    expect((await call('/v1/intake/tokens/revoke',{tenantId:'A',token:'invalid'},true)).status).toBe(400);
+    expect((await call('/v1/public/intake',{
+      tenantSlug:'clinica-a',token,name:'Contato Fictício',phone:'(17) 99999-9999',email:'',
+    })).status).toBe(202);
+    expect((await call('/v1/intake/tokens/revoke',{tenantId:'A',token},true)).status).toBe(409);
+    expect([...documents.values()].filter(v=>v.status==='pending_review')).toHaveLength(1);
+  });
   it('nega tokens expirados, demo e origens externas',async()=>{
     setup();
     const minted=await call('/v1/intake/tokens',{tenantId:'A'},true);
