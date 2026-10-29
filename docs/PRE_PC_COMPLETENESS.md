@@ -27,3 +27,23 @@ Depois de cada lote, atualizar esta tabela a partir de SHA + CI do commit corres
 ## DEFERRED explícito
 Checkout, gateway, billing automático, webhooks de cobrança, WhatsApp oficial, fiscal, IA, estoque, comissão, multi-unidade e domínios customizados automáticos.
 Essencial R$79,90; Pro R$129,90; Premium R$189,90 — contrato preservado.
+
+
+## Estimativa ponderada de avanço do código — 29/10/2026
+
+**Estimativa, não certificação de produto pronto.** O denominador são 100 pontos de implementação interna, escolhidos para refletir esforço/risco dos sete módulos D1–D7 (não quantidade de arquivos/linhas). Uma etapa parcial recebe apenas pontos proporcionais ao escopo efetivamente codificado e testado, com falhas de staging separadas.
+
+| Módulo | Peso | Pontos estimados | Observação para os pontos não atribuídos |
+|---|---:|---:|---|
+| D1 Odontograma | 14 | 14 | Código e testes; produção não incluída nesta régua |
+| D2 Tratamento | 14 | 14 | Código e testes; produção não incluída nesta régua |
+| D3 Retornos | 10 | 10 | Código e testes; produção não incluída nesta régua |
+| D4 Intake/agendamento | 18 | 14 | Agenda aberta sem convite e controles antiabuso ainda não implementados |
+| D5 Mídia/documentos | 18 | 13 | Reconciliação paginada/retention/backup e documentos ainda incompletos |
+| D6 UX e acessibilidade | 16 | 12 | QA leitor de tela, múltiplos dispositivos e UX de demais rotas |
+| D7 CI/evidências | 10 | 5 | Sessão PC real, screenshots persistentes e execução hospedada pendentes |
+| **Total código** | **100** | **82** | **~82% implementação interna estimada** |
+
+**Avanço geral até produção estimado em ~58%** usando 70% de peso para código interno (82% × 0,70 = 57,4 pontos) e 30% para validações/infraestrutura operacional ainda não comprovadas (0 ponto atribuível no checkpoint para essas exigências). Não é percentual de deploy nem prontidão clínica certificada.
+
+Separar evidência: `SCREENSHOT_REAL_DEMO` de Chromium é prova de tela renderizada em Vite com dados fictícios, armazenada como artefato temporário do Actions se o job executar; não é screenshot hospedado de produção, diagrama ou imagem conceitual. Não declarar sucesso antes de o workflow comprovar.
