@@ -368,6 +368,8 @@ describe('D4 — pré-cadastro público com token de uso único', () => {
     const payload={tenantSlug:'clinica-a',token,name:'Paciente Fictício',phone:'(17) 99999-9999',email:'fake@example.test'};
     const first=await call('/v1/public/intake',payload);
     expect(first.status,await first.clone().text()).toBe(202);
+    expect(first.headers.get('Cache-Control')).toContain('no-store');
+    expect(first.headers.get('Referrer-Policy')).toBe('no-referrer');
     expect([...documents.values()].filter(d=>d.status==='pending_review' && d.name==='Paciente Fictício')).toHaveLength(1);
     const second=await call('/v1/public/intake',payload);
     expect(second.status).toBe(404);
@@ -467,6 +469,9 @@ describe('D4 — agendamento público protegido por convite de uso único', () =
     const input={tenantSlug:'clinica-a',token,startsAt:future()};
     const created=await request('/v1/public/booking',input);
     expect(created.status,await created.clone().text()).toBe(201);
+    expect(created.headers.get('Cache-Control')).toContain('no-store');
+    expect(created.headers.get('Referrer-Policy')).toBe('no-referrer');
+    expect(created.headers.get('X-Content-Type-Options')).toBe('nosniff');
     expect((await created.json() as {booked:boolean}).booked).toBe(true);
     const booking=[...documents.values()].find(value=>value.bookingSource==='invite_only');
     expect(booking).toMatchObject({patientId:'patient-a',professionalId:'prof-a',resourceId:'chair-a',status:'confirmed'});
