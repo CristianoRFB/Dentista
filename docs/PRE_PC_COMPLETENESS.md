@@ -1,6 +1,6 @@
 # PRE-PC COMPLETENESS — OdontoFlow
 
-Atualização incremental: 2026-10-27. Fonte: branch `chore/global-standard-v01-ci-20261027`, não produção.
+Atualização incremental: 2026-10-29. Fonte: branch `chore/global-standard-v01-ci-20261027`, não produção.
 Não usar esta tabela como prova de homologação hospedada. Sem pacientes reais.
 
 | Módulo GOAL | Código principal | Teste verificável | Estado deste checkpoint |
@@ -9,9 +9,9 @@ Não usar esta tabela como prova de homologação hospedada. Sem pacientes reais
 | D2 Tratamento/orçamento | `src/domain/treatmentPlan.ts`, `src/lib/treatmentPlanData.ts`, `src/modules/clinical/PatientTreatmentPage.tsx`, `firestore.rules` | `tests/treatmentPlan.test.ts`, `tests/firestoreRules.test.ts` | CODE_COMPLETE — CI `b06af554` verde, versões append-only e orçamento Pro; ambiente real pendente |
 | D3 Central de Retorno | `src/lib/recallData.ts`, `src/lib/recallValidation.ts`, `src/modules/recalls/RecallCenterPage.tsx`, `firestore.rules` | `tests/recallValidation.test.ts`, `tests/firestoreRules.test.ts` | CODE_COMPLETE — CI `7108c582` verde; ambiente real pendente |
 | D4 Intake + booking público | `src/modules/public/PublicIntakePage.tsx`, `src/modules/tenant/IntakeReviewPage.tsx`, `src/modules/tenant/BookingInvitesPage.tsx`, `src/lib/publicBookingClient.ts`, `workers/media-api/src/publicBooking.ts`, `workers/media-api/src/index.ts` | `tests/appointmentWorker.test.ts`, `tests/firestoreRules.test.ts` | PARTIAL — intake Pro completo e agendamento Essencial via convite pessoal persistente com locks e token único; aberto sem convite não habilitado; ambiente hospedado pendente |
-| D5 Segurança + mídia | `workers/media-api/src/index.ts`, `workers/media-api/src/mediaLifecycle.ts`, `workers/media-api/src/mediaIntegrity.ts`, `src/modules/clinical-media/ClinicalPhotosPage.tsx` | `tests/mediaWorker.test.ts`, `tests/mediaLifecycle.test.ts`, `tests/mediaIntegrity.test.ts`, `tests/firestoreRules.test.ts` | PARTIAL — revisão reversível auditada e varredura diagnóstica R2 × Firestore por paciente, limitada e sem exclusão; varredura paginada global, retenção/backup e hospedagem ainda pendentes |
-| D6 UX clínica | Telas existentes de agenda, pacientes, clínico, fotos, retorno e odontograma | Build/CI, QA navegador pendente | PARTIAL |
-| D7 CI e sessão PC | `.github/workflows/ci.yml`, `.github/workflows/visual-qa.yml`, `scripts/capture-demo-screenshots.mjs` | GitHub Actions com unit, Rules/Emulator, build, docs e Chromium demo desktop/mobile | PARTIAL — 12 screenshots reais de **DEMO** arquivados como artefato temporário GitHub Actions #40949283614; staging/produção, sessão PC e persistência definitiva de screenshots ainda pendentes |
+| D5 Segurança + mídia | `workers/media-api/src/index.ts`, `workers/media-api/src/mediaLifecycle.ts`, `workers/media-api/src/mediaIntegrity.ts`, `src/modules/clinical-media/ClinicalPhotosPage.tsx` | `tests/mediaWorker.test.ts`, `tests/mediaLifecycle.test.ts`, `tests/mediaIntegrity.test.ts`, `tests/firestoreRules.test.ts` | PARTIAL — revisão reversível auditada e comparação paginada R2 × Firestore por paciente (100/500 por página, teto de 3.000 por origem), somente leitura; backup/retention e hospedagem pendentes |
+| D6 UX clínica | Menu mobile acessível, pesquisa/paginação de pacientes, agenda por dia, tabelas responsivas e telas clínicas | `tests/patientList.test.ts`, `tests/agendaDate.test.ts`, visual Chromium demo | PARTIAL — checks automatizados de navegador, QA com leitor de tela e dispositivos físicos pendente |
+| D7 CI e sessão PC | `.github/workflows/ci.yml`, `.github/workflows/visual-qa.yml`, `scripts/capture-demo-screenshots.mjs` | GitHub Actions com unit, Rules/Emulator, build, docs e Chromium demo desktop/mobile | PARTIAL — 12 screenshots reais de **DEMO** + manifesto arquivados em Actions #40949283614; smoke de interação mobile/search adicionado; staging/produção, sessão PC e persistência definitiva pendentes |
 
 ## Medição
 Não declarar "95%" sem estimar de forma reprodutível o peso dos requisitos executáveis por módulo e verificar os critérios de aceite.
@@ -19,7 +19,7 @@ Os status acima não contam documentos, mockups ou diagramas como código implem
 Depois de cada lote, atualizar esta tabela a partir de SHA + CI do commit correspondente.
 
 ## Bloqueios externos distintos
-- Screenshots reais não arquivadas.
+- Screenshots reais de **produção** não arquivadas; 12 telas do runtime demo disponíveis apenas em artefato temporário GitHub Actions.
 - Provisionamento de Firebase Auth/Firestore, Worker e binding R2 hospedados pendente.
 - Validação em ambiente real e QA de dispositivos pendentes.
 - Deploy de produção não executado.
@@ -29,21 +29,25 @@ Checkout, gateway, billing automático, webhooks de cobrança, WhatsApp oficial,
 Essencial R$79,90; Pro R$129,90; Premium R$189,90 — contrato preservado.
 
 
-## Estimativa ponderada de avanço do código — 29/10/2026
+## Estimativa ponderada de avanço do código — 29/10/2026 (lote D5 paginação / D6-D7 smoke)
 
-**Estimativa, não certificação de produto pronto.** O denominador são 100 pontos de implementação interna, escolhidos para refletir esforço/risco dos sete módulos D1–D7 (não quantidade de arquivos/linhas). Uma etapa parcial recebe apenas pontos proporcionais ao escopo efetivamente codificado e testado, com falhas de staging separadas.
+**Estimativa revisada, não certificação.** Escala fechada de 100 pontos de requisitos executáveis distribuídos por risco e complexidade; build/CI não representa homologação. Os pontos de D6 e D7 abaixo consideram a execução bem-sucedida de seus testes de navegador; se falharem, o valor deve ser reavaliado.
 
-| Módulo | Peso | Pontos estimados | Observação para os pontos não atribuídos |
+| Módulo | Peso | Estimativa implementada | Pendente no código |
 |---|---:|---:|---|
-| D1 Odontograma | 14 | 14 | Código e testes; produção não incluída nesta régua |
-| D2 Tratamento | 14 | 14 | Código e testes; produção não incluída nesta régua |
-| D3 Retornos | 10 | 10 | Código e testes; produção não incluída nesta régua |
-| D4 Intake/agendamento | 18 | 14 | Agenda aberta sem convite e controles antiabuso ainda não implementados |
-| D5 Mídia/documentos | 18 | 13 | Reconciliação paginada/retention/backup e documentos ainda incompletos |
-| D6 UX e acessibilidade | 16 | 12 | QA leitor de tela, múltiplos dispositivos e UX de demais rotas |
-| D7 CI/evidências | 10 | 5 | Sessão PC real, screenshots persistentes e execução hospedada pendentes |
-| **Total código** | **100** | **82** | **~82% implementação interna estimada** |
+| D1 Odontograma | 14 | 14 | Sem pendência P0 codificável constatada |
+| D2 Tratamento/orçamento | 14 | 14 | Sem pendência P0 codificável constatada |
+| D3 Retornos | 10 | 10 | Sem pendência P0 codificável constatada |
+| D4 Intake/booking | 18 | 14 | Agendamento aberto sem convite + proteção antiabuso |
+| D5 Mídia/documentos | 18 | 15 | Backup/retention operacionais, recovery e documentos avançados |
+| D6 UX/acessibilidade | 16 | 13 | Leitor de tela, teclado de rotas clínicas sensíveis, dispositivos reais |
+| D7 CI/evidências | 10 | 6 | Persistência visual canônica, runtime hospedado, sessão PC |
+| **Total implementação** | **100** | **86** | **~86% estimado de implementação interna** |
 
-**Avanço geral até produção estimado em ~58%** usando 70% de peso para código interno (82% × 0,70 = 57,4 pontos) e 30% para validações/infraestrutura operacional ainda não comprovadas (0 ponto atribuível no checkpoint para essas exigências). Não é percentual de deploy nem prontidão clínica certificada.
+**Avanço geral até produção: ~60%** (86% × 70% = 60,2%), considerando peso 70% da implementação e 30% de infraestrutura, testes hospedados, backup, segurança operacional, LGPD e deploy ainda não demonstrados. É uma régua de planejamento conservadora, não um levantamento independente de todos os requisitos legais/clínicos.
 
-Separar evidência: `SCREENSHOT_REAL_DEMO` de Chromium é prova de tela renderizada em Vite com dados fictícios, armazenada como artefato temporário do Actions se o job executar; não é screenshot hospedado de produção, diagrama ou imagem conceitual. Não declarar sucesso antes de o workflow comprovar.
+**Evidência específica do D5:** `GET /v1/media/integrity` pagina Firestore em lotes de 100 e R2 em lotes de 500, com teto de 3.000 registros por origem, cursores verificados e nenhum DELETE. Falha sem resposta parcial acima do limite; não se trata de snapshot atômico. Os testes `tests/mediaIntegrity.test.ts` e `tests/mediaWorker.test.ts` abrangem paginação, falta de objeto, órfãos candidatos, tenant A × B e cap. Não há reparo/backup automático.
+
+**Evidência específica do D6/D7:** `scripts/capture-demo-screenshots.mjs` captura 12 screenshots reais do aplicativo com dados fictícios, mais smoke de menu mobile com Escape e busca de pacientes. Capturas são artefato temporário de GitHub Actions classificado `SCREENSHOT_REAL_DEMO`, não screenshot de produção.
+
+**Ações de infraestrutura ainda não executadas:** provisionar Firebase Auth/Firestore, configurar Workers/R2/segredos, validar segurança real e política de backup, homologar com dados fictícios em staging, revisar screenshots com checklist de privacidade e só então considerar deploy. Não adicionar billing automático nem modificar pricing.
