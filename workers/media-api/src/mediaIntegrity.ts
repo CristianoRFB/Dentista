@@ -29,3 +29,30 @@ export function comparePatientMediaInventory(
   }
   return findings;
 }
+
+
+/** Limits avoid excessive costs/CPU while still allowing several pages of clinical media. */
+export const MEDIA_METADATA_PAGE_SIZE=100;
+export const MEDIA_R2_PAGE_SIZE=500;
+export const MAX_MEDIA_INVENTORY_ITEMS=3000;
+export type MediaInventoryPage<T>={items:T[];nextCursor?:string};
+export async function collectMediaInventoryPages<T>(
+  fetchPage:(cursor?:string)=>Promise<MediaInventoryPage<T>>,
+  maximum=MAX_MEDIA_INVENTORY_ITEMS,
+):Promise<T[]>{
+  if(!Number.isSafeInteger(maximum)||maximum<1)throw new Error('invalid_inventory_limit');
+  const seen=new Set<string>();
+  const result:T[]=[];
+  let cursor:string|undefined=undefined;
+  for(;;){
+    const page=await fetchPage(cursor);
+    if(!page||!Array.isArray(page.items))throw new Error('invalid_inventory_page');
+    if(page.items.length===0 && page.nextCursor)throw new Error('empty_inventory_page_with_cursor');
+    if(result.length+page.items.length>maximum)throw new Error('inventory_exceeds_safe_limit');
+    result.push(...page.items);
+    if(!page.nextCursor)return result;
+    if(page.nextCursor===cursor || seen.has(page.nextCursor))throw new Error('inventory_cursor_loop');
+    seen.add(page.nextCursor);
+    cursor=page.nextCursor;
+  }
+}
