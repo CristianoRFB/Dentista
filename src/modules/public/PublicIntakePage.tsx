@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { consumeInviteTokenFromAddressBar } from '../../lib/personalInviteUrl';
+import { readInviteToken, scrubInviteTokenFromAddressBar } from '../../lib/personalInviteUrl';
 import { submitIntake } from '../../lib/intakeClient';
 import { demoModeEnabled } from '../auth/AuthRoutes';
 
@@ -14,7 +14,8 @@ export function PublicIntakePage() {
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState('');
   const demo = demoModeEnabled() && tenantSlug === 'demo-clinica';
-  const [token,setToken] = useState(()=>consumeInviteTokenFromAddressBar());
+  const [token,setToken] = useState(()=>readInviteToken(window.location));
+  useEffect(()=>scrubInviteTokenFromAddressBar(),[]);
   const validTokenFormat = /^[A-Za-z0-9_-]{43}$/.test(token);
 
   async function send(event:FormEvent) {
