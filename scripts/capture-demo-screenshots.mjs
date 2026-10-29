@@ -27,6 +27,11 @@ const routes=[
   {id:'dashboard',url:'/demo-clinica/app',heading:/Painel da clínica/i},
   {id:'agenda',url:'/demo-clinica/app/agenda',heading:/^Agenda$/i},
   {id:'patients',url:'/demo-clinica/app/pacientes',heading:/^Pacientes$/i},
+  {id:'recalls',url:'/demo-clinica/app/retornos',heading:/^Central de retorno$/i},
+  {id:'clinical-demo-notice',url:'/demo-clinica/app/pacientes/p1/clinico',heading:/^Prontuário$/i},
+  {id:'odontogram',url:'/demo-clinica/app/pacientes/p1/odontograma',heading:/^Odontograma de Marina Souza$/i},
+  {id:'treatment',url:'/demo-clinica/app/pacientes/p1/tratamento',heading:/^Tratamento — Marina Souza$/i},
+  {id:'clinical-photos',url:'/demo-clinica/app/pacientes/p1/fotos',heading:/^Fotos clínicas$/i},
   {id:'public-booking-demo',url:'/demo-clinica/agendar',heading:/Selecione um procedimento ilustrativo/i},
 ];
 const viewports=[
@@ -57,7 +62,7 @@ try{
         const heading=(await page.locator('h1').first().textContent())?.trim()??'';
         if(!route.heading.test(heading))throw new Error('Unexpected real heading on '+route.url+': '+heading);
         // Ensure demo runtime rendered; exclude auth/permission error pages as evidence.
-        if(route.id==='dashboard'||route.id==='agenda'||route.id==='patients'){
+        if(['dashboard','agenda','patients','recalls','clinical-demo-notice','odontogram','treatment','clinical-photos'].includes(route.id)){
           await page.locator('main.content .demo-banner').first().waitFor({state:'visible',timeout:15000});
         }
         await page.screenshot({path:path.join(OUT,route.id+'-'+viewport.name+'.png'),fullPage:true,animations:'disabled'});
