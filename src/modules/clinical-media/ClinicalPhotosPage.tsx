@@ -148,6 +148,7 @@ export function ClinicalPhotosPage() {
         {integrity&&<div role="status">
           <p>Verificados: {integrity.checkedMetadata} metadados e {integrity.checkedObjects} objetos privados.</p>
           <p><strong>{integrity.findings.length} ocorrência(s) para revisão manual.</strong> Nenhum arquivo foi modificado.</p>
+          <p className="muted">Comparação não atômica entre R2 e Firestore, limitada a {integrity.limit.toLocaleString('pt-BR')} registros por origem. Confirme cada divergência antes de qualquer intervenção.</p>
           {integrity.findings.length>0&&<ul>{integrity.findings.map((f,i)=><li key={i}>
             {f.kind==='missing_r2_object'?'Arquivo ausente do R2':f.kind==='unreferenced_r2_candidate'
               ?'Possível objeto sem referência':'Referência fora do escopo'}
