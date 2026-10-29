@@ -72,10 +72,14 @@ const env = {
       return { body: new Blob([object.bytes]).stream(), httpMetadata: { contentType: object.contentType } };
     }),
     delete: vi.fn(async (key: string) => { storedObjects.delete(key); }),
-    list: vi.fn(async (options: {prefix:string;limit?:number}) => ({
-      objects:[...storedObjects.keys()].filter(key=>key.startsWith(options.prefix)).slice(0,options.limit??1000).map(key=>({key})),
-      truncated:[...storedObjects.keys()].filter(key=>key.startsWith(options.prefix)).length>(options.limit??1000),
-    })),
+    list: vi.fn(async (options: {prefix:string;limit?:number;cursor?:string}) => {
+      const keys=[...storedObjects.keys()].filter(key=>key.startsWith(options.prefix)).sort();
+      const after=options.cursor?keys.findIndex(key=>key===options.cursor)+1:0;
+      const limit=options.limit??1000;
+      const page=keys.slice(after,after+limit);
+      const truncated=after+limit<keys.length;
+      return {objects:page.map(key=>({key})),truncated,cursor:truncated?page.at(-1):undefined};
+    }),
   },
 } as unknown as Parameters<typeof mediaWorker.fetch>[1];
 
@@ -87,12 +91,14 @@ beforeAll(async () => {
       if (url.pathname.endsWith(':runQuery')) {
         const collectionPath=url.pathname.split('/documents/')[1]?.split(':runQuery')[0]??'';
         const query=JSON.parse(String(init?.body??'{}')) as {
-          structuredQuery?:{from?:{collectionId:string}[];limit?:number}
+          structuredQuery?:{from?:{collectionId:string}[];limit?:number;startAt?:{values?:{referenceValue?:string}[]}}
         };
         const collectionId=query.structuredQuery?.from?.[0]?.collectionId??'clinicalPhotos';
         const prefix=decodeURIComponent(collectionPath)+'/'+collectionId+'/';
+        const startAfter=query.structuredQuery?.startAt?.values?.[0]?.referenceValue?.split('/documents/')[1]??'';
         const entries=[...documents.entries()].filter(([path])=>path.startsWith(prefix)&&
-          !path.slice(prefix.length).includes('/')).slice(0,query.structuredQuery?.limit??201);
+          !path.slice(prefix.length).includes('/') && path>startAfter).sort(([a],[b])=>a.localeCompare(b))
+          .slice(0,query.structuredQuery?.limit??100);
         return new Response(JSON.stringify(entries.map(([path,value])=>({document:firestoreDoc(path,value)}))),{status:200});
       }
       if (url.pathname.endsWith(':beginTransaction')) {
@@ -445,13 +451,37 @@ describe('D5 — relatório de integridade de mídia por paciente',()=>{
     expect((await inspect()).status).toBe(403);
     expect(env.CLINICAL_MEDIA.list).not.toHaveBeenCalled();
   });
-  it('não divulga relatórios incompletos quando R2 excede o limite',async()=>{
-    for(let i=0;i<202;i++)storedObjects.set('tenants/A/patients/patient-a/object-'+i+'.jpg',{
+  it('compara múltiplas páginas de metadata Firestore e de objetos R2 sem modificar arquivos',async()=>{
+    const prefix='tenants/A/patients/patient-a/';
+    for(let i=0;i<250;i++){
+      const id='photo-'+String(i).padStart(4,'0');
+      documents.set(prefix+'clinicalPhotos/'+id,{
+        id,tenantId:'A',patientId:'patient-a',objectKey:prefix+id+'.jpg',
+      });
+      storedObjects.set(prefix+id+'.jpg',{bytes:new Uint8Array([0xff,0xd8,0xff]),contentType:'image/jpeg'});
+    }
+    for(let i=0;i<420;i++){
+      storedObjects.set(prefix+'orphan-'+String(i).padStart(4,'0')+'.jpg',{
+        bytes:new Uint8Array([0xff,0xd8,0xff]),contentType:'image/jpeg',
+      });
+    }
+    const result=await inspect();
+    expect(result.status,await result.clone().text()).toBe(200);
+    const report=await result.json() as {complete:boolean;snapshotConsistent:boolean;checkedMetadata:number;checkedObjects:number;findings:{kind:string}[]};
+    expect(report).toMatchObject({complete:true,snapshotConsistent:false,checkedMetadata:250,checkedObjects:670});
+    expect(report.findings).toHaveLength(420);
+    expect(report.findings.every(f=>f.kind==='unreferenced_r2_candidate')).toBe(true);
+    expect(vi.mocked(env.CLINICAL_MEDIA.list).mock.calls.length).toBeGreaterThan(1);
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+    expect(writes).toHaveLength(0);
+  });
+  it('rejeita resultados parciais acima do teto de segurança mesmo com paginação',async()=>{
+    for(let i=0;i<3001;i++)storedObjects.set('tenants/A/patients/patient-a/object-'+i+'.jpg',{
       bytes:new Uint8Array([0xff,0xd8,0xff]),contentType:'image/jpeg',
     });
     const result=await inspect();
     expect(result.status).toBe(409);
-    expect((await result.json() as {error:string}).error).toBe('media_inventory_too_large_for_bounded_scan');
+    expect((await result.json() as {error:string}).error).toBe('media_inventory_exceeds_safe_limit');
     expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
   });
 });
