@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { comparePatientMediaInventory } from '../workers/media-api/src/mediaIntegrity';
+import { collectMediaInventoryPages, comparePatientMediaInventory } from '../workers/media-api/src/mediaIntegrity';
 const prefix='tenants/A/patients/patient-a/';
 describe('D5 media inventory reconciliation',()=>{
   it('distinguishes matched records, missing bytes and orphan candidates without modifying anything',()=>{
@@ -24,5 +24,23 @@ describe('D5 media inventory reconciliation',()=>{
   });
   it('handles intact empty inventories',()=>{
     expect(comparePatientMediaInventory('A','patient-a',[],[])).toEqual([]);
+  });
+});
+
+
+describe('D5 — bounded cursor pagination',()=>{
+  it('collects multiple pages without losing the last item',async()=>{
+    const pages=new Map<string,{items:number[];nextCursor?:string}>([
+      ['',{items:[1,2],nextCursor:'second'}],
+      ['second',{items:[3],nextCursor:'third'}],
+      ['third',{items:[4]}],
+    ]);
+    const data=await collectMediaInventoryPages(async cursor=>pages.get(cursor??'')!,10);
+    expect(data).toEqual([1,2,3,4]);
+  });
+  it('rejects oversized inventories, empty continuations and cursor loops',async()=>{
+    await expect(collectMediaInventoryPages(async()=>({items:[1,2,3]}),2)).rejects.toThrow('inventory_exceeds_safe_limit');
+    await expect(collectMediaInventoryPages(async()=>({items:[],nextCursor:'next'}))).rejects.toThrow('empty_inventory_page_with_cursor');
+    await expect(collectMediaInventoryPages(async()=>({items:[1],nextCursor:'same'}))).rejects.toThrow('inventory_cursor_loop');
   });
 });
