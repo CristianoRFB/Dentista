@@ -75,7 +75,7 @@ try{
           const displayed=await skip.evaluate(el=>el.getBoundingClientRect().bottom>0);
           if(!displayed)throw new Error('Skip-to-content keyboard link did not become visible on focus');
           await skip.press('Enter');
-          await page.waitForFunction(()=>document.activeElement?.id==='tenant-main-content');
+          await page.waitForFunction(()=>document.activeElement?.id==='tenant-main-content',{timeout:5000}).catch(()=>{throw new Error('Skip link focus failed on '+viewport.name);});
         }
         if(viewport.name==='mobile' && route.id==='dashboard'){
           const trigger=page.locator('.app-menu-trigger');
@@ -87,7 +87,7 @@ try{
           if(modal!=='true')throw new Error('Open mobile drawer must be a modal navigation region');
           const scrollLock=await page.evaluate(()=>document.body.style.overflow);
           if(scrollLock!=='hidden')throw new Error('Background scroll remains enabled while drawer is open');
-          await page.waitForFunction(()=>document.activeElement?.classList.contains('app-menu-close'));
+          await page.waitForFunction(()=>document.activeElement?.classList.contains('app-menu-close'),{timeout:5000}).catch(()=>{throw new Error('Mobile drawer failed to autofocus close button');});
           await page.keyboard.press('Shift+Tab');
           const trapped=await page.evaluate(()=>document.querySelector('.sidebar-open')?.contains(document.activeElement));
           if(!trapped)throw new Error('Keyboard focus escaped the open mobile drawer');
