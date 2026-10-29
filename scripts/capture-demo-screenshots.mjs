@@ -23,7 +23,7 @@ let stderr='';
 app.stderr.on('data',data=>{stderr+=String(data).slice(-3000);});
 const routes=[
   {id:'pricing',url:'/precos',heading:/Planos pensados/i},
-  {id:'clinic-public',url:'/demo-clinica',heading:/Cuidado odontológico|Clínica Aurora|Sorriso/i},
+  {id:'clinic-public',url:'/demo-clinica',heading:/Odontologia clara, humana e organizada/i},
   {id:'dashboard',url:'/demo-clinica/app',heading:/Painel da clínica/i},
   {id:'agenda',url:'/demo-clinica/app/agenda',heading:/^Agenda$/i},
   {id:'patients',url:'/demo-clinica/app/pacientes',heading:/^Pacientes$/i},
