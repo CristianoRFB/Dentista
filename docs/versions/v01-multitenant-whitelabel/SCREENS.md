@@ -25,3 +25,11 @@ O Vite foi executado em modo demo de desenvolvimento com dados fictícios. Nesta
 Não referenciar wireframe ou imagem conceitual como screenshot real. Os visuais em `generated/` são materiais de conceito separados.
 
 Central de Retorno possui fluxo interno de criação/atualização por equipe autorizada na branch de implementação; captura de screenshot real ainda pendente. `/agendar?token=...` cria agendamento real por convite pessoal, com anti-double-booking e consumo transacional; `/app/convites-agenda` emite convites; agendamento aberto sem convite ainda não disponível; `/cadastro?token=...` recebe contatos via Worker e `/app/pre-cadastros` permite revisão autenticada Pro, sem screenshot real arquivada. Portal do paciente ainda não é fluxo operacional. Planos de tratamento e orçamentos Pro possuem rota persistida e auditada na branch, sem screenshot real arquivada. O odontograma FDI tem tela clínica e persistência append-only na branch de desenvolvimento, com screenshot real ainda não arquivada.
+
+
+## Cobertura automatizada de telas (implementação 29/10/2026)
+
+- `scripts/capture-demo-screenshots.mjs` abre Vite em modo desenvolvimento com `VITE_USE_DEMO_DATA=true`, e o workflow `.github/workflows/visual-qa.yml` aciona Chromium para visitar seis rotas reais de demonstração em desktop (1365×850) e mobile (390×844).
+- O script exige cabeçalho real da rota e estado fictício nas telas clínicas; caso haja erro ou redirecionamento indevido, o teste falha em vez de arquivar uma imagem enganosa.
+- Capturas são classificadas `SCREENSHOT_REAL_DEMO` no `SCREENSHOTS_MANIFEST.json` e mantidas em artefato temporário GitHub Actions, **não** dentro de `docs/screenshots/` enquanto não forem revisadas e persistidas na versão vigente.
+- Não capturar tokens de convite, contas reais, dados clínicos reais nem Platform Owner. Essas telas exigem homologação própria para gerar evidência verdadeira.
