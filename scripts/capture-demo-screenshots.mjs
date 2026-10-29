@@ -58,7 +58,7 @@ try{
         if(!route.heading.test(heading))throw new Error('Unexpected real heading on '+route.url+': '+heading);
         // Ensure demo runtime rendered; exclude auth/permission error pages as evidence.
         if(route.id==='dashboard'||route.id==='agenda'||route.id==='patients'){
-          await page.locator('.demo-banner').first().waitFor({state:'visible',timeout:15000});
+          await page.locator('main.content .demo-banner').first().waitFor({state:'visible',timeout:15000});
         }
         await page.screenshot({path:path.join(OUT,route.id+'-'+viewport.name+'.png'),fullPage:true,animations:'disabled'});
         results.push({route:route.url,viewport:viewport.name,size:`${viewport.width}x${viewport.height}`,
