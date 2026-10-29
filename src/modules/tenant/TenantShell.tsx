@@ -59,6 +59,7 @@ export function TenantShell() {
     return ()=>{document.removeEventListener('keydown',onKey);document.body.style.overflow=previousOverflow;};
   },[menuOpen]);
   return <div className="shell app-shell">
+    <a className="skip-to-clinical-content" href="#tenant-main-content">Pular para o conteúdo clínico</a>
     <header className="app-mobile-header">
       <Link to={base} className="app-brand"><span className="brand-mark small">O</span><span><b>OdontoFlow</b><small>{tenant.branding?.publicName??tenant.name}</small></span></Link>
       <button type="button" ref={triggerRef} className="btn secondary app-menu-trigger" aria-expanded={menuOpen}
