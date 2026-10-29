@@ -1,5 +1,9 @@
 import { importPKCS8, SignJWT } from 'jose';
+import { createIntakeSecret, intakeTokenHash, validatePublicIntake } from './intakeValidation';
+import { BOOKING_TTL_MS, validateBookingInvite, validatePublicBooking } from './publicBooking';
 import { verifyFirebaseIdToken } from './firebaseAuth';
+import { validatePhotoReview, photoTransition } from './mediaLifecycle';
+import { comparePatientMediaInventory, collectMediaInventoryPages, MEDIA_METADATA_PAGE_SIZE, MEDIA_R2_PAGE_SIZE, MAX_MEDIA_INVENTORY_ITEMS } from './mediaIntegrity';
 import { canCreateCommercialCapacity, canUse, getLimit } from '../../../src/commercial/entitlementService';
 import {
   findScheduleConflict, isValidAppointmentWindow, MAX_CONFLICT_LOOKBACK_MS,
@@ -46,6 +50,9 @@ class FirestoreError extends Error {
 
 function response(request: Request, env: Env, status: number, body: BodyInit | null, headers: Record<string, string> = {}) {
   const outputHeaders = new Headers(headers);
+  if (!outputHeaders.has('Cache-Control')) outputHeaders.set('Cache-Control', 'private, no-store, max-age=0');
+  outputHeaders.set('X-Content-Type-Options', 'nosniff');
+  outputHeaders.set('Referrer-Policy', 'no-referrer');
   const origin = request.headers.get('Origin');
   const allowedOrigins = (env.APP_ORIGIN ?? 'http://localhost:5173').split(',').map(value => value.trim()).filter(Boolean);
   if (origin && allowedOrigins.includes(origin)) {
@@ -247,6 +254,14 @@ function documentWrite(env: Env, path: string, value: Record<string, unknown>, c
   return write;
 }
 
+/** Write only the changed metadata fields; original Firestore timestamps and R2 pointers stay intact. */
+function documentPatch(env: Env, path: string, fields: Record<string, unknown>) {
+  return {
+    update: { name: firestoreDocumentName(env, path), fields: encodeFields(fields) },
+    updateMask: { fieldPaths: Object.keys(fields) },
+  };
+}
+
 function appointmentPermission(membership: Record<string, any>) {
   return hasRolePermission(membership, 'appointments.manage')
     && typeof membership.tenantId === 'string'
@@ -283,7 +298,10 @@ async function verifyAppointmentReferences(
     ...procedureIds.map(id => 'tenants/' + tenantId + '/procedures/' + id),
   ];
   const refs = await Promise.all(paths.map(path => getDocument(env, token, path, transaction)));
-  const [patient, professional, resource, ...procedures] = refs;
+  const patient = refs[0];
+  const professional = refs[1];
+  const resource = candidate.resourceId ? refs[2] : undefined;
+  const procedures = refs.slice(candidate.resourceId ? 3 : 2);
   if (!patient || patient.tenantId !== tenantId || patient.status !== 'active') throw new HttpError(400, 'patient_unavailable');
   if (!professional || professional.tenantId !== tenantId || professional.status !== 'active') throw new HttpError(400, 'professional_unavailable');
   if (candidate.resourceId && (!resource || resource.tenantId !== tenantId || resource.active !== true)) throw new HttpError(400, 'resource_unavailable');
@@ -333,7 +351,8 @@ function fsStatus(error: FirestoreError) {
   return error.code === 'ABORTED' || error.code === 'FAILED_PRECONDITION' || error.status === 409 || error.status === 400;
 }
 
-async function saveAppointment(env: Env, uid: string, input: Record<string, unknown>) {
+interface PublicBookingCapability { tenantSlug: string; tokenHash: string; }
+async function saveAppointment(env: Env, uid: string, input: Record<string, unknown>, guest?: PublicBookingCapability) {
   const tenantId = typeof input.tenantId === 'string' ? input.tenantId : '';
   const patientId = typeof input.patientId === 'string' ? input.patientId : '';
   const professionalId = typeof input.professionalId === 'string' ? input.professionalId : '';
@@ -359,7 +378,31 @@ async function saveAppointment(env: Env, uid: string, input: Record<string, unkn
   for (let attempt = 0; attempt < 5; attempt++) {
     const transaction = await beginTransaction(env, token);
     try {
-      const { membership } = await verifyAppointmentAccess(env, token, transaction, uid, tenantId);
+      let membership: Record<string, unknown> = {};
+      let guestToken: Record<string, any> | null = null;
+      if (guest) {
+        const [slug, bookingToken, tenant] = await Promise.all([
+          getDocument(env,token,'tenantSlugs/'+guest.tenantSlug,transaction),
+          getDocument(env,token,'tenants/'+tenantId+'/bookingTokens/'+guest.tokenHash,transaction),
+          getDocument(env,token,'tenants/'+tenantId,transaction),
+        ]);
+        const expiry=typeof bookingToken?.expiresAt==='string'?Date.parse(bookingToken.expiresAt):NaN;
+        const duration=Date.parse(endsAt)-Date.parse(startsAt);
+        if (!slug || slug.status!=='active' || slug.tenantId!==tenantId ||
+            !tenant || tenant.status!=='active' || tenant.slug!==guest.tenantSlug ||
+            !canCreateCommercialCapacity(tenant as any) || !canUse(tenant as any,'agenda') ||
+            !bookingToken || bookingToken.tenantId!==tenantId ||
+            bookingToken.usedAt!==null || Boolean(bookingToken.revokedAt) || !Number.isFinite(expiry) || expiry<=Date.now() ||
+            bookingToken.patientId!==patientId || bookingToken.professionalId!==professionalId ||
+            bookingToken.procedureId!==procedureIds[0] || procedureIds.length!==1 ||
+            (bookingToken.resourceId || undefined)!==(resourceId || undefined) ||
+            duration!==bookingToken.durationMinutes*60000) throw new HttpError(404,'invalid_or_expired_booking_link');
+        guestToken=bookingToken;
+        membership={role:'public_invite'};
+      } else {
+        const verified=await verifyAppointmentAccess(env,token,transaction,uid,tenantId);
+        membership=verified.membership;
+      }
       const oldAppointment = input.appointmentId
         ? await getDocument(env, token, 'tenants/' + tenantId + '/appointments/' + appointmentId, transaction)
         : null;
@@ -424,10 +467,18 @@ async function saveAppointment(env: Env, uid: string, input: Record<string, unkn
         id: appointmentId, tenantId, patientId, professionalId, startsAt, endsAt,
         procedureIds, status: nextStatus, resourceId,
         notes: oldAppointment?.notes,
+        ...(guest ? { bookingSource:'invite_only', publicBookingTokenId:guest.tokenHash } : {}),
         createdAt: oldAppointment?.createdAt ? new Date(String(oldAppointment.createdAt)) : now,
         updatedAt: now, createdBy: oldAppointment?.createdBy ?? uid, updatedBy: uid,
       };
       writes.push(documentWrite(env, appointmentPath, appointmentData, !oldAppointment));
+      if (guest && guestToken) {
+        writes.push(documentWrite(env, 'tenants/'+tenantId+'/bookingTokens/'+guest.tokenHash, {
+          ...guestToken, createdAt:new Date(String(guestToken.createdAt)),
+          expiresAt:new Date(String(guestToken.expiresAt)), usedAt:now,
+          appointmentId,
+        }));
+      }
       const auditId = crypto.randomUUID();
       writes.push(documentWrite(env, 'tenants/' + tenantId + '/auditLogs/' + auditId, {
         tenantId,
@@ -439,7 +490,7 @@ async function saveAppointment(env: Env, uid: string, input: Record<string, unkn
         timestamp: now,
       }, true));
       await commitTransaction(env, token, transaction, writes);
-      return { ...appointmentData, id: appointmentId };
+      return guest ? {id:appointmentId,status:nextStatus,startsAt,endsAt} : {...appointmentData,id:appointmentId};
     } catch (error) {
       if (!(error instanceof HttpError && error.status === 409)) await rollbackTransaction(env, token, transaction);
       if (error instanceof FirestoreError && fsStatus(error) && attempt < 4) continue;
@@ -759,7 +810,14 @@ async function uploadMedia(request: Request, env: Env, uid: string) {
     customMetadata: { tenantId, patientId, uploaderId: uid },
   });
 
-  const transaction = await beginTransaction(env, token);
+  // R2 already accepted the bytes. A failed transaction start must also clean up that orphan.
+  let transaction: string;
+  try {
+    transaction = await beginTransaction(env, token);
+  } catch (error) {
+    await env.CLINICAL_MEDIA.delete(objectKey).catch(() => undefined);
+    throw error;
+  }
   try {
     const access = await verifyClinicalAccess(env, token, uid, tenantId, patientId, 'clinical.write', transaction);
     const photoPath = 'tenants/' + tenantId + '/patients/' + patientId + '/clinicalPhotos/' + id;
@@ -785,6 +843,126 @@ async function uploadMedia(request: Request, env: Env, uid: string) {
   }
 }
 
+
+async function reviewMedia(request: Request,env:Env,uid:string,photoId:string) {
+  let input:ReturnType<typeof validatePhotoReview>;
+  try {
+    const raw=await request.text();
+    if(raw.length>4096)throw new HttpError(413,'request_too_large');
+    input=validatePhotoReview(JSON.parse(raw));
+  } catch(e) {
+    if(e instanceof HttpError)throw e;
+    throw new HttpError(400,'invalid_photo_review');
+  }
+  const token=await serviceAccountToken(env);
+  const photoPath='tenants/'+input.tenantId+'/patients/'+input.patientId+'/clinicalPhotos/'+photoId;
+  for(let attempt=0;attempt<4;attempt++) {
+    const transaction=await beginTransaction(env,token);
+    try {
+      const [access,photo]=await Promise.all([
+        verifyClinicalAccess(env,token,uid,input.tenantId,input.patientId,'clinical.write',transaction),
+        getDocument(env,token,photoPath,transaction),
+      ]);
+      if(access.tenant.planId==='premium_demo'||access.tenant.subscriptionStatus==='demo')
+        throw new HttpError(409,'demo_read_only');
+      if(!canUse(access.tenant as any,'clinical_photos')) throw new HttpError(403,'feature_not_available');
+      if(!photo||photo.id!==photoId||photo.tenantId!==input.tenantId
+        ||photo.patientId!==input.patientId
+        ||typeof photo.objectKey!=='string'
+        ||!photo.objectKey.startsWith('tenants/'+input.tenantId+'/patients/'+input.patientId+'/'))
+        throw new HttpError(404,'media_unavailable');
+      let next:ReturnType<typeof photoTransition>;
+      try {next=photoTransition(photo,input.action);}
+      catch {throw new HttpError(409,'invalid_photo_transition');}
+      const now=new Date(),auditId=crypto.randomUUID();
+      const revision=Number.isSafeInteger(photo.revision)?Number(photo.revision)+1:1;
+      const updated={
+        status:next.status,lifecycleStatus:next.lifecycleStatus,revision,
+        tags:input.tags,updatedAt:now,updatedBy:uid,lastAuditLogId:auditId,
+        ...(input.action==='archive'?{archivedAt:now,archivedBy:uid}:{}),
+        ...(input.action==='restore'?{archivedAt:null,archivedBy:null}:{}),
+      };
+      const audit={
+        tenantId:input.tenantId,patientId:input.patientId,actorId:uid,actorRole:access.actorRole,
+        action:'clinical_photo.'+input.action,resourceType:'clinicalPhoto',resourceId:photoId,
+        reason:input.reason,timestamp:now,
+      };
+      await commitTransaction(env,token,transaction,[
+        documentPatch(env,photoPath,updated),
+        documentWrite(env,'tenants/'+input.tenantId+'/auditLogs/'+auditId,audit,true),
+      ]);
+      return {photoId,status:next.status,lifecycleStatus:next.lifecycleStatus,revision};
+    } catch(error) {
+      await rollbackTransaction(env,token,transaction);
+      if(error instanceof FirestoreError && fsStatus(error) && attempt<3)continue;
+      if(error instanceof HttpError)throw error;
+      if(error instanceof FirestoreError)throw new HttpError(error.status===400?409:503,'media_review_conflict');
+      throw new HttpError(503,'media_review_failed');
+    }
+  }
+  throw new HttpError(409,'media_changed_retry');
+}
+
+/**
+ * Bounded multi-page inventory: read-only and tenant/patient scoped.
+ * Not transactional across R2 and Firestore. Findings are for manual review,
+ * never evidence sufficient for deletion or a guarantee of atomic consistency.
+ */
+async function diagnosePatientMedia(request: Request,env: Env,uid: string) {
+  const url=new URL(request.url);
+  const tenantId=url.searchParams.get('tenantId')??'';
+  const patientId=url.searchParams.get('patientId')??'';
+  const valid=/^[A-Za-z0-9_-]{1,128}$/;
+  if(!valid.test(tenantId)||!valid.test(patientId))throw new HttpError(400,'invalid_scope');
+
+  const token=await serviceAccountToken(env);
+  const access=await verifyClinicalAccess(env,token,uid,tenantId,patientId,'clinical.read');
+  if(access.membership && !hasRolePermission(access.membership,'clinical.write'))
+    throw new HttpError(403,'media_inventory_permission_required');
+
+  const parent='tenants/'+tenantId+'/patients/'+patientId;
+  const queryUrl=firestoreRoot(env)+'/'+encodedDocumentPath(parent)+':runQuery';
+  const prefix=parent+'/';
+  let records:(Record<string,any>&{id:string})[];
+  let r2Keys:string[];
+  try {
+    records=await collectMediaInventoryPages(async(cursor)=>{
+      const structuredQuery:Record<string,unknown>={
+        from:[{collectionId:'clinicalPhotos'}],
+        orderBy:[{field:{fieldPath:'__name__'},direction:'ASCENDING'}],
+        limit:MEDIA_METADATA_PAGE_SIZE,
+      };
+      if(cursor) structuredQuery.startAt={values:[{referenceValue:cursor}],before:false};
+      const result=await firestoreRequest<Array<{document?:FsDocument}>>(queryUrl,token,{
+        method:'POST',body:JSON.stringify({structuredQuery}),
+      });
+      const docs=(result??[]).flatMap(item=>item.document?[item.document]:[]);
+      if(docs.length>MEDIA_METADATA_PAGE_SIZE)throw new Error('firestore_page_overflow');
+      const items=docs.map(doc=>decodeDocument(doc) as Record<string,any>&{id:string});
+      return {items,nextCursor:docs.length===MEDIA_METADATA_PAGE_SIZE?docs.at(-1)?.name:undefined};
+    });
+    r2Keys=await collectMediaInventoryPages(async(cursor)=>{
+      const listing=await env.CLINICAL_MEDIA.list({
+        prefix,limit:MEDIA_R2_PAGE_SIZE,...(cursor?{cursor}:{}),
+      });
+      if(listing.truncated&&!listing.cursor)throw new Error('r2_cursor_unavailable');
+      return {
+        items:listing.objects.map(item=>item.key),
+        nextCursor:listing.truncated?listing.cursor:undefined,
+      };
+    });
+  }catch(err){
+    if(err instanceof Error && err.message==='inventory_exceeds_safe_limit')
+      throw new HttpError(409,'media_inventory_exceeds_safe_limit');
+    throw new HttpError(503,'media_inventory_unavailable');
+  }
+  const findings=comparePatientMediaInventory(tenantId,patientId,records,r2Keys);
+  return {tenantId,patientId,checkedMetadata:records.length,checkedObjects:r2Keys.length,
+    findings,complete:true,mode:'read_only',noFilesModified:true,
+    snapshotConsistent:false,limit:MAX_MEDIA_INVENTORY_ITEMS,
+    warning:'Resultados nao atomicos entre R2 e Firestore. Confirmar divergencias antes de qualquer intervencao.'};
+}
+
 async function downloadMedia(request: Request, env: Env, uid: string, photoId: string) {
   const url = new URL(request.url);
   const tenantId = url.searchParams.get('tenantId') ?? '';
@@ -807,13 +985,257 @@ async function downloadMedia(request: Request, env: Env, uid: string, photoId: s
   });
 }
 
+
+const INTAKE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+async function issueIntakeToken(env: Env, uid: string, input: Record<string, unknown>) {
+  const tenantId = typeof input.tenantId === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(input.tenantId)
+    ? input.tenantId : '';
+  if (!tenantId || Object.keys(input).some(key => key !== 'tenantId')) throw new HttpError(400, 'invalid_request');
+  const token = await serviceAccountToken(env);
+  const transaction = await beginTransaction(env, token);
+  try {
+    const [tenant, member] = await Promise.all([
+      getDocument(env, token, 'tenants/' + tenantId, transaction),
+      getDocument(env, token, 'tenants/' + tenantId + '/memberships/' + uid, transaction),
+    ]);
+    if (!tenant || tenant.id !== tenantId || tenant.status !== 'active' || tenant.planId === 'premium_demo') throw new HttpError(404, 'tenant_unavailable');
+    if (!member || member.tenantId !== tenantId || member.userId !== uid
+      || member.status !== 'active' || !hasRolePermission(member, 'intake.manage')) throw new HttpError(403, 'intake_permission_required');
+    if (!canUse(tenant as any, 'intake_link')) throw new HttpError(403, 'feature_not_available');
+    const raw = createIntakeSecret();
+    const hash = await intakeTokenHash(raw);
+    const issuedAt = new Date();
+    const expiresAt = new Date(issuedAt.getTime() + INTAKE_TTL_MS);
+    const path = 'tenants/' + tenantId + '/intakeTokens/' + hash;
+    await commitTransaction(env, token, transaction, [
+      documentWrite(env, path, {
+        tenantId, createdBy: uid, createdAt: issuedAt, expiresAt, usedAt: null,
+      }, true),
+    ]);
+    return { token: raw, expiresAt: expiresAt.toISOString() };
+  } catch (e) {
+    await rollbackTransaction(env, token, transaction);
+    throw e;
+  }
+}
+
+async function revokeIntakeInvite(env:Env,uid:string,payload:unknown) {
+  if(!payload||typeof payload!=='object'||Array.isArray(payload))throw new HttpError(400,'invalid_revocation');
+  const data=payload as Record<string,unknown>;
+  if(Object.keys(data).some(key=>!['tenantId','token'].includes(key))
+    ||typeof data.tenantId!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(data.tenantId)
+    ||typeof data.token!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(data.token))
+    throw new HttpError(400,'invalid_revocation');
+  const tenantId=data.tenantId,hash=await intakeTokenHash(data.token);
+  const token=await serviceAccountToken(env);
+  const transaction=await beginTransaction(env,token);
+  try{
+    const path='tenants/'+tenantId+'/intakeTokens/'+hash;
+    const [tenant,member,issued]=await Promise.all([
+      getDocument(env,token,'tenants/'+tenantId,transaction),
+      getDocument(env,token,'tenants/'+tenantId+'/memberships/'+uid,transaction),
+      getDocument(env,token,path,transaction),
+    ]);
+    if(!tenant||tenant.id!==tenantId||tenant.status!=='active')throw new HttpError(404,'tenant_unavailable');
+    if(!member||member.tenantId!==tenantId||member.userId!==uid||member.status!=='active'
+      ||!hasRolePermission(member,'intake.manage'))throw new HttpError(403,'intake_permission_required');
+    if(tenant.planId==='premium_demo'||tenant.subscriptionStatus==='demo')
+      throw new HttpError(409,'demo_read_only');
+    if(!issued||issued.tenantId!==tenantId)throw new HttpError(404,'invitation_unavailable');
+    if(issued.usedAt!==null || issued.revokedAt)throw new HttpError(409,'invitation_already_used_or_revoked');
+    const now=new Date(),auditId=crypto.randomUUID();
+    await commitTransaction(env,token,transaction,[
+      documentPatch(env,path,{revokedAt:now,revokedBy:uid,lastAuditLogId:auditId}),
+      documentWrite(env,'tenants/'+tenantId+'/auditLogs/'+auditId,{
+        tenantId,actorId:uid,actorRole:member.role,
+        action:'intake_invite.revoke',resourceType:'intakeInvite',resourceId:hash,timestamp:now,
+      },true),
+    ]);
+    return {revoked:true};
+  }catch(e){await rollbackTransaction(env,token,transaction);throw e;}
+}
+
+async function submitPublicIntake(env: Env, payload: unknown) {
+  let input: ReturnType<typeof validatePublicIntake>;
+  try { input = validatePublicIntake(payload); } catch { throw new HttpError(400, 'invalid_contact_details'); }
+  const token = await serviceAccountToken(env);
+  const transaction = await beginTransaction(env, token);
+  try {
+    const slug = await getDocument(env, token, 'tenantSlugs/' + input.tenantSlug, transaction);
+    if (!slug || slug.slug !== input.tenantSlug || slug.status !== 'active'
+      || typeof slug.tenantId !== 'string') throw new HttpError(404, 'invalid_or_expired_link');
+    const tenantId = slug.tenantId;
+    const [tenant, linkHash] = await Promise.all([
+      getDocument(env, token, 'tenants/' + tenantId, transaction),
+      intakeTokenHash(input.token),
+    ]);
+    if (!tenant || tenant.status !== 'active' || tenant.slug !== input.tenantSlug
+      || !canUse(tenant as any, 'intake_link')) throw new HttpError(404, 'invalid_or_expired_link');
+    const tokenPath = 'tenants/' + tenantId + '/intakeTokens/' + linkHash;
+    const issued = await getDocument(env, token, tokenPath, transaction);
+    const expiresAt = typeof issued?.expiresAt === 'string' ? Date.parse(issued.expiresAt) : NaN;
+    if (!issued || issued.tenantId !== tenantId || issued.usedAt !== null || Boolean(issued.revokedAt)
+      || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) throw new HttpError(404, 'invalid_or_expired_link');
+    const now = new Date();
+    const submissionId = crypto.randomUUID();
+    const submissionPath = 'tenants/' + tenantId + '/patientIntakeSubmissions/' + submissionId;
+    await commitTransaction(env, token, transaction, [
+      documentWrite(env, tokenPath, { ...issued, id: undefined, createdAt: new Date(String(issued.createdAt)), expiresAt: new Date(String(issued.expiresAt)), usedAt: now }),
+      documentWrite(env, submissionPath, {
+        id: submissionId, tenantId, tokenId: linkHash, status: 'pending_review',
+        name: input.name, phone: input.phone, email: input.email, submittedAt: now,
+      }, true),
+    ]);
+    return { submitted: true };
+  } catch(e) {
+    await rollbackTransaction(env, token, transaction);
+    throw e;
+  }
+}
+
+
+async function issuePublicBookingInvite(env:Env,uid:string,body:unknown) {
+  let input:ReturnType<typeof validateBookingInvite>;
+  try {input=validateBookingInvite(body);}catch {throw new HttpError(400,'invalid_booking_invite');}
+  const accessToken=await serviceAccountToken(env);
+  const transaction=await beginTransaction(env,accessToken);
+  try {
+    const paths=[
+      'tenants/'+input.tenantId,
+      'tenants/'+input.tenantId+'/memberships/'+uid,
+      'tenants/'+input.tenantId+'/patients/'+input.patientId,
+      'tenants/'+input.tenantId+'/professionals/'+input.professionalId,
+      'tenants/'+input.tenantId+'/procedures/'+input.procedureId,
+      ...(input.resourceId ? ['tenants/'+input.tenantId+'/scheduleResources/'+input.resourceId] : []),
+    ];
+    const [tenant,member,patient,professional,procedure,resource]=await Promise.all(paths.map(path=>getDocument(env,accessToken,path,transaction)));
+    if(!tenant || tenant.status!=='active' || tenant.id!==input.tenantId || !canUse(tenant as any,'agenda')
+       || !canCreateCommercialCapacity(tenant as any))throw new HttpError(404,'tenant_unavailable');
+    if(!member||member.tenantId!==input.tenantId||member.userId!==uid||member.status!=='active'
+       || !hasRolePermission(member,'appointments.manage'))throw new HttpError(403,'appointment_permission_required');
+    if(!patient||patient.tenantId!==input.tenantId||patient.status!=='active'
+      ||!professional||professional.tenantId!==input.tenantId||professional.status!=='active'
+      ||!procedure||procedure.tenantId!==input.tenantId||procedure.active!==true
+      ||(input.resourceId&&(!resource||resource.tenantId!==input.tenantId||resource.active!==true)))throw new HttpError(400,'booking_reference_unavailable');
+    const raw=createIntakeSecret();
+    const hash=await intakeTokenHash(raw);
+    const now=new Date(),expiresAt=new Date(now.getTime()+BOOKING_TTL_MS);
+    await commitTransaction(env,accessToken,transaction,[documentWrite(env,
+      'tenants/'+input.tenantId+'/bookingTokens/'+hash,
+      {...input,createdAt:now,expiresAt,usedAt:null,createdBy:uid},true)]);
+    return {token:raw,expiresAt:expiresAt.toISOString()};
+  }catch(e){await rollbackTransaction(env,accessToken,transaction);throw e;}
+}
+
+/** Revocation cannot cancel an existing booking; it only disables an unused capability. */
+async function revokePublicBookingInvite(env:Env,uid:string,body:unknown) {
+  if(!body || typeof body!=='object' || Array.isArray(body))throw new HttpError(400,'invalid_revocation');
+  const input=body as Record<string,unknown>;
+  if(Object.keys(input).some(key=>!['tenantId','token'].includes(key))
+    ||typeof input.tenantId!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(input.tenantId)
+    ||typeof input.token!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(input.token))
+    throw new HttpError(400,'invalid_revocation');
+  const tenantId=input.tenantId;
+  const hash=await intakeTokenHash(input.token);
+  const token=await serviceAccountToken(env);
+  const transaction=await beginTransaction(env,token);
+  try {
+    const tokenPath='tenants/'+tenantId+'/bookingTokens/'+hash;
+    const [tenant,membership,issued]=await Promise.all([
+      getDocument(env,token,'tenants/'+tenantId,transaction),
+      getDocument(env,token,'tenants/'+tenantId+'/memberships/'+uid,transaction),
+      getDocument(env,token,tokenPath,transaction),
+    ]);
+    if(!tenant||tenant.id!==tenantId||tenant.status!=='active')throw new HttpError(404,'tenant_unavailable');
+    if(!membership||membership.tenantId!==tenantId||membership.userId!==uid
+      ||membership.status!=='active'||!hasRolePermission(membership,'appointments.manage'))
+      throw new HttpError(403,'appointment_permission_required');
+    if(tenant.subscriptionStatus==='demo'||tenant.planId==='premium_demo')
+      throw new HttpError(409,'demo_read_only');
+    if(!issued||issued.tenantId!==tenantId)throw new HttpError(404,'invitation_unavailable');
+    if(issued.usedAt!==null || issued.revokedAt)throw new HttpError(409,'invitation_already_used_or_revoked');
+    const now=new Date(),auditId=crypto.randomUUID();
+    await commitTransaction(env,token,transaction,[
+      documentPatch(env,tokenPath,{revokedAt:now,revokedBy:uid,lastAuditLogId:auditId}),
+      documentWrite(env,'tenants/'+tenantId+'/auditLogs/'+auditId,{
+        tenantId,actorId:uid,actorRole:membership.role,action:'booking_invite.revoke',
+        resourceType:'bookingInvite',resourceId:hash,timestamp:now,
+      },true),
+    ]);
+    return {revoked:true};
+  }catch(error){await rollbackTransaction(env,token,transaction);throw error;}
+}
+
+async function savePublicBooking(env:Env,payload:unknown) {
+  let data:ReturnType<typeof validatePublicBooking>;
+  try{data=validatePublicBooking(payload);}catch{throw new HttpError(400,'invalid_booking_time_or_link');}
+  const accessToken=await serviceAccountToken(env);
+  const slug=await getDocument(env,accessToken,'tenantSlugs/'+data.tenantSlug);
+  if(!slug||slug.status!=='active'||typeof slug.tenantId!=='string')throw new HttpError(404,'invalid_or_expired_booking_link');
+  const tokenHash=await intakeTokenHash(data.token);
+  const tokenData=await getDocument(env,accessToken,'tenants/'+slug.tenantId+'/bookingTokens/'+tokenHash);
+  if(!tokenData||tokenData.tenantId!==slug.tenantId)throw new HttpError(404,'invalid_or_expired_booking_link');
+  const endsAt=new Date(Date.parse(data.startsAt)+Number(tokenData.durationMinutes)*60000).toISOString();
+  const appointment=await saveAppointment(env,'public_invite',{
+    tenantId:slug.tenantId,patientId:tokenData.patientId,professionalId:tokenData.professionalId,
+    resourceId:tokenData.resourceId,procedureIds:[tokenData.procedureId],
+    startsAt:data.startsAt,endsAt,status:'confirmed',
+  },{tenantSlug:data.tenantSlug,tokenHash});
+  return {booked:true,status:appointment.status,startsAt:data.startsAt};
+}
+
 async function handle(request: Request, env: Env) {
   validateOrigin(request, env);
   if (request.method === 'OPTIONS') return response(request, env, 204, null);
   const url = new URL(request.url);
   if (request.method === 'GET' && url.pathname === '/health') return json(request, env, 200, { ok: true });
+  if (request.method === 'POST' && url.pathname === '/v1/public/intake') {
+    if (Number(request.headers.get('Content-Length') ?? '0') > 4096) throw new HttpError(413, 'request_too_large');
+    let body: unknown;
+    try {
+      const raw = await request.text();
+      if (raw.length > 4096) throw new HttpError(413, 'request_too_large');
+      body = JSON.parse(raw);
+    } catch(e) { if(e instanceof HttpError) throw e; throw new HttpError(400, 'invalid_json'); }
+    return response(request,env,202,JSON.stringify(await submitPublicIntake(env,body)),
+      {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
+  }
+
+  if (request.method==='POST' && url.pathname==='/v1/public/booking') {
+    let payload:unknown;
+    try{const raw=await request.text();if(raw.length>4096)throw new HttpError(413,'request_too_large');payload=JSON.parse(raw);}
+    catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,'invalid_json');}
+    return response(request,env,201,JSON.stringify(await savePublicBooking(env,payload)),
+      {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
+  }
 
   const user = await authenticate(request, env);
+  if(request.method==='POST' && url.pathname==='/v1/booking/tokens/revoke') {
+    let body:unknown;
+    try{const raw=await request.text();if(raw.length>4096)throw new HttpError(413,'request_too_large');body=JSON.parse(raw);}
+    catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,'invalid_json');}
+    return json(request,env,200,await revokePublicBookingInvite(env,user.uid,body));
+  }
+  if(request.method==='POST' && url.pathname==='/v1/booking/tokens') {
+    let body:unknown;
+    try{const raw=await request.text();if(raw.length>4096)throw new HttpError(413,'request_too_large');body=JSON.parse(raw);}
+    catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,'invalid_json');}
+    return response(request,env,201,JSON.stringify(await issuePublicBookingInvite(env,user.uid,body)),
+      {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
+  }
+  if(request.method==='POST' && url.pathname==='/v1/intake/tokens/revoke') {
+    let body:unknown;
+    try{const raw=await request.text();if(raw.length>4096)throw new HttpError(413,'request_too_large');body=JSON.parse(raw);}
+    catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,'invalid_json');}
+    return json(request,env,200,await revokeIntakeInvite(env,user.uid,body));
+  }
+  if (request.method === 'POST' && url.pathname === '/v1/intake/tokens') {
+    let body: Record<string, unknown>;
+    try { body = await request.json() as Record<string, unknown>; }
+    catch { throw new HttpError(400, 'invalid_json'); }
+    return response(request, env, 201, JSON.stringify(await issueIntakeToken(env, user.uid, body)), {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
+  }
   if (request.method === 'POST' && url.pathname === '/v1/tenants/capacity') {
     let payload: Record<string, unknown>;
     try { payload = await request.json() as Record<string, unknown>; }
@@ -836,6 +1258,15 @@ async function handle(request: Request, env: Env) {
     return json(request, env, 200, result);
   }
 
+  if(request.method==='GET' && url.pathname==='/v1/media/integrity') {
+    return response(request,env,200,JSON.stringify(await diagnosePatientMedia(request,env,user.uid)),
+      {'Content-Type':'application/json; charset=utf-8','Cache-Control':'private, no-store'});
+  }
+
+  const mediaReviewMatch=url.pathname.match(/^\/v1\/media\/([A-Za-z0-9_-]{1,128})\/review$/);
+  if(request.method==='POST' && mediaReviewMatch) {
+    return json(request,env,200,await reviewMedia(request,env,user.uid,mediaReviewMatch[1]));
+  }
   if (request.method === 'POST' && url.pathname === '/v1/media') {
     const uploaded = await uploadMedia(request, env, user.uid);
     return json(request, env, 201, uploaded);

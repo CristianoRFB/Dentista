@@ -5,13 +5,8 @@ import type { Appointment, Patient, Procedure, Professional, ScheduleBlock, Sche
 import { db } from '../../lib/firebase';
 import { listTenantRecords } from '../../lib/tenantData';
 import { cancelAppointment, saveAppointment } from '../../lib/appointmentClient';
+import { adjacentAgendaDay, agendaDayWindow, localDateString } from '../../lib/agendaDate';
 import { useReadyTenantAccess } from '../tenant/TenantContext';
-
-function dayWindow() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return { start, end: new Date(start.getTime() + 86_400_000) };
-}
 
 function toLocalInput(date: Date) {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
@@ -47,6 +42,8 @@ export function AgendaPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [selectedDay,setSelectedDay] = useState(()=>localDateString(new Date()));
+  const [cancelPendingId,setCancelPendingId] = useState<string|null>(null);
 
   async function refresh() {
     setLoading(true); setError('');
@@ -55,7 +52,7 @@ export function AgendaPage() {
       setProfessionals([]); setProcedures([]); setBlocks([]); setLoading(false); return;
     }
     try {
-      const { start, end } = dayWindow();
+      const { start, end } = agendaDayWindow(selectedDay);
       const appointmentQuery = query(
         collection(db, 'tenants', session.tenant.id, 'appointments'),
         where('startsAt', '>=', start.toISOString()),
@@ -79,7 +76,7 @@ export function AgendaPage() {
       setError('Não foi possível carregar a agenda deste tenant.');
     } finally { setLoading(false); }
   }
-  useEffect(() => { void refresh(); }, [session]);
+  useEffect(() => { void refresh(); }, [session,selectedDay]);
 
   function beginReschedule(appointment: Appointment) {
     setEditing(appointment);
@@ -128,6 +125,7 @@ export function AgendaPage() {
       if (session.isDemo) throw new Error('A agenda demonstrativa é somente para leitura.');
       await cancelAppointment(session.tenant.id, appointment.id);
       setMessage('Agendamento cancelado. O horário foi liberado na agenda.');
+      setCancelPendingId(null);
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível cancelar o agendamento.');
@@ -139,7 +137,13 @@ export function AgendaPage() {
 
   return <>
     <div className="page-head"><div><span className="eyebrow">Operação do dia</span><h1>Agenda</h1><p className="muted">Conflitos são verificados em transação confiável por profissional, recurso e bloqueios.</p></div></div>
-    {session.isDemo && <p className="demo-banner">Modo demonstrativo · Clínica Aurora e registros fictícios.</p>}
+    {session.isDemo && <p className="demo-banner">Modo demonstrativo · Clínica Aurora e registros fictícios. Os dados de exemplo não representam uma agenda real.</p>}
+    <section className="card clinical-list-toolbar" aria-label="Navegar pelos dias da agenda">
+      <button className="btn secondary" type="button" onClick={()=>setSelectedDay(day=>adjacentAgendaDay(day,-1))}>Dia anterior</button>
+      <label>Dia da agenda<input type="date" value={selectedDay} onChange={event=>{if(event.target.value)setSelectedDay(event.target.value);}}/></label>
+      <button className="btn secondary" type="button" onClick={()=>setSelectedDay(day=>adjacentAgendaDay(day,1))}>Próximo dia</button>
+      <button className="btn secondary" type="button" onClick={()=>setSelectedDay(localDateString(new Date()))}>Hoje</button>
+    </section>
     {(error || message) && <p className={error ? 'form-error' : 'form-success'} role={error ? 'alert' : 'status'}>{error || message}</p>}
     {session.permissions.includes('appointments.manage') && !session.isDemo && <form className="card data-form appointment-form" onSubmit={submit}>
       <h2>{editing ? 'Remarcar atendimento' : 'Novo agendamento'}</h2>
@@ -154,12 +158,18 @@ export function AgendaPage() {
       <div className="form-actions"><button className="btn primary" disabled={saving} type="submit">{saving ? 'Salvando…' : editing ? 'Confirmar remarcação' : 'Criar agendamento'}</button>{editing && <button className="btn secondary" type="button" onClick={resetForm}>Cancelar</button>}</div>
       {blocks.length > 0 && <p className="muted">Há {blocks.length} bloqueios ativos; o serviço confiável verificará os intervalos ao salvar.</p>}
     </form>}
-    <div className="card table-card"><table className="table"><caption className="sr-only">Agendamentos do tenant</caption><thead><tr><th>Horário</th><th>Paciente</th><th>Profissional</th><th>Recurso</th><th>Status</th><th></th></tr></thead><tbody>
-      {loading ? <tr><td colSpan={6}>Carregando agenda…</td></tr> : appointments.length === 0 ? <tr><td colSpan={6}>Nenhum atendimento para hoje.</td></tr> : appointments.map(appointment => <tr key={appointment.id}>
-        <td><b>{new Date(appointment.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}–{new Date(appointment.endsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</b></td>
-        <td>{nameForPatient(appointment.patientId)}</td><td>{professionals.find(person => person.id === appointment.professionalId)?.displayName ?? '—'}</td>
-        <td>{nameForResource(appointment.resourceId)}</td><td><span className={'status-pill ' + appointment.status}>{appointment.status}</span></td>
-        <td className="row-actions">{session.permissions.includes('appointments.manage') && !session.isDemo && !['completed', 'cancelled', 'no_show'].includes(appointment.status) && <><button className="text-button" type="button" onClick={() => beginReschedule(appointment)}>Remarcar</button><button className="text-button danger-link" type="button" onClick={() => void cancel(appointment)}>Cancelar</button></>}</td>
+    <div className="card table-card"><table className="table clinical-stack-table"><caption className="sr-only">Agendamentos do tenant</caption><thead><tr><th>Horário</th><th>Paciente</th><th>Profissional</th><th>Recurso</th><th>Status</th><th></th></tr></thead><tbody>
+      {loading ? <tr><td colSpan={6}>Carregando agenda…</td></tr> : appointments.length === 0 ? <tr><td colSpan={6}>Nenhum atendimento para o dia selecionado.</td></tr> : appointments.map(appointment => <tr key={appointment.id}>
+        <td data-label="Horário"><b>{new Date(appointment.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}–{new Date(appointment.endsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</b></td>
+        <td data-label="Paciente">{nameForPatient(appointment.patientId)}</td><td data-label="Profissional">{professionals.find(person => person.id === appointment.professionalId)?.displayName ?? '—'}</td>
+        <td data-label="Recurso">{nameForResource(appointment.resourceId)}</td><td data-label="Status"><span className={'status-pill ' + appointment.status}>{appointment.status}</span></td>
+        <td data-label="Ações" className="row-actions">{session.permissions.includes('appointments.manage') && !session.isDemo && !['completed', 'cancelled', 'no_show'].includes(appointment.status) &&
+          <><button className="text-button" type="button" onClick={() => beginReschedule(appointment)}>Remarcar</button>
+          {cancelPendingId===appointment.id?<span>
+            Cancelar esta consulta?
+            <button className="text-button danger-link" type="button" onClick={()=>void cancel(appointment)}>Confirmar cancelamento</button>
+            <button className="text-button" type="button" onClick={()=>setCancelPendingId(null)}>Voltar</button>
+          </span>:<button className="text-button danger-link" type="button" onClick={()=>setCancelPendingId(appointment.id)}>Cancelar</button>}</>}</td>
       </tr>)}
     </tbody></table></div>
   </>;

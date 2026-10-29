@@ -125,6 +125,11 @@ export interface Recall {
   dueAt: string;
   status: RecallStatus;
   lastContactAt?: string;
+  appointmentId?: string;
+  createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  lastAuditLogId?: string;
 }
 
 export interface PatientIntakeSubmission {
@@ -136,6 +141,9 @@ export interface PatientIntakeSubmission {
   phone?: string;
   email?: string;
   submittedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  lastAuditLogId?: string;
 }
 
 export interface UsageCounter {
@@ -198,4 +206,26 @@ export interface ClinicalPhoto {
   contentType: string;
   originalName: string;
   createdBy?: string;
+  lifecycleStatus?: 'active' | 'archived';
+  archivedAt?: string | null;
+  archivedBy?: string | null;
+  updatedAt?: string;
+  updatedBy?: string;
+  lastAuditLogId?: string;
+  revision?: number;
+}
+
+/** Immutable odontogram event for one patient and FDI tooth; corrections reference earlier events. */
+export interface OdontogramEvent {
+  id: string;
+  tenantId: string;
+  patientId: string;
+  toothId: string;
+  surface: string;
+  finding: string;
+  note: string;
+  supersedesEventId?: string;
+  createdBy: string;
+  createdAt: string;
+  auditLogId: string;
 }

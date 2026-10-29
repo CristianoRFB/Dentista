@@ -12,6 +12,7 @@ const documents = new Map<string, Record<string, unknown>>();
 const writes: unknown[] = [];
 const storedObjects = new Map<string, { bytes: Uint8Array; contentType: string }>();
 const fetchCalls: string[] = [];
+let failNextMediaTransactionStart = false;
 
 function documentFields(value: Record<string, unknown>) {
   const encode = (item: unknown): Record<string, unknown> => {
@@ -71,6 +72,14 @@ const env = {
       return { body: new Blob([object.bytes]).stream(), httpMetadata: { contentType: object.contentType } };
     }),
     delete: vi.fn(async (key: string) => { storedObjects.delete(key); }),
+    list: vi.fn(async (options: {prefix:string;limit?:number;cursor?:string}) => {
+      const keys=[...storedObjects.keys()].filter(key=>key.startsWith(options.prefix)).sort();
+      const after=options.cursor?keys.findIndex(key=>key===options.cursor)+1:0;
+      const limit=options.limit??1000;
+      const page=keys.slice(after,after+limit);
+      const truncated=after+limit<keys.length;
+      return {objects:page.map(key=>({key})),truncated,cursor:truncated?page.at(-1):undefined};
+    }),
   },
 } as unknown as Parameters<typeof mediaWorker.fetch>[1];
 
@@ -79,7 +88,26 @@ beforeAll(async () => {
     const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
     fetchCalls.push(url.toString());
     if (url.hostname === '127.0.0.1' && url.port === '8081') {
-      if (url.pathname.endsWith(':beginTransaction')) return new Response(JSON.stringify({ transaction: 'media-test-transaction' }), { status: 200 });
+      if (url.pathname.endsWith(':runQuery')) {
+        const collectionPath=url.pathname.split('/documents/')[1]?.split(':runQuery')[0]??'';
+        const query=JSON.parse(String(init?.body??'{}')) as {
+          structuredQuery?:{from?:{collectionId:string}[];limit?:number;startAt?:{values?:{referenceValue?:string}[]}}
+        };
+        const collectionId=query.structuredQuery?.from?.[0]?.collectionId??'clinicalPhotos';
+        const prefix=decodeURIComponent(collectionPath)+'/'+collectionId+'/';
+        const startAfter=query.structuredQuery?.startAt?.values?.[0]?.referenceValue?.split('/documents/')[1]??'';
+        const entries=[...documents.entries()].filter(([path])=>path.startsWith(prefix)&&
+          !path.slice(prefix.length).includes('/') && path>startAfter).sort(([a],[b])=>a.localeCompare(b))
+          .slice(0,query.structuredQuery?.limit??100);
+        return new Response(JSON.stringify(entries.map(([path,value])=>({document:firestoreDoc(path,value)}))),{status:200});
+      }
+      if (url.pathname.endsWith(':beginTransaction')) {
+        if (failNextMediaTransactionStart) {
+          failNextMediaTransactionStart=false;
+          return new Response(JSON.stringify({error:{status:'UNAVAILABLE',message:'test transaction unavailable'}}),{status:503});
+        }
+        return new Response(JSON.stringify({ transaction: 'media-test-transaction' }), { status: 200 });
+      }
       if (url.pathname.endsWith(':commit')) {
         const body = init?.body ? JSON.parse(String(init.body)) as { writes?: unknown[] } : {};
         writes.push(...(body.writes ?? []));
@@ -104,8 +132,11 @@ beforeEach(() => {
   writes.length = 0;
   fetchCalls.length = 0;
   storedObjects.clear();
+  failNextMediaTransactionStart = false;
   vi.mocked(env.CLINICAL_MEDIA.put).mockClear();
   vi.mocked(env.CLINICAL_MEDIA.get).mockClear();
+  vi.mocked(env.CLINICAL_MEDIA.delete).mockClear();
+  vi.mocked(env.CLINICAL_MEDIA.list).mockClear();
   vi.mocked(verifyFirebaseIdToken).mockReset().mockResolvedValue({ uid: 'dentist-a' });
 });
 
@@ -120,6 +151,16 @@ async function upload(token: string, file = new File([new Uint8Array([0xff, 0xd8
 }
 
 describe('Worker de mídia clínica', () => {
+  it('compensa upload R2 se Firestore falhar antes de iniciar a transação', async () => {
+    failNextMediaTransactionStart=true;
+    const result=await upload('verified-test-token');
+    expect(result.status).toBe(503);
+    expect(env.CLINICAL_MEDIA.put).toHaveBeenCalledOnce();
+    expect(env.CLINICAL_MEDIA.delete).toHaveBeenCalledOnce();
+    expect(storedObjects.size).toBe(0);
+    expect(writes).toHaveLength(0);
+  });
+
   it('autoriza upload, grava objeto privado tenant/patient-scoped e metadata auditável', async () => {
     const response = await upload('verified-test-token');
     const payload = await response.json() as { photoId: string; objectKey: string; url?: string };
@@ -216,5 +257,231 @@ describe('Worker de mídia clínica', () => {
     expect(response.status).toBe(401);
     expect(env.CLINICAL_MEDIA.put).not.toHaveBeenCalled();
     expect(fetchCalls).toEqual([]);
+  });
+});
+
+
+describe('D5 — ciclo de revisão e arquivamento sem exclusão clínica',()=>{
+  function seedPhoto() {
+    const key='tenants/A/patients/patient-a/photo-a.jpg';
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a',{
+      id:'photo-a',tenantId:'A',patientId:'patient-a',objectKey:key,status:'unverified',
+      lifecycleStatus:'active',tags:[],createdBy:'dentist-a',
+    });
+    storedObjects.set(key,{bytes:new Uint8Array([0xff,0xd8,0xff]),contentType:'image/jpeg'});
+    return key;
+  }
+  function review(action:'verify'|'reject'|'archive'|'restore',overrides:Record<string,unknown>={}){
+    return mediaWorker.fetch(new Request('https://worker.test/v1/media/photo-a/review',{
+      method:'POST',headers:{Authorization:'Bearer test-token',Origin:'https://app.test','Content-Type':'application/json'},
+      body:JSON.stringify({tenantId:'A',patientId:'patient-a',action,reason:'Registro operacional para auditoria',tags:['frontal'],...overrides}),
+    }),env);
+  }
+  it('classifica uma foto sem tocar no bucket R2 e gera auditoria com identidade',async()=>{
+    const key=seedPhoto();
+    const r=await review('verify');
+    expect(r.status,await r.clone().text()).toBe(200);
+    expect(await r.json()).toMatchObject({photoId:'photo-a',status:'verified',lifecycleStatus:'active',revision:1});
+    expect(JSON.stringify(writes)).toContain('clinical_photo.verify');
+    expect(JSON.stringify(writes)).toContain('lastAuditLogId');
+    expect(JSON.stringify(writes)).toContain('frontal');
+    expect(storedObjects.has(key)).toBe(true);
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+  });
+  it('arquiva sem apagar nem impedir restauração autorizada',async()=>{
+    const key=seedPhoto();
+    const first=await review('archive');
+    expect(first.status).toBe(200);
+    expect(await first.json()).toMatchObject({lifecycleStatus:'archived'});
+    expect(JSON.stringify(writes)).toContain('clinical_photo.archive');
+    expect(storedObjects.has(key)).toBe(true);
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a',{
+      ...documents.get('tenants/A/patients/patient-a/clinicalPhotos/photo-a')!,
+      lifecycleStatus:'archived',archivedAt:new Date().toISOString(),
+    });
+    writes.length=0;
+    const second=await review('restore');
+    expect(second.status).toBe(200);
+    expect(await second.json()).toMatchObject({lifecycleStatus:'active'});
+    expect(JSON.stringify(writes)).toContain('clinical_photo.restore');
+    expect(storedObjects.has(key)).toBe(true);
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+  });
+  it('nega revisão para leitor sem escrita, membership inativa e ID de outro tenant',async()=>{
+    seedPhoto();
+    seedAccess({permissions:['clinical.read']});
+    expect((await review('verify')).status).toBe(403);
+    seedAccess({status:'inactive'});
+    expect((await review('verify')).status).toBe(403);
+    seedAccess();
+    expect((await review('verify',{tenantId:'B',patientId:'patient-b'})).status).toBe(403);
+    expect(writes).toHaveLength(0);
+  });
+  it('nega demo, texto insuficiente e transições inválidas sem alterar objeto R2',async()=>{
+    const key=seedPhoto();
+    expect((await review('reject',{reason:'curto'})).status).toBe(400);
+    expect((await review('restore')).status).toBe(409);
+    documents.set('tenants/A',{...documents.get('tenants/A')!,planId:'premium_demo',subscriptionStatus:'demo'});
+    expect((await review('archive')).status).toBe(409);
+    expect(writes).toHaveLength(0);
+    expect(storedObjects.has(key)).toBe(true);
+  });
+});
+
+
+describe('D5 — revisão, arquivamento e restauração auditada', () => {
+  function seedPhoto(){
+    const objectKey='tenants/A/patients/patient-a/photo-a.jpg';
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a',{
+      id:'photo-a',tenantId:'A',patientId:'patient-a',objectKey,status:'unverified',
+      lifecycleStatus:'active',tags:[],originalName:'clinical-image-photo-a.jpg',
+      capturedAt:'2026-10-01T10:00:00.000Z',createdAt:'2026-10-01T10:00:00.000Z',
+    });
+    storedObjects.set(objectKey,{bytes:new Uint8Array([0xff,0xd8,0xff]),contentType:'image/jpeg'});
+    return objectKey;
+  }
+  async function act(action:'verify'|'reject'|'archive'|'restore', options:Record<string,unknown>={}) {
+    return mediaWorker.fetch(new Request('https://worker.test/v1/media/photo-a/review',{
+      method:'POST',headers:{Authorization:'Bearer verified-test-token',Origin:'https://app.test',
+        'Content-Type':'application/json'},
+      body:JSON.stringify({tenantId:'A',patientId:'patient-a',action,
+        reason:'Revisão técnica registrada pelo profissional',tags:['frontal'],...options}),
+    }),env);
+  }
+  it('verifica foto com audit log e preserva os campos originais do Firestore sem tocar no R2',async()=>{
+    const key=seedPhoto();
+    const resp=await act('verify');
+    expect(resp.status,await resp.clone().text()).toBe(200);
+    expect((await resp.json() as {status:string}).status).toBe('verified');
+    expect(writes).toHaveLength(2);
+    const patch=writes[0] as {updateMask?:{fieldPaths?:string[]};update?:{fields?:Record<string,unknown>}};
+    expect(patch.updateMask?.fieldPaths).toContain('status');
+    expect(patch.updateMask?.fieldPaths).not.toContain('createdAt');
+    expect(patch.updateMask?.fieldPaths).not.toContain('capturedAt');
+    expect(patch.update?.fields).not.toHaveProperty('objectKey');
+    expect(JSON.stringify(writes)).toContain('clinical_photo.verify');
+    expect(storedObjects.has(key)).toBe(true);
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+  });
+  it('arquivamento gera alteração lógica e audit log, sem exclusão de bytes',async()=>{
+    const key=seedPhoto();
+    const resp=await act('archive');
+    expect(resp.status,await resp.clone().text()).toBe(200);
+    expect((await resp.json() as {lifecycleStatus:string}).lifecycleStatus).toBe('archived');
+    expect(JSON.stringify(writes)).toContain('clinical_photo.archive');
+    expect(storedObjects.has(key)).toBe(true);
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+  });
+  it('restaura somente imagem arquivada com autoria e campos de limpeza',async()=>{
+    seedPhoto();
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a',{
+      ...documents.get('tenants/A/patients/patient-a/clinicalPhotos/photo-a')!,
+      lifecycleStatus:'archived',archivedAt:'2026-10-02T10:00:00.000Z',archivedBy:'dentist-a',
+    });
+    const resp=await act('restore');
+    expect(resp.status).toBe(200);
+    const patch=writes[0] as {update?:{fields?:Record<string,unknown>}};
+    expect(patch.update?.fields?.archivedAt).toEqual({nullValue:'NULL'});
+    expect(JSON.stringify(writes)).toContain('clinical_photo.restore');
+  });
+  it('nega edição de outro tenant, recepção, usuário inativo e demo',async()=>{
+    seedPhoto();
+    expect((await act('verify',{tenantId:'B'})).status).toBe(404);
+    seedAccess();
+    seedPhoto();
+    documents.set('tenants/A',{...documents.get('tenants/A')!,features:{clinical_photos:false}});
+    expect((await act('verify')).status).toBe(403);
+
+    seedAccess({role:'receptionist',permissions:['clinical.write']});
+    expect((await act('verify')).status).toBe(403);
+    seedAccess({status:'inactive'});
+    expect((await act('verify')).status).toBe(403);
+    seedAccess();
+    documents.set('tenants/A',{...documents.get('tenants/A')!,planId:'premium_demo',subscriptionStatus:'demo'});
+    expect((await act('verify')).status).toBe(409);
+    expect(writes).toHaveLength(0);
+  });
+  it('rejeita motivo insuficiente, repetição de revisão e restauração de imagem ativa',async()=>{
+    seedPhoto();
+    expect((await act('verify',{reason:'curto'})).status).toBe(400);
+    expect((await act('restore')).status).toBe(409);
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a',{
+      ...documents.get('tenants/A/patients/patient-a/clinicalPhotos/photo-a')!,status:'verified',
+    });
+    expect((await act('verify')).status).toBe(409);
+    expect(writes).toHaveLength(0);
+  });
+});
+
+describe('D5 — relatório de integridade de mídia por paciente',()=>{
+  async function inspect(tenantId='A',patientId='patient-a'){
+    return mediaWorker.fetch(new Request(
+      'https://worker.test/v1/media/integrity?tenantId='+tenantId+'&patientId='+patientId,{
+        headers:{Authorization:'Bearer verified-test-token',Origin:'https://app.test'},
+      }),env);
+  }
+  it('mostra objetos ausentes e órfãos potenciais apenas da pasta do paciente, sem mudar o R2',async()=>{
+    const prefix='tenants/A/patients/patient-a/';
+    documents.set(prefix+'clinicalPhotos/photo-found',{
+      id:'photo-found',tenantId:'A',patientId:'patient-a',objectKey:prefix+'photo-found.jpg',
+    });
+    documents.set(prefix+'clinicalPhotos/photo-missing',{
+      id:'photo-missing',tenantId:'A',patientId:'patient-a',objectKey:prefix+'photo-missing.jpg',
+    });
+    storedObjects.set(prefix+'photo-found.jpg',{bytes:new Uint8Array([0xff,0xd8,0xff]),contentType:'image/jpeg'});
+    storedObjects.set(prefix+'possible-orphan.jpg',{bytes:new Uint8Array([0xff,0xd8,0xff]),contentType:'image/jpeg'});
+    storedObjects.set('tenants/B/patients/patient-b/private.jpg',{
+      bytes:new Uint8Array([0xff,0xd8,0xff]),contentType:'image/jpeg',
+    });
+    const result=await inspect();
+    expect(result.status,await result.clone().text()).toBe(200);
+    const report=await result.json() as {complete:boolean;noFilesModified:boolean;findings:{kind:string;photoId?:string;objectKey?:string}[]};
+    expect(report.complete).toBe(true);
+    expect(report.noFilesModified).toBe(true);
+    expect(report.findings.map(x=>x.kind).sort()).toEqual(['missing_r2_object','unreferenced_r2_candidate']);
+    expect(JSON.stringify(report)).not.toContain('tenants/B/');
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+    expect(writes).toHaveLength(0);
+  });
+  it('nega inspeção sem identidade clínica de escrita e fora do tenant',async()=>{
+    expect((await inspect('B','patient-b')).status).toBe(403);
+    seedAccess({role:'receptionist',permissions:['clinical.read']});
+    expect((await inspect()).status).toBe(403);
+    seedAccess({status:'inactive'});
+    expect((await inspect()).status).toBe(403);
+    expect(env.CLINICAL_MEDIA.list).not.toHaveBeenCalled();
+  });
+  it('compara múltiplas páginas de metadata Firestore e de objetos R2 sem modificar arquivos',async()=>{
+    const prefix='tenants/A/patients/patient-a/';
+    for(let i=0;i<250;i++){
+      const id='photo-'+String(i).padStart(4,'0');
+      documents.set(prefix+'clinicalPhotos/'+id,{
+        id,tenantId:'A',patientId:'patient-a',objectKey:prefix+id+'.jpg',
+      });
+      storedObjects.set(prefix+id+'.jpg',{bytes:new Uint8Array([0xff,0xd8,0xff]),contentType:'image/jpeg'});
+    }
+    for(let i=0;i<420;i++){
+      storedObjects.set(prefix+'orphan-'+String(i).padStart(4,'0')+'.jpg',{
+        bytes:new Uint8Array([0xff,0xd8,0xff]),contentType:'image/jpeg',
+      });
+    }
+    const result=await inspect();
+    expect(result.status,await result.clone().text()).toBe(200);
+    const report=await result.json() as {complete:boolean;snapshotConsistent:boolean;checkedMetadata:number;checkedObjects:number;findings:{kind:string}[]};
+    expect(report).toMatchObject({complete:true,snapshotConsistent:false,checkedMetadata:250,checkedObjects:670});
+    expect(report.findings).toHaveLength(420);
+    expect(report.findings.every(f=>f.kind==='unreferenced_r2_candidate')).toBe(true);
+    expect(vi.mocked(env.CLINICAL_MEDIA.list).mock.calls.length).toBeGreaterThan(1);
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+    expect(writes).toHaveLength(0);
+  });
+  it('rejeita resultados parciais acima do teto de segurança mesmo com paginação',async()=>{
+    for(let i=0;i<3001;i++)storedObjects.set('tenants/A/patients/patient-a/object-'+i+'.jpg',{
+      bytes:new Uint8Array([0xff,0xd8,0xff]),contentType:'image/jpeg',
+    });
+    const result=await inspect();
+    expect(result.status).toBe(409);
+    expect((await result.json() as {error:string}).error).toBe('media_inventory_exceeds_safe_limit');
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
   });
 });

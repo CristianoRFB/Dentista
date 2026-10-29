@@ -146,7 +146,17 @@ async function fakeFirestoreFetch(input: RequestInfo | URL, init?: RequestInit) 
     for (const write of body.writes ?? []) {
       const name = String(write.update.name);
       const path = name.slice(name.indexOf(pathMarker) + pathMarker.length);
-      documents.set(path, decodeFields(write.update.fields));
+      const incoming=decodeFields(write.update.fields);
+      if(Array.isArray(write.updateMask?.fieldPaths)){
+        const merged={...(documents.get(path)??{})};
+        for(const key of write.updateMask.fieldPaths as string[]){
+          if(key in incoming)merged[key]=incoming[key];
+          else delete merged[key];
+        }
+        documents.set(path,merged);
+      }else{
+        documents.set(path,incoming);
+      }
       versions.set(path, ++currentVersion);
     }
     transactions.delete(String(body.transaction));
@@ -325,5 +335,225 @@ describe('Worker de limites comerciais', () => {
     const denied = await mutateCapacity('memberships', 'create', { role: 'dentist', status: 'active' }, 'member-7');
     expect(denied.status).toBe(409);
     expect(documents.get('tenants/A/limitCounters/memberships')?.count).toBe(6);
+  });
+});
+
+
+describe('D4 — pré-cadastro público com token de uso único', () => {
+  function setup() {
+    const a = documents.get('tenants/A')!;
+    documents.set('tenants/A',{...a,slug:'clinica-a'});
+    const b = documents.get('tenants/B')!;
+    documents.set('tenants/B',{...b,slug:'clinica-b'});
+    documents.set('tenantSlugs/clinica-a',{slug:'clinica-a',tenantId:'A',status:'active'});
+    documents.set('tenantSlugs/clinica-b',{slug:'clinica-b',tenantId:'B',status:'active'});
+    const member = documents.get('tenants/A/memberships/dentist-a')!;
+    documents.set('tenants/A/memberships/dentist-a',{
+      ...member,permissions:[...member.permissions as string[],'intake.manage','intake.read'],
+    });
+  }
+  async function call(path: string, body: Record<string,unknown>, authenticated = false) {
+    return appointmentWorker.fetch(new Request('https://worker.test'+path,{
+      method:'POST',headers:{Origin:'https://app.test','Content-Type':'application/json',
+        ...(authenticated?{'Authorization':'Bearer mock'}:{})}, body:JSON.stringify(body),
+    }),workerEnv);
+  }
+  it('emite link para a equipe e cria uma única solicitação pendente sem autenticação pública',async()=>{
+    setup();
+    const minted=await call('/v1/intake/tokens',{tenantId:'A'},true);
+    expect(minted.status,await minted.clone().text()).toBe(201);
+    const {token}=await minted.json() as {token:string};
+    expect(token).toMatch(/^[a-zA-Z0-9_-]{43}$/);
+    expect([...documents.keys()].some(path=>path.includes('/intakeTokens/') && !path.includes(token))).toBe(true);
+    const payload={tenantSlug:'clinica-a',token,name:'Paciente Fictício',phone:'(17) 99999-9999',email:'fake@example.test'};
+    const first=await call('/v1/public/intake',payload);
+    expect(first.status,await first.clone().text()).toBe(202);
+    expect(first.headers.get('Cache-Control')).toContain('no-store');
+    expect(first.headers.get('Referrer-Policy')).toBe('no-referrer');
+    expect([...documents.values()].filter(d=>d.status==='pending_review' && d.name==='Paciente Fictício')).toHaveLength(1);
+    const second=await call('/v1/public/intake',payload);
+    expect(second.status).toBe(404);
+    expect([...documents.values()].filter(d=>d.status==='pending_review' && d.name==='Paciente Fictício')).toHaveLength(1);
+  });
+  it('nega criação anônima de links, token do tenant errado e submissão sem contato válido',async()=>{
+    setup();
+    expect((await call('/v1/intake/tokens',{tenantId:'A'})).status).toBe(401);
+    const minted=await call('/v1/intake/tokens',{tenantId:'A'},true);
+    expect(minted.status).toBe(201);
+    const {token}=await minted.json() as {token:string};
+    expect((await call('/v1/public/intake',{
+      tenantSlug:'clinica-b',token,name:'Paciente Fictício',phone:'(17) 99999-9999',email:'',
+    })).status).toBe(404);
+    expect((await call('/v1/public/intake',{
+      tenantSlug:'clinica-a',token,name:'A',phone:'desconhecido',email:'',
+    })).status).toBe(400);
+    expect((await call('/v1/public/intake',{
+      tenantSlug:'clinica-a',token,name:'Paciente Válido',phone:'(17) 99999-9999',email:'',
+    })).status).toBe(202);
+  });
+  it('revoga convite de pré-cadastro não utilizado e bloqueia futuros envios',async()=>{
+    setup();
+    const minted=await call('/v1/intake/tokens',{tenantId:'A'},true);
+    expect(minted.status).toBe(201);
+    const {token}=await minted.json() as {token:string};
+    const revoked=await call('/v1/intake/tokens/revoke',{tenantId:'A',token},true);
+    expect(revoked.status,await revoked.clone().text()).toBe(200);
+    expect((await revoked.json() as {revoked:boolean}).revoked).toBe(true);
+    expect([...documents.values()].some(v=>v.action==='intake_invite.revoke'&&v.actorRole==='tenant_owner')).toBe(true);
+    const submitted=await call('/v1/public/intake',{
+      tenantSlug:'clinica-a',token,name:'Contato Fictício',phone:'(17) 99999-9999',email:'',
+    });
+    expect(submitted.status).toBe(404);
+    expect((await call('/v1/intake/tokens/revoke',{tenantId:'A',token},true)).status).toBe(409);
+    expect([...documents.values()].filter(v=>v.status==='pending_review')).toHaveLength(0);
+  });
+  it('recusa revogação anônima, cruzada ou de convite já utilizado sem apagar a solicitação',async()=>{
+    setup();
+    const minted=await call('/v1/intake/tokens',{tenantId:'A'},true);
+    const {token}=await minted.json() as {token:string};
+    expect((await call('/v1/intake/tokens/revoke',{tenantId:'A',token})).status).toBe(401);
+    expect((await call('/v1/intake/tokens/revoke',{tenantId:'B',token},true)).status).toBe(403);
+    expect((await call('/v1/intake/tokens/revoke',{tenantId:'A',token:'invalid'},true)).status).toBe(400);
+    expect((await call('/v1/public/intake',{
+      tenantSlug:'clinica-a',token,name:'Contato Fictício',phone:'(17) 99999-9999',email:'',
+    })).status).toBe(202);
+    expect((await call('/v1/intake/tokens/revoke',{tenantId:'A',token},true)).status).toBe(409);
+    expect([...documents.values()].filter(v=>v.status==='pending_review')).toHaveLength(1);
+  });
+  it('nega tokens expirados, demo e origens externas',async()=>{
+    setup();
+    const minted=await call('/v1/intake/tokens',{tenantId:'A'},true);
+    const {token}=await minted.json() as {token:string};
+    const path=[...documents.keys()].find(p=>p.includes('/intakeTokens/'))!;
+    const current=documents.get(path)!;
+    documents.set(path,{...current,expiresAt:'2020-01-01T00:00:00.000Z'});
+    expect((await call('/v1/public/intake',{tenantSlug:'clinica-a',token,name:'Paciente Teste',phone:'(17) 99999-9999',email:''})).status).toBe(404);
+    documents.set('tenants/A',{...documents.get('tenants/A')!,planId:'premium_demo',subscriptionStatus:'demo'});
+    expect((await call('/v1/intake/tokens',{tenantId:'A'},true)).status).toBe(404);
+    const external=await appointmentWorker.fetch(new Request('https://worker.test/v1/public/intake',{
+      method:'POST',headers:{Origin:'https://malicious.test','Content-Type':'application/json'},body:'{}',
+    }),workerEnv);
+    expect(external.status).toBe(403);
+  });
+});
+
+
+describe('D4 — agendamento público protegido por convite de uso único', () => {
+  function seedBooking(){
+    documents.set('tenants/A',{...documents.get('tenants/A')!,slug:'clinica-a'});
+    documents.set('tenants/B',{...documents.get('tenants/B')!,slug:'clinica-b'});
+    documents.set('tenantSlugs/clinica-a',{tenantId:'A',slug:'clinica-a',status:'active'});
+    documents.set('tenantSlugs/clinica-b',{tenantId:'B',slug:'clinica-b',status:'active'});
+  }
+  async function request(path:string,body:Record<string,unknown>,authenticated=false) {
+    return appointmentWorker.fetch(new Request('https://worker.test'+path,{
+      method:'POST',headers:{Origin:'https://app.test','Content-Type':'application/json',
+        ...(authenticated?{Authorization:'Bearer test-token'}:{})},body:JSON.stringify(body),
+    }),workerEnv);
+  }
+  async function invite(){
+    const minted=await request('/v1/booking/tokens',{
+      tenantId:'A',patientId:'patient-a',professionalId:'prof-a',procedureId:'proc-a',
+      resourceId:'chair-a',durationMinutes:30,
+    },true);
+    expect(minted.status,await minted.clone().text()).toBe(201);
+    const result=await minted.json() as {token:string;expiresAt:string};
+    expect(result.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    return result.token;
+  }
+  const future=(minutes=0)=>new Date(Date.now()+24*60*60*1000+minutes*60*1000).toISOString();
+
+  it('reserva agenda de paciente cadastrado, consome token e recusa replay',async()=>{
+    seedBooking();
+    const token=await invite();
+    const input={tenantSlug:'clinica-a',token,startsAt:future()};
+    const created=await request('/v1/public/booking',input);
+    expect(created.status,await created.clone().text()).toBe(201);
+    expect(created.headers.get('Cache-Control')).toContain('no-store');
+    expect(created.headers.get('Referrer-Policy')).toBe('no-referrer');
+    expect(created.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect((await created.json() as {booked:boolean}).booked).toBe(true);
+    const booking=[...documents.values()].find(value=>value.bookingSource==='invite_only');
+    expect(booking).toMatchObject({patientId:'patient-a',professionalId:'prof-a',resourceId:'chair-a',status:'confirmed'});
+    expect([...documents.values()].some(value=>value.action==='appointment.create'&&value.actorRole==='public_invite')).toBe(true);
+    expect([...documents.keys()].some(path=>path.includes('/bookingTokens/')&&path.includes(token))).toBe(false);
+    const replay=await request('/v1/public/booking',input);
+    expect(replay.status).toBe(404);
+    expect([...documents.values()].filter(value=>value.bookingSource==='invite_only')).toHaveLength(1);
+  });
+
+  it('impede dois convites concorrentes para o mesmo profissional/recurso',async()=>{
+    seedBooking();
+    const [a,b]=await Promise.all([invite(),invite()]);
+    const at=future(45);
+    const result=await Promise.all([
+      request('/v1/public/booking',{tenantSlug:'clinica-a',token:a,startsAt:at}),
+      request('/v1/public/booking',{tenantSlug:'clinica-a',token:b,startsAt:at}),
+    ]);
+    expect(result.map(x=>x.status).sort()).toEqual([201,409]);
+    expect([...documents.values()].filter(value=>value.bookingSource==='invite_only')).toHaveLength(1);
+  });
+
+  it('não reserva com token de outra clínica, token expirado, data passada ou demo',async()=>{
+    seedBooking();
+    const token=await invite();
+    expect((await request('/v1/public/booking',{tenantSlug:'clinica-b',token,startsAt:future()})).status).toBe(404);
+    expect((await request('/v1/public/booking',{tenantSlug:'clinica-a',token,startsAt:'2020-01-01T10:00:00.000Z'})).status).toBe(400);
+    const path=[...documents.keys()].find(x=>x.includes('/bookingTokens/'))!;
+    documents.set(path,{...documents.get(path)!,expiresAt:'2020-01-01T00:00:00.000Z'});
+    expect((await request('/v1/public/booking',{tenantSlug:'clinica-a',token,startsAt:future()})).status).toBe(404);
+    documents.set('tenants/A',{...documents.get('tenants/A')!,planId:'premium_demo',subscriptionStatus:'demo'});
+    const blocked=await request('/v1/booking/tokens',{
+      tenantId:'A',patientId:'patient-a',professionalId:'prof-a',procedureId:'proc-a',durationMinutes:30,
+    },true);
+    expect(blocked.status).toBe(404);
+    expect((await request('/v1/booking/tokens',{tenantId:'A'})).status).toBe(401);
+  });
+
+  it('revoga um convite não utilizado com auditoria e impede agendamento futuro',async()=>{
+    seedBooking();
+    const token=await invite();
+    const revoke=await request('/v1/booking/tokens/revoke',{tenantId:'A',token},true);
+    expect(revoke.status,await revoke.clone().text()).toBe(200);
+    expect((await revoke.json() as {revoked:boolean}).revoked).toBe(true);
+    const tokenDoc=[...documents.values()].find(d=>d.revokedBy==='dentist-a');
+    expect(tokenDoc?.revokedAt).toBeTruthy();
+    expect([...documents.values()].some(d=>d.action==='booking_invite.revoke' && d.actorRole==='tenant_owner')).toBe(true);
+    expect((await request('/v1/public/booking',{tenantSlug:'clinica-a',token,startsAt:future()})).status).toBe(404);
+    expect((await request('/v1/booking/tokens/revoke',{tenantId:'A',token},true)).status).toBe(409);
+    expect([...documents.values()].filter(d=>d.bookingSource==='invite_only')).toHaveLength(0);
+  });
+
+  it('não permite revogar sem identidade, com dados inválidos ou pertencentes a outro tenant',async()=>{
+    seedBooking();
+    const token=await invite();
+    expect((await request('/v1/booking/tokens/revoke',{tenantId:'A',token})).status).toBe(401);
+    expect((await request('/v1/booking/tokens/revoke',{tenantId:'B',token},true)).status).toBe(403);
+    expect((await request('/v1/booking/tokens/revoke',{tenantId:'A',token:'short'},true)).status).toBe(400);
+    expect((await request('/v1/booking/tokens/revoke',{tenantId:'A',token,extra:'unexpected'},true)).status).toBe(400);
+    const intact=[...documents.values()].find(d=>d.createdBy==='dentist-a'&&d.durationMinutes===30);
+    expect(intact?.revokedAt).toBeUndefined();
+  });
+
+  it('convite consumido não pode ser revogado para ocultar consulta já confirmada',async()=>{
+    seedBooking();
+    const token=await invite();
+    const booking=await request('/v1/public/booking',{tenantSlug:'clinica-a',token,startsAt:future()});
+    expect(booking.status).toBe(201);
+    const blocked=await request('/v1/booking/tokens/revoke',{tenantId:'A',token},true);
+    expect(blocked.status).toBe(409);
+    expect([...documents.values()].filter(d=>d.bookingSource==='invite_only')).toHaveLength(1);
+  });
+
+  it('rejeita agendamento com referências cruzadas e procedimento inexistente',async()=>{
+    seedBooking();
+    const forged=await request('/v1/booking/tokens',{
+      tenantId:'A',patientId:'patient-b',professionalId:'prof-a',procedureId:'proc-a',durationMinutes:30,
+    },true);
+    expect(forged.status).toBe(400);
+    const invalid=await request('/v1/booking/tokens',{
+      tenantId:'A',patientId:'patient-a',professionalId:'prof-a',procedureId:'unknown',durationMinutes:30,
+    },true);
+    expect(invalid.status).toBe(400);
   });
 });

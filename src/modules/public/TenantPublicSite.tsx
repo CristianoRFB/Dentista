@@ -24,9 +24,9 @@ export function TenantPublicSite() {
       setState('loading'); setProfile(null);
       if (demoModeEnabled()) {
         const demo = demoTenantForSlug(tenantSlug);
-        if (!cancelled && demo) {
-          setProfile({ tenantId: demo.id, ...(demo.branding ?? {}) });
-          setState('ready');
+        if (!cancelled) {
+          if (demo) setProfile({ tenantId: demo.id, ...(demo.branding ?? {}) });
+          setState(demo ? 'ready' : 'not-found');
         }
         return;
       }
