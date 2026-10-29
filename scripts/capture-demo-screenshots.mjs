@@ -63,6 +63,25 @@ try{
         await page.screenshot({path:path.join(OUT,route.id+'-'+viewport.name+'.png'),fullPage:true,animations:'disabled'});
         results.push({route:route.url,viewport:viewport.name,size:`${viewport.width}x${viewport.height}`,
           file:route.id+'-'+viewport.name+'.png',heading,classification:'SCREENSHOT_REAL_DEMO',containsOnlyFictitiousData:true});
+        // Functional smoke checks run AFTER capturing the unmodified real page.
+        if(viewport.name==='mobile' && route.id==='dashboard'){
+          const trigger=page.locator('.app-menu-trigger');
+          await trigger.click();
+          await page.waitForFunction(()=>document.querySelector('.app-menu-trigger')?.getAttribute('aria-expanded')==='true');
+          const links=await page.locator('.sidebar-open nav a').allTextContents();
+          if(!links.some(text=>text.includes('Pacientes')))throw new Error('Mobile drawer hides permitted patient navigation');
+          await page.keyboard.press('Escape');
+          await page.waitForFunction(()=>document.querySelector('.app-menu-trigger')?.getAttribute('aria-expanded')==='false');
+        }
+        if(route.id==='patients'){
+          const search=page.locator('input[type="search"][aria-label="Buscar paciente pelo nome ou contato"]');
+          await search.fill('marina');
+          await page.waitForFunction(()=>document.querySelectorAll('.clinical-stack-table tbody tr').length===1);
+          const names=(await page.locator('.clinical-stack-table tbody').textContent())??'';
+          if(!names.includes('Marina')||names.includes('Carlos'))throw new Error('Patient filter did not limit visible rows');
+          await search.fill('');
+          await page.waitForFunction(()=>document.querySelectorAll('.clinical-stack-table tbody tr').length===3);
+        }
       }finally{await page.close();}
     }
     await context.close();
