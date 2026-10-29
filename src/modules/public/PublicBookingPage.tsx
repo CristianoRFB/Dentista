@@ -1,5 +1,5 @@
-import { useState,type FormEvent } from 'react';
-import { consumeInviteTokenFromAddressBar } from '../../lib/personalInviteUrl';
+import { useEffect,useState,type FormEvent } from 'react';
+import { readInviteToken, scrubInviteTokenFromAddressBar } from '../../lib/personalInviteUrl';
 import { Link,useParams } from 'react-router-dom';
 import { demoModeEnabled } from '../auth/AuthRoutes';
 import { submitPublicBooking } from '../../lib/publicBookingClient';
@@ -10,7 +10,8 @@ export function PublicBookingPage(){
   const {tenantSlug=''}=useParams();
 
   const demo=demoModeEnabled()&&tenantSlug==='demo-clinica';
-  const [token,setToken]=useState(()=>consumeInviteTokenFromAddressBar());
+  const [token,setToken]=useState(()=>readInviteToken(window.location));
+  useEffect(()=>scrubInviteTokenFromAddressBar(),[]);
   const validToken=/^[A-Za-z0-9_-]{43}$/.test(token);
   const [dateTime,setDateTime]=useState('');
   const [selected,setSelected]=useState('14:00');
