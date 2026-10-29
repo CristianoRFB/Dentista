@@ -56,6 +56,7 @@ export async function reviewClinicalPhoto(args:{
 export interface MediaIntegrityReport {
   tenantId:string; patientId:string; checkedMetadata:number; checkedObjects:number;
   complete:true; mode:'read_only'; noFilesModified:true;
+  snapshotConsistent:false;limit:number;warning:string;
   findings:Array<{kind:'missing_r2_object'|'unreferenced_r2_candidate'|'metadata_scope_mismatch';
     photoId?:string;objectKey?:string}>;
 }
