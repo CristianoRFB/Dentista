@@ -146,7 +146,17 @@ async function fakeFirestoreFetch(input: RequestInfo | URL, init?: RequestInit) 
     for (const write of body.writes ?? []) {
       const name = String(write.update.name);
       const path = name.slice(name.indexOf(pathMarker) + pathMarker.length);
-      documents.set(path, decodeFields(write.update.fields));
+      const incoming=decodeFields(write.update.fields);
+      if(Array.isArray(write.updateMask?.fieldPaths)){
+        const merged={...(documents.get(path)??{})};
+        for(const key of write.updateMask.fieldPaths as string[]){
+          if(key in incoming)merged[key]=incoming[key];
+          else delete merged[key];
+        }
+        documents.set(path,merged);
+      }else{
+        documents.set(path,incoming);
+      }
       versions.set(path, ++currentVersion);
     }
     transactions.delete(String(body.transaction));
