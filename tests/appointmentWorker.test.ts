@@ -466,6 +466,41 @@ describe('D4 — agendamento público protegido por convite de uso único', () =
     expect((await request('/v1/booking/tokens',{tenantId:'A'})).status).toBe(401);
   });
 
+  it('revoga um convite não utilizado com auditoria e impede agendamento futuro',async()=>{
+    seedBooking();
+    const token=await invite();
+    const revoke=await request('/v1/booking/tokens/revoke',{tenantId:'A',token},true);
+    expect(revoke.status,await revoke.clone().text()).toBe(200);
+    expect((await revoke.json() as {revoked:boolean}).revoked).toBe(true);
+    const tokenDoc=[...documents.values()].find(d=>d.revokedBy==='dentist-a');
+    expect(tokenDoc?.revokedAt).toBeTruthy();
+    expect([...documents.values()].some(d=>d.action==='booking_invite.revoke' && d.actorRole==='dentist')).toBe(true);
+    expect((await request('/v1/public/booking',{tenantSlug:'clinica-a',token,startsAt:future()})).status).toBe(404);
+    expect((await request('/v1/booking/tokens/revoke',{tenantId:'A',token},true)).status).toBe(409);
+    expect([...documents.values()].filter(d=>d.bookingSource==='invite_only')).toHaveLength(0);
+  });
+
+  it('não permite revogar sem identidade, com dados inválidos ou pertencentes a outro tenant',async()=>{
+    seedBooking();
+    const token=await invite();
+    expect((await request('/v1/booking/tokens/revoke',{tenantId:'A',token})).status).toBe(401);
+    expect((await request('/v1/booking/tokens/revoke',{tenantId:'B',token},true)).status).toBe(403);
+    expect((await request('/v1/booking/tokens/revoke',{tenantId:'A',token:'short'},true)).status).toBe(400);
+    expect((await request('/v1/booking/tokens/revoke',{tenantId:'A',token,extra:'unexpected'},true)).status).toBe(400);
+    const intact=[...documents.values()].find(d=>d.createdBy==='dentist-a'&&d.durationMinutes===30);
+    expect(intact?.revokedAt).toBeUndefined();
+  });
+
+  it('convite consumido não pode ser revogado para ocultar consulta já confirmada',async()=>{
+    seedBooking();
+    const token=await invite();
+    const booking=await request('/v1/public/booking',{tenantSlug:'clinica-a',token,startsAt:future()});
+    expect(booking.status).toBe(201);
+    const blocked=await request('/v1/booking/tokens/revoke',{tenantId:'A',token},true);
+    expect(blocked.status).toBe(409);
+    expect([...documents.values()].filter(d=>d.bookingSource==='invite_only')).toHaveLength(1);
+  });
+
   it('rejeita agendamento com referências cruzadas e procedimento inexistente',async()=>{
     seedBooking();
     const forged=await request('/v1/booking/tokens',{
