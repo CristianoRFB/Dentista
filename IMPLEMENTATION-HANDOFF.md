@@ -80,3 +80,13 @@ A continuação na mesma branch adicionou leitura paginada do inventário de fot
 D6: menu responsivo, acessibilidade de navegação mobile, busca/paginação de pacientes, agenda por dia e tabelas legíveis em telas pequenas já implementados. D7: a rotina `scripts/capture-demo-screenshots.mjs` valida seis rotas em desktop e mobile, captura 12 screenshots reais do **demo fictício** e agora também testa menu/Escape e busca de pacientes no Chromium. Workflow visual CI verificado em `40950921973`; artefatos temporários GitHub Actions não são screenshots de produção ou arquivo canônico revisado.
 
 A régua detalhada de progresso vive em `docs/PRE_PC_COMPLETENESS.md`: 86/100 pontos estimados para implementação interna e ~60% de avanço geral ponderado, **não** certificação independente. A infraestrutura hospedada, retenção/backup reais, testes com leitor de tela, QA em dispositivos, capturas canônicas revisadas e deploy permanecem separados. Não executar deploy, billing ou mudança de pricing nesta continuidade.
+
+## Checkpoint D6/D7 — 22 screenshots demo e teclado (29/10/2026)
+
+Continuar na branch `chore/global-standard-v01-ci-20261027` sem reset ou merge automático. Último SHA de código comprovado: `8b950a1b3f12569b16b81f0253fdc10e729ae9f7`. [CI principal](https://github.com/CristianoRFB/Dentista/actions/runs/40953806462) e [QA visual](https://github.com/CristianoRFB/Dentista/actions/runs/40953800997) aprovados nesse SHA.
+
+D6: `TenantShell` recebeu foco inicial depois da transição do menu mobile, contenção de Tab/Shift+Tab no diálogo, saída com Esc, devolução do foco ao acionador, bloqueio de scroll de fundo e link de teclado para pular ao conteúdo clínico. O teste Chromium executou essas verificações.
+
+D7: o visual QA cobre **11 rotas em desktop e mobile**, gerando **22 screenshots reais do aplicativo com dados fictícios** e manifesto `SCREENSHOT_REAL_DEMO`. [Artefato Actions 12933500262](https://github.com/CristianoRFB/Dentista/actions/runs/40953800997/artifacts/12933500262) é temporário (14 dias); não são capturas de produção nem arquivos canônicos revisados.
+
+A estimativa ponderada do código sobe de 86/100 para **88/100** e o avanço geral conservador para **~62%**. Os pesos e limitações estão em `docs/PRE_PC_COMPLETENESS.md`. Ainda falta homologação real, revisão de teclado/leitor de tela em dispositivos, política de retenção/backup e restauração de mídia, provisionamento Firebase/Worker/R2, screenshots canônicos e deploy — **não realizados**. Não alterar preços e limites nem implementar billing automático.
