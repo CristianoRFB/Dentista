@@ -87,7 +87,7 @@ try{
           if(modal!=='true')throw new Error('Open mobile drawer must be a modal navigation region');
           const scrollLock=await page.evaluate(()=>document.body.style.overflow);
           if(scrollLock!=='hidden')throw new Error('Background scroll remains enabled while drawer is open');
-          await page.waitForFunction(()=>document.activeElement?.classList.contains('app-menu-close'),{timeout:5000}).catch(()=>{throw new Error('Mobile drawer failed to autofocus close button');});
+          await page.waitForFunction(()=>document.activeElement?.classList.contains('app-menu-close'),{timeout:5000}).catch(async()=>{const state=await page.evaluate(()=>({active:document.activeElement?.tagName,activeClass:document.activeElement?.className,closeVisibility:getComputedStyle(document.querySelector('.app-menu-close')).visibility,open:document.querySelector('.app-menu-trigger')?.getAttribute('aria-expanded')}));throw new Error('Mobile drawer failed to autofocus close button: '+JSON.stringify(state));});
           await page.keyboard.press('Shift+Tab');
           const trapped=await page.evaluate(()=>document.querySelector('.sidebar-open')?.contains(document.activeElement));
           if(!trapped)throw new Error('Keyboard focus escaped the open mobile drawer');
