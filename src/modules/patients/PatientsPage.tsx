@@ -100,7 +100,7 @@ export function PatientsPage() {
         </label>
       </div>
       <p role="status" className="muted">{loading?'Carregando…':paginated.total+' paciente(s) nesta busca.'}</p>
-      <table className="table clinical-patient-table"><caption className="sr-only">Pacientes do tenant atual, filtrados e paginados</caption><thead>
+      <table className="table clinical-stack-table"><caption className="sr-only">Pacientes do tenant atual, filtrados e paginados</caption><thead>
         <tr><th>Paciente</th><th>Contato</th><th>Estado</th><th>Ações</th></tr></thead><tbody>
         {loading ? <tr><td colSpan={4}>Carregando pacientes…</td></tr>
         : filtered.length === 0 ? <tr><td colSpan={4}>Nenhum paciente corresponde aos filtros.</td></tr>
