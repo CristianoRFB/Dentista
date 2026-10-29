@@ -1,6 +1,6 @@
 import { useEffect,useState } from 'react';
 import { listTenantRecords } from '../../lib/tenantData';
-import { issueBookingLink } from '../../lib/publicBookingClient';
+import { issueBookingLink, revokeBookingLink } from '../../lib/publicBookingClient';
 import type { Patient,Professional,Procedure,ScheduleResource } from '../../domain/types';
 import { useReadyTenantAccess } from './TenantContext';
 
@@ -17,6 +17,8 @@ export function BookingInvitesPage() {
   const [durationMinutes,setDurationMinutes]=useState<30|60>(30);
   const [link,setLink]=useState<{url:string;expiresAt:string}|null>(null);
   const [busy,setBusy]=useState(false);
+  const [confirmRevoke,setConfirmRevoke]=useState(false);
+  const [message,setMessage]=useState('');
   const [error,setError]=useState('');
   const [loaded,setLoaded]=useState(false);
   useEffect(()=>{
@@ -38,12 +40,20 @@ export function BookingInvitesPage() {
     return ()=>{active=false;};
   },[session]);
   async function generate(){
-    setBusy(true);setError('');setLink(null);
+    setBusy(true);setError('');setMessage('');setConfirmRevoke(false);setLink(null);
     try{
       const invite=await issueBookingLink(session,{patientId,professionalId,procedureId,
         ...(resourceId?{resourceId}:{}),durationMinutes});
       setLink(invite);
     }catch(e){setError(e instanceof Error?e.message:'Não foi possível gerar o convite.');}
+    finally{setBusy(false);}
+  }
+  async function revoke(){
+    if(!link)return;
+    setBusy(true);setError('');setMessage('');
+    try{await revokeBookingLink(session,link.url);setLink(null);setConfirmRevoke(false);
+      setMessage('Convite revogado com auditoria. Nenhuma consulta existente foi cancelada.');}
+    catch(e){setError(e instanceof Error?e.message:'Não foi possível revogar o convite.');}
     finally{setBusy(false);}
   }
   return <section>
@@ -52,6 +62,7 @@ export function BookingInvitesPage() {
     </div></div>
     {session.isDemo && <p className="demo-banner">Ambiente de demonstração · nenhuma reserva real.</p>}
     {error&&<p role="alert" className="form-error">{error}</p>}
+    {message&&<p role="status" className="form-success">{message}</p>}
     <div className="card data-form">
       {!loaded?<p>Carregando cadastros…</p>:<>
       <label>Paciente cadastrado<select required value={patientId} onChange={e=>setPatientId(e.target.value)}>
@@ -77,6 +88,16 @@ export function BookingInvitesPage() {
         <label>Link pessoal<input readOnly value={link.url} onFocus={e=>e.currentTarget.select()} /></label>
         <p className="muted">Expira em {new Date(link.expiresAt).toLocaleString('pt-BR')}, ou após o primeiro agendamento.</p>
         <button type="button" className="btn secondary" onClick={()=>{void navigator.clipboard.writeText(link.url);}}>Copiar convite</button>
+        {!confirmRevoke?<button type="button" className="btn secondary" disabled={busy}
+          onClick={()=>setConfirmRevoke(true)}>Revogar convite não utilizado</button>
+          : <div role="group" aria-label="Confirmação de revogação">
+            <p>Este link deixará de funcionar. Consultas já confirmadas não serão canceladas.</p>
+            <button type="button" className="btn secondary" disabled={busy} onClick={()=>void revoke()}>
+              {busy?'Revogando…':'Confirmar revogação'}
+            </button>
+            <button type="button" className="btn secondary" disabled={busy}
+              onClick={()=>setConfirmRevoke(false)}>Voltar</button>
+          </div>}
       </section>}
     </div>
   </section>;
