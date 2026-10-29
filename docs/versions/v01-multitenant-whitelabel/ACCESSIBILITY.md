@@ -28,3 +28,15 @@ Acessibilidade e responsividade são padrões globais do ecossistema. Este produ
 - screenshots reais em desktop/mobile depois do build real.
 
 Esta documentação não deve ser interpretada como certificação de acessibilidade.
+
+
+## D6 — incrementos de usabilidade mobile (29/10/2026)
+
+- Menu da clínica apresenta rótulos completos também em telas pequenas, sinaliza a rota ativa e tem botão de abrir/fechar com `aria-expanded`, `aria-controls`, foco no fechamento e tecla Esc.
+- Links do menu continuam sujeitos às permissões e entitlements; navegação não substitui a validação do backend.
+- Tabelas de pacientes, agenda e retornos usam `data-label` em telas pequenas para preservar a identificação de cada campo, sem remover cabeçalhos semânticos.
+- Pacientes: pesquisa por nome/contato sem acento, filtros ativo/inativo, paginação de 12 registros por visualização e confirmação antes de inativar.
+- Agenda: seleção de dia, avanço/retorno de data, limites de dia civil local (inclusive DST) e confirmação antes de cancelar.
+- Casos unitários: `tests/patientList.test.ts`, `tests/agendaDate.test.ts`.
+
+**Limite de evidência:** build e testes unitários/Emulator não equivalem a auditoria de teclado/leitor de tela em dispositivo real. O workflow de captura desktop/mobile do modo demo, `.github/workflows/visual-qa.yml`, arquiva evidências técnicas de runtime apenas quando realmente executado; não substitui validação com contas e dados hospedados.
