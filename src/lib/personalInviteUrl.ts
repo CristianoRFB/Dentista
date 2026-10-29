@@ -28,11 +28,9 @@ export function sanitizedInviteLocation(location:Pick<Location,'pathname'|'searc
   return location.pathname+(query?'?'+query:'')+hash;
 }
 
-/** The secret remains only in the component's memory until the page is closed. */
-export function consumeInviteTokenFromAddressBar():string {
-  const token=readInviteToken(window.location);
+/** React reads the token before the first effect, then scrubs the visible URL. */
+export function scrubInviteTokenFromAddressBar():void {
   const cleaned=sanitizedInviteLocation(window.location);
   if(window.location.pathname+window.location.search+window.location.hash!==cleaned)
     window.history.replaceState(window.history.state,'',cleaned);
-  return token;
 }
