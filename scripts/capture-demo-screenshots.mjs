@@ -64,6 +64,14 @@ try{
         results.push({route:route.url,viewport:viewport.name,size:`${viewport.width}x${viewport.height}`,
           file:route.id+'-'+viewport.name+'.png',heading,classification:'SCREENSHOT_REAL_DEMO',containsOnlyFictitiousData:true});
         // Functional smoke checks run AFTER capturing the unmodified real page.
+        if(route.id==='dashboard'){
+          const skip=page.locator('.skip-to-clinical-content');
+          await skip.focus();
+          const displayed=await skip.evaluate(el=>el.getBoundingClientRect().bottom>0);
+          if(!displayed)throw new Error('Skip-to-content keyboard link did not become visible on focus');
+          await skip.press('Enter');
+          await page.waitForFunction(()=>document.activeElement?.id==='tenant-main-content');
+        }
         if(viewport.name==='mobile' && route.id==='dashboard'){
           const trigger=page.locator('.app-menu-trigger');
           await trigger.click();
