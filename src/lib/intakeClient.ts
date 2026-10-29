@@ -1,5 +1,6 @@
 import { collection, doc, runTransaction, serverTimestamp, where } from 'firebase/firestore';
 import { auth, db } from './firebase';
+import { createPersonalInviteUrl } from './personalInviteUrl';
 import type { PatientIntakeSubmission } from '../domain/types';
 import { listTenantRecords } from './tenantData';
 import { requirePermission, requireReady } from './tenantDataCore';
@@ -32,7 +33,7 @@ export async function issueIntakeLink(session: TenantAccessState) {
   if (!result.ok) throw new Error('Não foi possível criar o link. Verifique permissões e disponibilidade da API.');
   const data = await result.json() as { token: string; expiresAt: string };
   return {
-    url: window.location.origin + '/' + encodeURIComponent(ready.tenant.slug) + '/cadastro?token=' + encodeURIComponent(data.token),
+    url: createPersonalInviteUrl(window.location.origin,ready.tenant.slug,'cadastro',data.token),
     expiresAt: data.expiresAt,
   };
 }
