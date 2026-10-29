@@ -39,4 +39,4 @@ Esta documentação não deve ser interpretada como certificação de acessibili
 - Agenda: seleção de dia, avanço/retorno de data, limites de dia civil local (inclusive DST) e confirmação antes de cancelar.
 - Casos unitários: `tests/patientList.test.ts`, `tests/agendaDate.test.ts`.
 
-**Limite de evidência:** build e testes unitários/Emulator não equivalem a auditoria de teclado/leitor de tela em dispositivo real. O workflow de captura desktop/mobile do modo demo, `.github/workflows/visual-qa.yml`, arquiva evidências técnicas de runtime apenas quando realmente executado; não substitui validação com contas e dados hospedados.
+**Limite de evidência:** build e testes unitários/Emulator não equivalem a auditoria de teclado/leitor de tela em dispositivo real. O workflow `.github/workflows/visual-qa.yml` executou Chromium em desktop/mobile com sucesso no [run #40949283614](https://github.com/CristianoRFB/Dentista/actions/runs/40949283614), capturando 12 telas do **runtime demo fictício**. É evidência técnica temporária de tela renderizada, não certificação de acessibilidade, validação com contas hospedadas ou screenshot de produção.
