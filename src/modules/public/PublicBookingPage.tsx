@@ -1,5 +1,6 @@
 import { useState,type FormEvent } from 'react';
-import { Link,useParams,useSearchParams } from 'react-router-dom';
+import { consumeInviteTokenFromAddressBar } from '../../lib/personalInviteUrl';
+import { Link,useParams } from 'react-router-dom';
 import { demoModeEnabled } from '../auth/AuthRoutes';
 import { submitPublicBooking } from '../../lib/publicBookingClient';
 
@@ -7,9 +8,9 @@ const demoSlots=['09:00','10:30','14:00','15:30','17:00'];
 function validLocal(date:string){const time=new Date(date).getTime();return Number.isFinite(time);}
 export function PublicBookingPage(){
   const {tenantSlug=''}=useParams();
-  const [search,setSearch]=useSearchParams();
+
   const demo=demoModeEnabled()&&tenantSlug==='demo-clinica';
-  const token=search.get('token')??'';
+  const [token,setToken]=useState(()=>consumeInviteTokenFromAddressBar());
   const validToken=/^[A-Za-z0-9_-]{43}$/.test(token);
   const [dateTime,setDateTime]=useState('');
   const [selected,setSelected]=useState('14:00');
@@ -25,7 +26,7 @@ export function PublicBookingPage(){
       const startsAt=new Date(dateTime).toISOString();
       const result=await submitPublicBooking(tenantSlug,token,startsAt);
       setBooked(result.startsAt);
-      setSearch({},{replace:true});
+      setToken('');
     }catch(e){setError(e instanceof Error?e.message:'Não foi possível fazer a reserva.');}
     finally{setBusy(false);}
   }
