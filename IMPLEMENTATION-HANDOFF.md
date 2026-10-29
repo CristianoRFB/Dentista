@@ -72,3 +72,11 @@ Na branch `chore/global-standard-v01-ci-20261027`, fotos privadas mantêm seu ob
 Os testes `tests/mediaLifecycle.test.ts` e `tests/mediaWorker.test.ts` exercitam a transição reversível, RBAC, negativa entre tenants, ausência de exclusão do bucket e preservação dos campos históricos. O Core, D1–D4 e os contratos de pricing/limites continuam intactos.
 
 **Ainda não realizado:** provisionamento real de R2/Worker/Firebase, política operacional de backup/retention, reconciliação de objetos órfãos, captura de screenshots reais e homologação hospedada. Não confundir arquivamento lógico com exclusão definitiva ou restauração de disaster recovery.
+
+## Checkpoint D5 paginado + QA D6/D7 — 29/10/2026
+
+A continuação na mesma branch adicionou leitura paginada do inventário de fotos do paciente, comparando Firestore (100/página) com R2 (500/página), limite de 3.000 itens por origem e bloqueio de loops de cursor. `GET /v1/media/integrity` permanece somente leitura, autenticado e condicionado a autorização clínica; classifica arquivos ausentes, metadados fora do escopo e possíveis órfãos. **A comparação não usa snapshot atômico**, e nenhum resultado autoriza apagar objetos, reescrever metadados ou afirmar sucesso de backup/restauração. Para mais de 3.000 itens, recusa relatório incompleto.
+
+D6: menu responsivo, acessibilidade de navegação mobile, busca/paginação de pacientes, agenda por dia e tabelas legíveis em telas pequenas já implementados. D7: a rotina `scripts/capture-demo-screenshots.mjs` valida seis rotas em desktop e mobile, captura 12 screenshots reais do **demo fictício** e agora também testa menu/Escape e busca de pacientes no Chromium. Workflow visual CI verificado em `40950921973`; artefatos temporários GitHub Actions não são screenshots de produção ou arquivo canônico revisado.
+
+A régua detalhada de progresso vive em `docs/PRE_PC_COMPLETENESS.md`: 86/100 pontos estimados para implementação interna e ~60% de avanço geral ponderado, **não** certificação independente. A infraestrutura hospedada, retenção/backup reais, testes com leitor de tela, QA em dispositivos, capturas canônicas revisadas e deploy permanecem separados. Não executar deploy, billing ou mudança de pricing nesta continuidade.
