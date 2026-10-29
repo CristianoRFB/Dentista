@@ -66,7 +66,7 @@ export async function inspectClinicalPhotoIntegrity(tenantId:string,patientId:st
   url.searchParams.set('tenantId',tenantId);url.searchParams.set('patientId',patientId);
   const result=await fetch(url,{headers,cache:'no-store'});
   if(result.status===403)throw new Error('Sem permissão clínica para diagnóstico de integridade.');
-  if(result.status===409)throw new Error('Quantidade excede a varredura limitada. Solicite diagnóstico operacional paginado.');
+  if(result.status===409)throw new Error('Inventário acima do limite seguro de 3.000 registros por origem. Solicite uma conferência operacional supervisionada.');
   if(!result.ok)throw new Error('Não foi possível verificar o inventário privado.');
   return result.json() as Promise<MediaIntegrityReport>;
 }
