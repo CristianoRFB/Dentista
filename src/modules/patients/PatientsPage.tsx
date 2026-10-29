@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { filterPatients, pagePatients, type PatientStateFilter } from '../../lib/patientList';
 import { Link, useParams } from 'react-router-dom';
 import { demoPatients } from '../../sample/demoData';
 import type { Patient } from '../../domain/types';
@@ -20,6 +21,10 @@ export function PatientsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [query,setQuery] = useState('');
+  const [stateFilter,setStateFilter] = useState<PatientStateFilter>('active');
+  const [page,setPage] = useState(1);
+  const [confirmId,setConfirmId] = useState<string|null>(null);
 
   async function refresh() {
     setLoading(true);
@@ -55,11 +60,16 @@ export function PatientsPage() {
     }
   }
 
+  const filtered = useMemo(()=>filterPatients(patients,query,stateFilter),[patients,query,stateFilter]);
+  const paginated = useMemo(()=>pagePatients(filtered,page),[filtered,page]);
+  useEffect(()=>setPage(1),[query,stateFilter]);
+
   async function deactivate(patient: Patient) {
     setError(''); setMessage('');
     try {
       await updateTenantRecord(session, 'patients', patient.id, { status: 'inactive' }, 'patients.manage', 'patient.deactivate', 'patient');
       setMessage('Paciente inativado. O histórico foi preservado.');
+      setConfirmId(null);
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível inativar o paciente.');
@@ -77,16 +87,48 @@ export function PatientsPage() {
       <label>E-mail<input maxLength={254} type="email" value={email} onChange={event => setEmail(event.target.value)} /></label>
       <button className="btn primary" disabled={saving} type="submit">{saving ? 'Salvando…' : 'Cadastrar paciente'}</button>
     </form>}
-    <div className="card table-card"><table className="table"><caption className="sr-only">Pacientes do tenant atual</caption><thead><tr><th>Paciente</th><th>Contato</th><th>Estado</th><th>Ações</th></tr></thead><tbody>
-      {loading ? <tr><td colSpan={4}>Carregando pacientes…</td></tr> : patients.length === 0 ? <tr><td colSpan={4}>Ainda não há pacientes cadastrados.</td></tr> : patients.map(patient => <tr key={patient.id}>
-        <td><b>{patient.name}</b></td><td>{patient.phone || patient.email || '—'}</td><td><span className="status-pill">{patient.status}</span></td>
-        <td className="row-actions">
-          {session.permissions.includes('clinical.read') && <Link to={'/' + tenantSlug + '/app/pacientes/' + patient.id + '/clinico'}>Prontuário</Link>}
-          {session.permissions.includes('clinical.read') && <Link to={'/' + tenantSlug + '/app/pacientes/' + patient.id + '/odontograma'}>Odontograma</Link>}
-          {session.permissions.includes('clinical.read') && <Link to={'/' + tenantSlug + '/app/pacientes/' + patient.id + '/tratamento'}>Tratamento</Link>}
-          {patient.status === 'active' && session.permissions.includes('patients.manage') && !session.isDemo && <button className="text-button" type="button" onClick={() => void deactivate(patient)}>Inativar</button>}
-        </td>
-      </tr>)}
-    </tbody></table></div>
+    <div className="card table-card">
+      <div className="clinical-list-toolbar">
+        <label>Buscar paciente
+          <input type="search" autoComplete="off" value={query} onChange={event=>setQuery(event.target.value)}
+            placeholder="Nome, telefone ou e-mail" aria-label="Buscar paciente pelo nome ou contato"/>
+        </label>
+        <label>Estado
+          <select value={stateFilter} onChange={event=>setStateFilter(event.target.value as PatientStateFilter)}>
+            <option value="active">Ativos</option><option value="inactive">Inativos</option><option value="all">Todos</option>
+          </select>
+        </label>
+      </div>
+      <p role="status" className="muted">{loading?'Carregando…':paginated.total+' paciente(s) nesta busca.'}</p>
+      <table className="table clinical-patient-table"><caption className="sr-only">Pacientes do tenant atual, filtrados e paginados</caption><thead>
+        <tr><th>Paciente</th><th>Contato</th><th>Estado</th><th>Ações</th></tr></thead><tbody>
+        {loading ? <tr><td colSpan={4}>Carregando pacientes…</td></tr>
+        : filtered.length === 0 ? <tr><td colSpan={4}>Nenhum paciente corresponde aos filtros.</td></tr>
+        : paginated.rows.map(patient=><tr key={patient.id}>
+          <td data-label="Paciente"><b>{patient.name}</b></td>
+          <td data-label="Contato">{patient.phone || patient.email || '—'}</td>
+          <td data-label="Estado"><span className="status-pill">{patient.status === 'active'?'Ativo':'Inativo'}</span></td>
+          <td data-label="Ações" className="row-actions">
+            {session.permissions.includes('clinical.read') && <Link to={'/'+tenantSlug+'/app/pacientes/'+patient.id+'/clinico'}>Prontuário</Link>}
+            {session.permissions.includes('clinical.read') && <Link to={'/'+tenantSlug+'/app/pacientes/'+patient.id+'/odontograma'}>Odontograma</Link>}
+            {session.permissions.includes('clinical.read') && <Link to={'/'+tenantSlug+'/app/pacientes/'+patient.id+'/tratamento'}>Tratamento</Link>}
+            {patient.status === 'active' && session.permissions.includes('patients.manage') && !session.isDemo &&
+              (confirmId === patient.id ? <>
+                <span>Inativar {patient.name}?</span>
+                <button className="text-button" type="button" onClick={()=>void deactivate(patient)}>Confirmar</button>
+                <button className="text-button" type="button" onClick={()=>setConfirmId(null)}>Cancelar</button>
+              </> : <button className="text-button" type="button" onClick={()=>setConfirmId(patient.id)}>Inativar</button>)}
+          </td>
+        </tr>)}
+      </tbody></table>
+      {!loading&&paginated.pages>1&&<nav className="clinical-list-actions" aria-label="Páginas de pacientes">
+        <button className="btn secondary" type="button" disabled={paginated.page===1}
+          onClick={()=>setPage(paginated.page-1)}>Anterior</button>
+        <span aria-live="polite">Página {paginated.page} de {paginated.pages}</span>
+        <button className="btn secondary" type="button" disabled={paginated.page===paginated.pages}
+          onClick={()=>setPage(paginated.page+1)}>Próxima</button>
+      </nav>}
+      <small className="muted">Paginação da lista carregada nesta sessão; não representa paginação de consulta Firestore.</small>
+    </div>
   </>;
 }
