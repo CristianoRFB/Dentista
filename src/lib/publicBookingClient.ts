@@ -1,5 +1,5 @@
 import { auth } from './firebase';
-import { createPersonalInviteUrl } from './personalInviteUrl';
+import { createPersonalInviteUrl, readInviteToken } from './personalInviteUrl';
 import type { TenantAccessState } from '../modules/tenant/tenantResolver';
 import { requirePermission, requireReady } from './tenantDataCore';
 import { canUse } from '../commercial/entitlementService';
@@ -38,4 +38,28 @@ export async function submitPublicBooking(tenantSlug:string,token:string,startsA
   if(response.status===400)throw new Error('Horário inválido. Escolha uma data futura.');
   if(!response.ok)throw new Error('Não foi possível reservar. Tente novamente.');
   return response.json() as Promise<{booked:boolean;startsAt:string;status:string}>;
+}
+
+/** Disables an unused invitation. This does not cancel any confirmed appointment. */
+export async function revokeBookingLink(session:TenantAccessState,url:string) {
+  const ready=requireReady(session);
+  requirePermission(ready,'appointments.manage');
+  if(ready.isDemo)throw new Error('A demonstração não permite revogar convites reais.');
+  if(!BASE)throw new Error('API de agenda ainda não configurada.');
+  const parsed=new URL(url);
+  if(parsed.origin!==window.location.origin ||
+    parsed.pathname!=='/'+encodeURIComponent(ready.tenant.slug)+'/agendar')
+    throw new Error('Link não pertence à clínica atual.');
+  const personalToken=readInviteToken(parsed);
+  if(!personalToken)throw new Error('Link inválido ou sem token individual.');
+  const authToken=await auth.currentUser?.getIdToken();
+  if(!authToken)throw new Error('Autenticação obrigatória.');
+  const response=await fetch(BASE.replace(/\/$/,'')+'/v1/booking/tokens/revoke',{
+    method:'POST',headers:{Authorization:'Bearer '+authToken,'Content-Type':'application/json'},
+    body:JSON.stringify({tenantId:ready.tenant.id,token:personalToken}),
+  });
+  if(response.status===409)throw new Error('O convite já foi utilizado ou revogado; consulte a agenda antes de agir.');
+  if(response.status===404)throw new Error('Convite não encontrado na clínica.');
+  if(!response.ok)throw new Error('Não foi possível revogar o convite.');
+  return true;
 }
