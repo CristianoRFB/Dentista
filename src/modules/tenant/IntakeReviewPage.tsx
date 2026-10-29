@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { issueIntakeLink, listIntakeSubmissions, reviewIntake, type IntakeSubmission } from '../../lib/intakeClient';
+import { issueIntakeLink, listIntakeSubmissions, reviewIntake, revokeIntakeLink, type IntakeSubmission } from '../../lib/intakeClient';
 import { useReadyTenantAccess } from './TenantContext';
 
 export function IntakeReviewPage() {
@@ -10,6 +10,7 @@ export function IntakeReviewPage() {
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState('');
   const [message,setMessage] = useState('');
+  const [confirmRevoke,setConfirmRevoke]=useState(false);
   const canManage = !session.isDemo && session.permissions.includes('intake.manage');
 
   async function refresh() {
@@ -21,10 +22,19 @@ export function IntakeReviewPage() {
   useEffect(()=>{void refresh();},[session]);
 
   async function createLink() {
-    setBusy(true);setError('');setMessage('');
+    setBusy(true);setError('');setMessage('');setConfirmRevoke(false);setLink(null);
     try {setLink(await issueIntakeLink(session));setMessage('Link de uso único emitido. Envie apenas ao paciente destinatário.');}
     catch (e) {setError(e instanceof Error?e.message:'Falha ao emitir link.');}
     finally {setBusy(false);}
+  }
+
+  async function revokeLink(){
+    if(!link)return;
+    setBusy(true);setError('');setMessage('');
+    try{await revokeIntakeLink(session,link.url);setLink(null);setConfirmRevoke(false);
+      setMessage('Convite revogado com auditoria. Solicitações já recebidas continuam no histórico.');}
+    catch(e){setError(e instanceof Error?e.message:'Não foi possível revogar o convite.');}
+    finally{setBusy(false);}
   }
 
   async function review(id:string, decision:'approved'|'rejected') {
@@ -52,6 +62,15 @@ export function IntakeReviewPage() {
         <label>Copie e envie individualmente ao paciente<input readOnly value={link.url} onFocus={e=>e.currentTarget.select()} /></label>
         <p className="muted">Expira em {new Date(link.expiresAt).toLocaleString('pt-BR')}; um envio apenas. A URL não será arquivada na interface.</p>
         <button className="btn secondary" type="button" onClick={()=>{void navigator.clipboard.writeText(link.url);}}>Copiar link</button>
+        {!confirmRevoke?<button className="btn secondary" type="button" disabled={busy}
+          onClick={()=>setConfirmRevoke(true)}>Revogar convite não utilizado</button>
+          : <div role="group" aria-label="Confirmar revogação">
+            <p>O link deixará de aceitar novos contatos. Pré-cadastros já recebidos permanecem preservados.</p>
+            <button className="btn secondary" type="button" disabled={busy} onClick={()=>void revokeLink()}>
+              {busy?'Revogando…':'Confirmar revogação'}</button>
+            <button className="btn secondary" type="button" disabled={busy}
+              onClick={()=>setConfirmRevoke(false)}>Voltar</button>
+          </div>}
       </div>}
     </section>}
     <section className="card table-card" style={{marginTop:16}}>
