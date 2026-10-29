@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import { consumeInviteTokenFromAddressBar } from '../../lib/personalInviteUrl';
 import { submitIntake } from '../../lib/intakeClient';
 import { demoModeEnabled } from '../auth/AuthRoutes';
 
 export function PublicIntakePage() {
   const { tenantSlug = '' } = useParams();
-  const [search,setSearch] = useSearchParams();
+
   const [name,setName] = useState('');
   const [phone,setPhone] = useState('');
   const [email,setEmail] = useState('');
@@ -13,7 +14,7 @@ export function PublicIntakePage() {
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState('');
   const demo = demoModeEnabled() && tenantSlug === 'demo-clinica';
-  const token = search.get('token') ?? '';
+  const [token,setToken] = useState(()=>consumeInviteTokenFromAddressBar());
   const validTokenFormat = /^[A-Za-z0-9_-]{43}$/.test(token);
 
   async function send(event:FormEvent) {
@@ -24,7 +25,7 @@ export function PublicIntakePage() {
     try {
       await submitIntake(tenantSlug,token,{name,phone,email});
       setSent(true);
-      setSearch({}, {replace:true});
+      setToken('');
     }catch(e){setError(e instanceof Error?e.message:'Não foi possível enviar os dados.');}
     finally{setBusy(false);}
   }
