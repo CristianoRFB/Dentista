@@ -158,12 +158,12 @@ export function AgendaPage() {
       <div className="form-actions"><button className="btn primary" disabled={saving} type="submit">{saving ? 'Salvando…' : editing ? 'Confirmar remarcação' : 'Criar agendamento'}</button>{editing && <button className="btn secondary" type="button" onClick={resetForm}>Cancelar</button>}</div>
       {blocks.length > 0 && <p className="muted">Há {blocks.length} bloqueios ativos; o serviço confiável verificará os intervalos ao salvar.</p>}
     </form>}
-    <div className="card table-card"><table className="table"><caption className="sr-only">Agendamentos do tenant</caption><thead><tr><th>Horário</th><th>Paciente</th><th>Profissional</th><th>Recurso</th><th>Status</th><th></th></tr></thead><tbody>
+    <div className="card table-card"><table className="table clinical-stack-table"><caption className="sr-only">Agendamentos do tenant</caption><thead><tr><th>Horário</th><th>Paciente</th><th>Profissional</th><th>Recurso</th><th>Status</th><th></th></tr></thead><tbody>
       {loading ? <tr><td colSpan={6}>Carregando agenda…</td></tr> : appointments.length === 0 ? <tr><td colSpan={6}>Nenhum atendimento para o dia selecionado.</td></tr> : appointments.map(appointment => <tr key={appointment.id}>
-        <td><b>{new Date(appointment.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}–{new Date(appointment.endsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</b></td>
-        <td>{nameForPatient(appointment.patientId)}</td><td>{professionals.find(person => person.id === appointment.professionalId)?.displayName ?? '—'}</td>
-        <td>{nameForResource(appointment.resourceId)}</td><td><span className={'status-pill ' + appointment.status}>{appointment.status}</span></td>
-        <td className="row-actions">{session.permissions.includes('appointments.manage') && !session.isDemo && !['completed', 'cancelled', 'no_show'].includes(appointment.status) &&
+        <td data-label="Horário"><b>{new Date(appointment.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}–{new Date(appointment.endsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</b></td>
+        <td data-label="Paciente">{nameForPatient(appointment.patientId)}</td><td data-label="Profissional">{professionals.find(person => person.id === appointment.professionalId)?.displayName ?? '—'}</td>
+        <td data-label="Recurso">{nameForResource(appointment.resourceId)}</td><td data-label="Status"><span className={'status-pill ' + appointment.status}>{appointment.status}</span></td>
+        <td data-label="Ações" className="row-actions">{session.permissions.includes('appointments.manage') && !session.isDemo && !['completed', 'cancelled', 'no_show'].includes(appointment.status) &&
           <><button className="text-button" type="button" onClick={() => beginReschedule(appointment)}>Remarcar</button>
           {cancelPendingId===appointment.id?<span>
             Cancelar esta consulta?
