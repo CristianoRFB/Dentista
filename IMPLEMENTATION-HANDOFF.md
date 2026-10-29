@@ -90,3 +90,13 @@ D6: `TenantShell` recebeu foco inicial depois da transição do menu mobile, con
 D7: o visual QA cobre **11 rotas em desktop e mobile**, gerando **22 screenshots reais do aplicativo com dados fictícios** e manifesto `SCREENSHOT_REAL_DEMO`. [Artefato Actions 12933500262](https://github.com/CristianoRFB/Dentista/actions/runs/40953800997/artifacts/12933500262) é temporário (14 dias); não são capturas de produção nem arquivos canônicos revisados.
 
 A estimativa ponderada do código sobe de 86/100 para **88/100** e o avanço geral conservador para **~62%**. Os pesos e limitações estão em `docs/PRE_PC_COMPLETENESS.md`. Ainda falta homologação real, revisão de teclado/leitor de tela em dispositivos, política de retenção/backup e restauração de mídia, provisionamento Firebase/Worker/R2, screenshots canônicos e deploy — **não realizados**. Não alterar preços e limites nem implementar billing automático.
+
+## Checkpoint D4 — revogação auditada e privacidade de URLs (29/10/2026)
+
+Partir do **SHA mais recente validado no PR**. O código anterior já foi confirmado no CI do SHA `f994ec73ad2050ca3b2e41a408a7a536f60375f2` ([run #40956719212](https://github.com/CristianoRFB/Dentista/actions/runs/40956719212)); QA visual das duas páginas e 22 telas demo com teste de token na URL foi confirmado em [run #40956427358](https://github.com/CristianoRFB/Dentista/actions/runs/40956427358). Documentação pode receber commit posterior, que exige seu próprio CI.
+
+D4 implementado neste lote: helper `personalInviteUrl.ts` cria URLs individuais com fragmento `#token=...`, sem query no novo link; páginas aceitam links antigos, removem token da barra após captura e usam `Referrer-Policy: no-referrer`. Os Workers devolvem cabeçalhos ant-cache e ant-sniff. Links antigos podem permanecer em logs anteriores à execução do JavaScript; não prometer retroatividade.
+
+`/v1/booking/tokens/revoke` e `/v1/intake/tokens/revoke` permitem revogação transacional por equipe autorizada, com `revokedAt/revokedBy` e audit log; não apagam registros clínicos, submissões já recebidas ou consultas confirmadas. UI de recepção/agenda possui confirmação explícita. Testes incluem replay, used vs revoked, negação entre tenants, preservação e simulação correta de `updateMask`.
+
+Régua `docs/PRE_PC_COMPLETENESS.md`: D4 passa a 16/18, implementação interna estimada **90/100**, projeto até produção **~63%**. Permanecem por fazer o agendamento aberto sem convite com antiabuso, retenção e backup real de fotos, QA físico/a11y, screenshots canônicos, provisionamento Firebase/Worker/R2, staging e deploy. Sem billing automático; pricing e limites comerciais não foram modificados.
