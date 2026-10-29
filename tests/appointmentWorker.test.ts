@@ -474,7 +474,7 @@ describe('D4 — agendamento público protegido por convite de uso único', () =
     expect((await revoke.json() as {revoked:boolean}).revoked).toBe(true);
     const tokenDoc=[...documents.values()].find(d=>d.revokedBy==='dentist-a');
     expect(tokenDoc?.revokedAt).toBeTruthy();
-    expect([...documents.values()].some(d=>d.action==='booking_invite.revoke' && d.actorRole==='dentist')).toBe(true);
+    expect([...documents.values()].some(d=>d.action==='booking_invite.revoke' && d.actorRole==='tenant_owner')).toBe(true);
     expect((await request('/v1/public/booking',{tenantSlug:'clinica-a',token,startsAt:future()})).status).toBe(404);
     expect((await request('/v1/booking/tokens/revoke',{tenantId:'A',token},true)).status).toBe(409);
     expect([...documents.values()].filter(d=>d.bookingSource==='invite_only')).toHaveLength(0);
