@@ -50,6 +50,9 @@ class FirestoreError extends Error {
 
 function response(request: Request, env: Env, status: number, body: BodyInit | null, headers: Record<string, string> = {}) {
   const outputHeaders = new Headers(headers);
+  if (!outputHeaders.has('Cache-Control')) outputHeaders.set('Cache-Control', 'private, no-store, max-age=0');
+  outputHeaders.set('X-Content-Type-Options', 'nosniff');
+  outputHeaders.set('Referrer-Policy', 'no-referrer');
   const origin = request.headers.get('Origin');
   const allowedOrigins = (env.APP_ORIGIN ?? 'http://localhost:5173').split(',').map(value => value.trim()).filter(Boolean);
   if (origin && allowedOrigins.includes(origin)) {
@@ -1120,14 +1123,16 @@ async function handle(request: Request, env: Env) {
       if (raw.length > 4096) throw new HttpError(413, 'request_too_large');
       body = JSON.parse(raw);
     } catch(e) { if(e instanceof HttpError) throw e; throw new HttpError(400, 'invalid_json'); }
-    return json(request, env, 202, await submitPublicIntake(env, body));
+    return response(request,env,202,JSON.stringify(await submitPublicIntake(env,body)),
+      {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
   }
 
   if (request.method==='POST' && url.pathname==='/v1/public/booking') {
     let payload:unknown;
     try{const raw=await request.text();if(raw.length>4096)throw new HttpError(413,'request_too_large');payload=JSON.parse(raw);}
     catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,'invalid_json');}
-    return json(request,env,201,await savePublicBooking(env,payload));
+    return response(request,env,201,JSON.stringify(await savePublicBooking(env,payload)),
+      {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
   }
 
   const user = await authenticate(request, env);
