@@ -86,3 +86,11 @@
 - Diagnóstico de integridade por paciente disponível em `GET /v1/media/integrity` (identidade clínica autenticada, escopo de tenant/paciente, modo exclusivamente leitura). Leitura paginada de metadados Firestore (100/página) e objetos R2 (500/página), com teto de 3.000 por origem e verificação de repetição de cursor. Detecta candidatos a órfãos, arquivos ausentes e metadados fora do escopo. Nega resposta parcial acima do teto; **a comparação não é um snapshot atômico e jamais autoriza exclusões automáticas**.
 - Galeria carrega oito imagens inicialmente, com opção de exibir mais; diagnóstico é separado das ações clínicas.
 - **Ainda pendente:** inventários acima do limite de 3.000 por origem (exigem conferência operacional supervisionada), política real de retenção/backup/restauração de desastre, provisionamento R2/Worker/Firebase e testes hospedados. Não anunciar recuperação automatizada ou backup como concluídos.
+
+## Checkpoint D4 — convites revogáveis e URLs protegidas (29/10/2026)
+
+Os links novos de pré-cadastro e agendamento são emitidos com `#token=...`, não `?token=...`. Código de leitura remove o segredo da barra após a inicialização e mantém compatibilidade com links antigos, com a ressalva de que uma URL antiga já pode ter sido registrada antes da limpeza. `Referrer-Policy: no-referrer` na página e nos endpoints, além de `Cache-Control: no-store`, reduzem cache e referência indevida.
+
+A equipe pode **revogar links não utilizados** pelo Worker (`/v1/intake/tokens/revoke`, `/v1/booking/tokens/revoke`), com RBAC, transação Firestore, `revokedAt/revokedBy` e audit log. A revogação não cancela agendamentos confirmados nem apaga solicitações recebidas. Testes cobrem origem, Replay, Tenant A×B, tokens consumidos, revogação e cabeçalhos.
+
+[CI #40956719212](https://github.com/CristianoRFB/Dentista/actions/runs/40956719212) passou no SHA `f994ec73ad2050ca3b2e41a408a7a536f60375f2`. [QA Chromium #40956427358](https://github.com/CristianoRFB/Dentista/actions/runs/40956427358) passou em SHA de implementação. A produção continua **não provisionada e não homologada**. Agendamento aberto sem convite permanece indisponível.
