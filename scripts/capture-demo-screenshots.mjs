@@ -58,7 +58,7 @@ try{
       const page=await context.newPage();
       try{
         await page.goto(ORIGIN+route.url,{waitUntil:'domcontentloaded',timeout:25000});
-        await page.locator('h1').first().waitFor({state:'visible',timeout:25000});
+        await page.getByRole('heading',{level:1,name:route.heading}).first().waitFor({state:'visible',timeout:25000});
         const heading=(await page.locator('h1').first().textContent())?.trim()??'';
         if(!route.heading.test(heading))throw new Error('Unexpected real heading on '+route.url+': '+heading);
         // Ensure demo runtime rendered; exclude auth/permission error pages as evidence.
