@@ -12,6 +12,9 @@ export function TenantShell() {
   const [menuOpen,setMenuOpen] = useState(false);
   const menuId=useId();
   const closeRef=useRef<HTMLButtonElement>(null);
+  const triggerRef=useRef<HTMLButtonElement>(null);
+  const drawerRef=useRef<HTMLElement>(null);
+  const dismissMenu=() => {setMenuOpen(false);triggerRef.current?.focus();};
   const base = '/' + tenantSlug + '/app';
   const nav = [
     {to:base,label:'Dashboard',icon:'▦',allowed:true,end:true},
@@ -26,24 +29,48 @@ export function TenantShell() {
   useEffect(()=>setMenuOpen(false),[pathname]);
   useEffect(()=>{
     if(!menuOpen)return;
+    // The drawer is modal on mobile: trap keyboard navigation and prevent
+    // background scroll; desktop sidebar behavior remains unchanged.
+    const previousOverflow=document.body.style.overflow;
+    document.body.style.overflow='hidden';
     closeRef.current?.focus();
-    const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')setMenuOpen(false);};
+    const onKey=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){
+        event.preventDefault();
+        setMenuOpen(false);
+        triggerRef.current?.focus();
+        return;
+      }
+      if(event.key!=='Tab')return;
+      const drawer=drawerRef.current;
+      if(!drawer)return;
+      const focusables=[...drawer.querySelectorAll<HTMLElement>(
+        'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])'
+      )].filter(el=>el.getClientRects().length>0);
+      if(!focusables.length){event.preventDefault();return;}
+      const first=focusables[0],last=focusables[focusables.length-1];
+      if(event.shiftKey && (document.activeElement===first || !drawer.contains(document.activeElement))){
+        event.preventDefault();last.focus();
+      }else if(!event.shiftKey && (document.activeElement===last || !drawer.contains(document.activeElement))){
+        event.preventDefault();first.focus();
+      }
+    };
     document.addEventListener('keydown',onKey);
-    return ()=>document.removeEventListener('keydown',onKey);
+    return ()=>{document.removeEventListener('keydown',onKey);document.body.style.overflow=previousOverflow;};
   },[menuOpen]);
   return <div className="shell app-shell">
     <header className="app-mobile-header">
       <Link to={base} className="app-brand"><span className="brand-mark small">O</span><span><b>OdontoFlow</b><small>{tenant.branding?.publicName??tenant.name}</small></span></Link>
-      <button type="button" className="btn secondary app-menu-trigger" aria-expanded={menuOpen}
+      <button type="button" ref={triggerRef} className="btn secondary app-menu-trigger" aria-expanded={menuOpen}
         aria-controls={menuId} onClick={()=>setMenuOpen(value=>!value)}>
         {menuOpen?'Fechar':'Menu'} <span aria-hidden="true">{menuOpen?'×':'☰'}</span>
       </button>
     </header>
-    {menuOpen&&<button type="button" className="app-menu-scrim" aria-label="Fechar navegação da clínica" onClick={()=>setMenuOpen(false)}/>}
-    <aside id={menuId} className={'sidebar'+(menuOpen?' sidebar-open':'')}>
+    {menuOpen&&<button type="button" className="app-menu-scrim" aria-label="Fechar navegação da clínica" onClick={dismissMenu}/>}
+    <aside ref={drawerRef} id={menuId} aria-label="Menu da clínica" aria-modal={menuOpen ? true : undefined} role={menuOpen ? "dialog" : undefined} className={'sidebar'+(menuOpen?' sidebar-open':'')}>
       <div className="sidebar-top">
         <Link to={base} className="app-brand"><span className="brand-mark small">O</span><span><b>OdontoFlow</b><small>{tenant.branding?.publicName??tenant.name}</small></span></Link>
-        <button type="button" ref={closeRef} className="app-menu-close" onClick={()=>setMenuOpen(false)} aria-label="Fechar menu">×</button>
+        <button type="button" ref={closeRef} className="app-menu-close" onClick={dismissMenu} aria-label="Fechar menu">×</button>
       </div>
       <nav aria-label="Navegação da clínica">
         {nav.filter(item=>item.allowed).map(item=><NavLink key={item.to} end={item.end} to={item.to}
