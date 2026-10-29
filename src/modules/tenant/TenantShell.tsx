@@ -33,7 +33,8 @@ export function TenantShell() {
     // background scroll; desktop sidebar behavior remains unchanged.
     const previousOverflow=document.body.style.overflow;
     document.body.style.overflow='hidden';
-    closeRef.current?.focus();
+    // Defer initial focus until the mobile drawer is painted and visible.
+    const focusFrame=requestAnimationFrame(()=>closeRef.current?.focus());
     const onKey=(event:KeyboardEvent)=>{
       if(event.key==='Escape'){
         event.preventDefault();
@@ -56,7 +57,7 @@ export function TenantShell() {
       }
     };
     document.addEventListener('keydown',onKey);
-    return ()=>{document.removeEventListener('keydown',onKey);document.body.style.overflow=previousOverflow;};
+    return ()=>{cancelAnimationFrame(focusFrame);document.removeEventListener('keydown',onKey);document.body.style.overflow=previousOverflow;};
   },[menuOpen]);
   return <div className="shell app-shell">
     <a className="skip-to-clinical-content" href="#tenant-main-content">Pular para o conteúdo clínico</a>
