@@ -44,7 +44,7 @@
 | Agenda | Detecção pura de sobreposição/conflito | IMPLEMENTADA | Interna | — |
 | Agenda | Validação transacional anti-double-booking | IMPLEMENTADA | Interna | Worker + locks transacionais; obrigatória em todos os planos |
 | Agenda | Recursos físicos (cadeira/sala/equipamento) | IMPLEMENTADA | Essencial/Pro/Premium | primeiro recurso permitido no Essencial; cota 1 / 5 / 15; Worker transacional e bloqueio de bypass; múltiplos começam no Pro |
-| Agenda | Agendamento público | EM IMPLEMENTAÇÃO | Essencial | Reserva por convite individual de paciente já cadastrado IMPLEMENTADA com Worker/locks transacionais e token único; agendamento aberto sem convite não disponível |
+| Agenda | Agendamento público | EM IMPLEMENTAÇÃO | Essencial | Booking individual IMPLEMENTADO com Worker/locks, token hash, link fragmentado e revogação autenticada/auditada; aberto sem convite não disponível |
 | Agenda | Lembretes automáticos | DEFERRED | Add-on | provedor/custo/consentimento pendentes |
 | Clínica | Prontuário append-only | IMPLEMENTADA | Essencial | registros imutáveis com autoria e auditoria; histórico completo, sem corte por plano |
 | Clínica | Adendos de prontuário | IMPLEMENTADA | Essencial | correção auditável por novo registro; integridade sem diferenciação |
@@ -57,7 +57,7 @@
 | Fotos | Revisão e arquivamento reversível | IMPLEMENTADA | Essencial | verificar/rejeitar + arquivar/restaurar apenas metadata, com audit log; R2 original preservado; CI/Emulator sem homologação hospedada |
 | Fotos | Timeline/comparação antes/depois | PLANEJADA | Pro | — |
 | Retorno | Central de retorno | IMPLEMENTADA | Pro | CRUD interno auditado e acesso restrito, CI/Emulator; sem lembretes automáticos |
-| Intake | Pré-cadastro por link | IMPLEMENTADA | Pro | token opaco de uso único e 7 dias, contato público pendente de revisão, Worker e Rules tenant-aware; produção não homologada |
+| Intake | Pré-cadastro por link | IMPLEMENTADA | Pro | token individual de 7 dias em hash fragment, limpeza do URL, revogação auditada e revisão de contatos; produção não homologada |
 | Site público | Mini-site white-label do tenant | IMPLEMENTADA | Essencial | perfil público configurável; agendamento persistido somente por convite individual, sem agenda aberta anônima |
 | Documentos | Receitas/atestados/templates básicos | PLANEJADA | Essencial | — |
 | Financeiro | Financeiro básico | PLANEJADA | Pro | — |
