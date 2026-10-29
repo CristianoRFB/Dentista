@@ -392,7 +392,7 @@ async function saveAppointment(env: Env, uid: string, input: Record<string, unkn
             !tenant || tenant.status!=='active' || tenant.slug!==guest.tenantSlug ||
             !canCreateCommercialCapacity(tenant as any) || !canUse(tenant as any,'agenda') ||
             !bookingToken || bookingToken.tenantId!==tenantId ||
-            bookingToken.usedAt!==null || !Number.isFinite(expiry) || expiry<=Date.now() ||
+            bookingToken.usedAt!==null || Boolean(bookingToken.revokedAt) || !Number.isFinite(expiry) || expiry<=Date.now() ||
             bookingToken.patientId!==patientId || bookingToken.professionalId!==professionalId ||
             bookingToken.procedureId!==procedureIds[0] || procedureIds.length!==1 ||
             (bookingToken.resourceId || undefined)!==(resourceId || undefined) ||
@@ -1092,6 +1092,45 @@ async function issuePublicBookingInvite(env:Env,uid:string,body:unknown) {
   }catch(e){await rollbackTransaction(env,accessToken,transaction);throw e;}
 }
 
+/** Revocation cannot cancel an existing booking; it only disables an unused capability. */
+async function revokePublicBookingInvite(env:Env,uid:string,body:unknown) {
+  if(!body || typeof body!=='object' || Array.isArray(body))throw new HttpError(400,'invalid_revocation');
+  const input=body as Record<string,unknown>;
+  if(Object.keys(input).some(key=>!['tenantId','token'].includes(key))
+    ||typeof input.tenantId!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(input.tenantId)
+    ||typeof input.token!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(input.token))
+    throw new HttpError(400,'invalid_revocation');
+  const tenantId=input.tenantId;
+  const hash=await intakeTokenHash(input.token);
+  const token=await serviceAccountToken(env);
+  const transaction=await beginTransaction(env,token);
+  try {
+    const tokenPath='tenants/'+tenantId+'/bookingTokens/'+hash;
+    const [tenant,membership,issued]=await Promise.all([
+      getDocument(env,token,'tenants/'+tenantId,transaction),
+      getDocument(env,token,'tenants/'+tenantId+'/memberships/'+uid,transaction),
+      getDocument(env,token,tokenPath,transaction),
+    ]);
+    if(!tenant||tenant.id!==tenantId||tenant.status!=='active')throw new HttpError(404,'tenant_unavailable');
+    if(!membership||membership.tenantId!==tenantId||membership.userId!==uid
+      ||membership.status!=='active'||!hasRolePermission(membership,'appointments.manage'))
+      throw new HttpError(403,'appointment_permission_required');
+    if(tenant.subscriptionStatus==='demo'||tenant.planId==='premium_demo')
+      throw new HttpError(409,'demo_read_only');
+    if(!issued||issued.tenantId!==tenantId)throw new HttpError(404,'invitation_unavailable');
+    if(issued.usedAt!==null || issued.revokedAt)throw new HttpError(409,'invitation_already_used_or_revoked');
+    const now=new Date(),auditId=crypto.randomUUID();
+    await commitTransaction(env,token,transaction,[
+      documentPatch(env,tokenPath,{revokedAt:now,revokedBy:uid,lastAuditLogId:auditId}),
+      documentWrite(env,'tenants/'+tenantId+'/auditLogs/'+auditId,{
+        tenantId,actorId:uid,actorRole:membership.role,action:'booking_invite.revoke',
+        resourceType:'bookingInvite',resourceId:hash,timestamp:now,
+      },true),
+    ]);
+    return {revoked:true};
+  }catch(error){await rollbackTransaction(env,token,transaction);throw error;}
+}
+
 async function savePublicBooking(env:Env,payload:unknown) {
   let data:ReturnType<typeof validatePublicBooking>;
   try{data=validatePublicBooking(payload);}catch{throw new HttpError(400,'invalid_booking_time_or_link');}
@@ -1136,6 +1175,12 @@ async function handle(request: Request, env: Env) {
   }
 
   const user = await authenticate(request, env);
+  if(request.method==='POST' && url.pathname==='/v1/booking/tokens/revoke') {
+    let body:unknown;
+    try{const raw=await request.text();if(raw.length>4096)throw new HttpError(413,'request_too_large');body=JSON.parse(raw);}
+    catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,'invalid_json');}
+    return json(request,env,200,await revokePublicBookingInvite(env,user.uid,body));
+  }
   if(request.method==='POST' && url.pathname==='/v1/booking/tokens') {
     let body:unknown;
     try{const raw=await request.text();if(raw.length>4096)throw new HttpError(413,'request_too_large');body=JSON.parse(raw);}
