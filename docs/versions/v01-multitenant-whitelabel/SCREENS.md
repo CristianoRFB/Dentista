@@ -35,3 +35,13 @@ Central de Retorno possui fluxo interno de criação/atualização por equipe au
 - Não capturar tokens de convite, contas reais, dados clínicos reais nem Platform Owner. Essas telas exigem homologação própria para gerar evidência verdadeira.
 
 **Execução comprovada em 29/10/2026:** [GitHub Actions visual QA #40949283614](https://github.com/CristianoRFB/Dentista/actions/runs/40949283614) — **SUCCESS** no SHA `492480dbf5fdc3d65219bdf14036a5019eeb2011`. Foram arquivados **12 screenshots reais de DEMO** + `SCREENSHOTS_MANIFEST.json` no artefato temporário [`odontoflow-real-demo-screenshots`](https://github.com/CristianoRFB/Dentista/actions/runs/40949283614/artifacts/12931220780), com retenção de 14 dias. Classificação: `SCREENSHOT_REAL_DEMO`. Não existe screenshot de produção nem arquivo de screenshot persistido no Git; revisão e arquivamento documental definitivo ainda pendentes.
+
+## Verificação Chromium ampliada — 29/10/2026
+
+- **SHA de código verificado:** `8b950a1b3f12569b16b81f0253fdc10e729ae9f7`.
+- **GitHub Actions visual:** [run #40953800997](https://github.com/CristianoRFB/Dentista/actions/runs/40953800997) — `success`.
+- **GitHub Actions principal:** [run #40953806462](https://github.com/CristianoRFB/Dentista/actions/runs/40953806462) — `success`.
+- **Artefato temporário:** [odontoflow-real-demo-screenshots](https://github.com/CristianoRFB/Dentista/actions/runs/40953800997/artifacts/12933500262), retenção de 14 dias.
+- **Cobertura efetiva:** 11 rotas × 2 viewports = **22 screenshots reais do Vite demo**, mais `SCREENSHOTS_MANIFEST.json`; incluem retornos, aviso de prontuário demo, odontograma, tratamento e fotos.
+- **Verificação de interação:** menu mobile com teclado/Shift+Tab e Escape, foco devolvido ao acionador, bloqueio da rolagem de fundo, atalho de pular para o conteúdo e busca de pacientes fictícios.
+- **Classificação obrigatória:** `SCREENSHOT_REAL_DEMO`; sem paciente real, prontuário real, screenshot de produção ou evidência de deploy. Os arquivos continuam no Actions, não estão arquivados em `docs/screenshots/` nem revisados como screenshots canônicos.
