@@ -78,7 +78,7 @@ const env = {
       const limit=options.limit??1000;
       const page=keys.slice(after,after+limit);
       const truncated=after+limit<keys.length;
-      return {objects:page.map(key=>({key})),truncated,cursor:truncated?page.at(-1):undefined};
+      return {objects:page.map(key=>({key,size:storedObjects.get(key)?.bytes.length??0})),truncated,cursor:truncated?page.at(-1):undefined};
     }),
   },
 } as unknown as Parameters<typeof mediaWorker.fetch>[1];
@@ -483,5 +483,57 @@ describe('D5 — relatório de integridade de mídia por paciente',()=>{
     expect(result.status).toBe(409);
     expect((await result.json() as {error:string}).error).toBe('media_inventory_exceeds_safe_limit');
     expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('D5 — medição paginada e privada de bytes R2 por tenant',()=>{
+  const request=(tenantId:string,cursor?:string)=>mediaWorker.fetch(new Request(
+    'https://worker.test/v1/media/usage?'+new URLSearchParams({tenantId,...(cursor?{cursor}:{})}),{
+      headers:{Authorization:'Bearer verified-test-token',Origin:'https://app.test'},
+    }),env);
+
+  it('restringe a medição ao owner com usage.read e não expõe nomes de objetos',async()=>{
+    seedAccess({role:'tenant_owner',permissions:['usage.read']});
+    storedObjects.set('tenants/A/patients/patient-a/a.jpg',{bytes:new Uint8Array(18),contentType:'image/jpeg'});
+    storedObjects.set('tenants/B/patients/patient-b/secret.jpg',{bytes:new Uint8Array(99),contentType:'image/jpeg'});
+    const response=await request('A');
+    expect(response.status).toBe(200);
+    const raw=await response.text();
+    expect(raw).not.toContain('patient-a');
+    expect(raw).not.toContain('secret.jpg');
+    const body=JSON.parse(raw) as {bytes:number;objectCount:number;complete:boolean;readOnly:boolean;nextCursor:null};
+    expect(body).toMatchObject({bytes:18,objectCount:1,complete:true,readOnly:true,nextCursor:null});
+    expect(env.CLINICAL_MEDIA.list).toHaveBeenCalledWith({prefix:'tenants/A/patients/',limit:500});
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+    expect((await request('B')).status).toBe(403);
+  });
+
+  it('nega leitura de dentista comum, membro inativo, acesso anônimo e tenant inválido',async()=>{
+    expect((await request('A')).status).toBe(403);
+    seedAccess({role:'tenant_owner',status:'inactive',permissions:['usage.read']});
+    expect((await request('A')).status).toBe(403);
+    expect((await request('../B')).status).toBe(400);
+    const unauthenticated=await mediaWorker.fetch(new Request('https://worker.test/v1/media/usage?tenantId=A'),env);
+    expect(unauthenticated.status).toBe(401);
+    expect(env.CLINICAL_MEDIA.list).not.toHaveBeenCalled();
+  });
+
+  it('pagina 501 objetos sem fornecer falsos totais ou misturar tenants',async()=>{
+    seedAccess({role:'tenant_owner',permissions:['usage.read']});
+    for(let i=0;i<501;i++) storedObjects.set(
+      'tenants/A/patients/patient-a/image-'+String(i).padStart(4,'0')+'.jpg',
+      {bytes:new Uint8Array(2),contentType:'image/jpeg'},
+    );
+    const first=await request('A');
+    expect(first.status).toBe(200);
+    const one=await first.json() as {bytes:number;objectCount:number;hasMore:boolean;nextCursor:string;complete:boolean};
+    expect(one).toMatchObject({bytes:1000,objectCount:500,hasMore:true,complete:false});
+    expect(one.nextCursor).toBeTruthy();
+    const next=await request('A',one.nextCursor);
+    expect(next.status).toBe(200);
+    const two=await next.json() as {bytes:number;objectCount:number;hasMore:boolean;complete:boolean};
+    expect(two).toMatchObject({bytes:2,objectCount:1,hasMore:false,complete:true});
+    expect(one.bytes+two.bytes).toBe(1002);
   });
 });

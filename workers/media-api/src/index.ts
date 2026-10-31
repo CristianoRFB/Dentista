@@ -4,6 +4,7 @@ import { BOOKING_TTL_MS, validateBookingInvite, validatePublicBooking } from './
 import { verifyFirebaseIdToken } from './firebaseAuth';
 import { validatePhotoReview, photoTransition } from './mediaLifecycle';
 import { comparePatientMediaInventory, collectMediaInventoryPages, MEDIA_METADATA_PAGE_SIZE, MEDIA_R2_PAGE_SIZE, MAX_MEDIA_INVENTORY_ITEMS } from './mediaIntegrity';
+import { MEDIA_USAGE_PAGE_SIZE, summarizeMediaUsagePage } from './mediaUsage';
 import { canCreateCommercialCapacity, canUse, getLimit } from '../../../src/commercial/entitlementService';
 import {
   findScheduleConflict, isValidAppointmentWindow, MAX_CONFLICT_LOOKBACK_MS,
@@ -963,6 +964,45 @@ async function diagnosePatientMedia(request: Request,env: Env,uid: string) {
     warning:'Resultados nao atomicos entre R2 e Firestore. Confirmar divergencias antes de qualquer intervencao.'};
 }
 
+
+/** Owner-authorized, paged R2 byte measurement. Not a backup or atomic usage snapshot. */
+async function measureTenantMediaUsage(request: Request,env: Env,uid: string) {
+  const url=new URL(request.url);
+  if([...url.searchParams.keys()].some(key=>key!=='tenantId'&&key!=='cursor'))
+    throw new HttpError(400,'invalid_media_usage_request');
+  const tenantId=url.searchParams.get('tenantId')??'';
+  const cursor=url.searchParams.get('cursor')??undefined;
+  if(!/^[A-Za-z0-9_-]{1,128}$/.test(tenantId)
+    || (cursor!==undefined && (cursor.length<1 || cursor.length>2048 || /[\\x00-\\x1f]/.test(cursor))))
+    throw new HttpError(400,'invalid_media_usage_scope');
+  const token=await serviceAccountToken(env);
+  const [tenant,membership]=await Promise.all([
+    getDocument(env,token,'tenants/'+tenantId),
+    getDocument(env,token,'tenants/'+tenantId+'/memberships/'+uid),
+  ]);
+  if(!tenant||tenant.id!==tenantId||tenant.status!=='active')
+    throw new HttpError(404,'tenant_unavailable');
+  if(!membership||membership.tenantId!==tenantId||membership.userId!==uid||
+    membership.status!=='active'||!hasRolePermission(membership,'usage.read'))
+    throw new HttpError(403,'media_usage_permission_required');
+  if(tenant.planId==='premium_demo'||tenant.subscriptionStatus==='demo')
+    throw new HttpError(409,'demo_read_only');
+  try {
+    const listing=await env.CLINICAL_MEDIA.list({
+      prefix:'tenants/'+tenantId+'/patients/',limit:MEDIA_USAGE_PAGE_SIZE,...(cursor?{cursor}:{}),
+    });
+    const summary=summarizeMediaUsagePage(listing.objects,tenantId);
+    if(listing.truncated && (typeof listing.cursor!=='string'||!listing.cursor))
+      throw new Error('r2_usage_cursor_missing');
+    return {tenantId,...summary,hasMore:listing.truncated,
+      nextCursor:listing.truncated?listing.cursor:null,pageSize:MEDIA_USAGE_PAGE_SIZE,
+      metric:'clinical_media_r2_bytes',complete:!listing.truncated,
+      snapshotConsistent:false,readOnly:true};
+  }catch{
+    throw new HttpError(503,'media_usage_unavailable');
+  }
+}
+
 async function downloadMedia(request: Request, env: Env, uid: string, photoId: string) {
   const url = new URL(request.url);
   const tenantId = url.searchParams.get('tenantId') ?? '';
@@ -1258,6 +1298,9 @@ async function handle(request: Request, env: Env) {
     return json(request, env, 200, result);
   }
 
+  if(request.method==='GET' && url.pathname==='/v1/media/usage') {
+    return json(request,env,200,await measureTenantMediaUsage(request,env,user.uid));
+  }
   if(request.method==='GET' && url.pathname==='/v1/media/integrity') {
     return response(request,env,200,JSON.stringify(await diagnosePatientMedia(request,env,user.uid)),
       {'Content-Type':'application/json; charset=utf-8','Cache-Control':'private, no-store'});
