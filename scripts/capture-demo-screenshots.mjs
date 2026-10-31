@@ -36,6 +36,7 @@ const routes=[
   {id:'treatment',url:'/demo-clinica/app/pacientes/p1/tratamento',heading:/^Tratamento — Marina Souza$/i},
   {id:'clinical-photos',url:'/demo-clinica/app/pacientes/p1/fotos',heading:/^Fotos clínicas$/i},
   {id:'public-booking-demo',url:'/demo-clinica/agendar',heading:/Selecione um procedimento ilustrativo/i},
+  {id:'open-booking-disabled',url:'/demo-clinica/solicitar-agendamento',heading:/Solicitação online indisponível/i},
   {id:'public-booking-invite',url:'/clinica-qa/agendar#token='+QA_INVITE_TOKEN,
     displayUrl:'/clinica-qa/agendar',heading:/Selecione o horário/i},
   {id:'public-intake-invite',url:'/clinica-qa/cadastro#token='+QA_INVITE_TOKEN,
