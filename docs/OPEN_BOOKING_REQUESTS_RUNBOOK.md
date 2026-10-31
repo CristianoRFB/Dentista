@@ -46,3 +46,7 @@ period = 60
 
 ## Ciência do uso de contato
 O formulário contém confirmação obrigatória de que a pessoa está ciente do uso dos contatos para responder ao pedido. O Worker rejeita explicitamente `contactAcknowledged !== true` e grava o sinalizador sem incluir texto clínico. **Isto não substitui aviso de privacidade institucional, revisão de base legal, retenção/eliminação e controles LGPD operacionais.**
+
+## Defesa complementar de ativação (31/10/2026)
+
+As regras Firestore exigem **membership ativa com papel tenant_owner e permissão tenant.manage** para qualquer alteração em `openBookingRequestsEnabled`. A plataforma continua autorizada a atualizar o branding com auditoria quando não muda o sinalizador, mas **não** pode habilitar ou desabilitar o recebimento público em nome da clínica. Criação do perfil público é sempre com opt-in ausente/falso. O Worker permanece independente: exige sinalizador verdadeiro, Turnstile, throttling e tenant ativo. Testes negativos e positivos pelo Firestore Emulator em `tests/firestoreRules.test.ts`.

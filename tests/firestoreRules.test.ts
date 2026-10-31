@@ -947,3 +947,56 @@ describe('D5 — proteção explícita dos manifestos privados de backup',()=>{
     await assertFails(getDoc(doc(env.authenticatedContext('dentist-b').firestore(),path)));
   });
 });
+
+
+describe('D4 — toggle público exige tenant_owner real no backend',()=>{
+  async function fixture(){
+    await env.withSecurityRulesDisabled(async context=>{
+      await updateDoc(doc(context.firestore(),'tenants/A/publicProfile/public'),{
+        lastAuditLogId:'seed',
+      });
+    });
+  }
+  async function auditedProfileUpdate(actor:string,role:string,delta:Record<string,unknown>,auditId:string){
+    const db=env.authenticatedContext(actor).firestore();
+    const batch=writeBatch(db);
+    batch.update(doc(db,'tenants/A/publicProfile/public'),{
+      ...delta,lastAuditLogId:auditId,updatedAt:serverTimestamp(),
+    });
+    batch.set(doc(db,'tenants/A/auditLogs',auditId),{
+      tenantId:'A',actorId:actor,actorRole:role,action:'publicProfile.update',
+      resourceType:'publicProfile',resourceId:'public',timestamp:serverTimestamp(),
+    });
+    return batch.commit();
+  }
+  it('permite ao tenant_owner habilitar/desabilitar, mas bloqueia plataforma e outros perfis',async()=>{
+    await fixture();
+    await assertFails(auditedProfileUpdate('platform-owner','platform_owner',{
+      openBookingRequestsEnabled:true,
+    },'bad-platform-enable'));
+    await assertFails(auditedProfileUpdate('dentist-a','dentist',{
+      openBookingRequestsEnabled:true,
+    },'bad-dentist-enable'));
+    await assertSucceeds(auditedProfileUpdate('tenant-owner-a','tenant_owner',{
+      openBookingRequestsEnabled:true,
+    },'good-owner-enable'));
+    const profile=doc(env.authenticatedContext('tenant-owner-a').firestore(),'tenants/A/publicProfile/public');
+    expect((await getDoc(profile)).data()?.openBookingRequestsEnabled).toBe(true);
+    await assertFails(auditedProfileUpdate('platform-owner','platform_owner',{
+      openBookingRequestsEnabled:false,
+    },'bad-platform-disable'));
+    await assertSucceeds(auditedProfileUpdate('tenant-owner-a','tenant_owner',{
+      openBookingRequestsEnabled:false,
+    },'good-owner-disable'));
+    expect((await getDoc(profile)).data()?.openBookingRequestsEnabled).toBe(false);
+  });
+  it('preserva edição auditada de branding pela plataforma se não muda opt-in',async()=>{
+    await fixture();
+    await assertSucceeds(auditedProfileUpdate('platform-owner','platform_owner',{
+      publicName:'Clínica A identidade revisada',
+    },'platform-brand-only'));
+    const db=env.authenticatedContext('tenant-owner-a').firestore();
+    expect((await getDoc(doc(db,'tenants/A/publicProfile/public'))).data()?.publicName)
+      .toBe('Clínica A identidade revisada');
+  });
+});
