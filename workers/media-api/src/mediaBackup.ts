@@ -39,11 +39,36 @@ export async function sha256Hex(value:ArrayBuffer):Promise<string> {
   return Array.from(hash,b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-export async function boundedImageBytes(object:{body:ReadableStream|null}|null) {
+export async function boundedImageBytes(object:{body:ReadableStream<Uint8Array>|null;size?:number}|null) {
   if(!object?.body)throw Error('backup_object_unavailable');
-  const bytes=await new Response(object.body).arrayBuffer();
-  if(bytes.byteLength<1||bytes.byteLength>MAX_BACKUP_PHOTO_BYTES)throw Error('backup_invalid_object_size');
-  return bytes;
+  // Reject declared oversized R2 objects before touching their payload.
+  if(object.size!==undefined && (!Number.isSafeInteger(object.size) ||
+    object.size<1 || object.size>MAX_BACKUP_PHOTO_BYTES))
+    throw Error('backup_invalid_object_size');
+  const reader=object.body.getReader();
+  const chunks:Uint8Array[]=[];
+  let total=0,finished=false;
+  try{
+    while(true){
+      const {done,value}=await reader.read();
+      if(done){finished=true;break;}
+      if(!(value instanceof Uint8Array))throw Error('backup_invalid_stream_chunk');
+      total+=value.byteLength;
+      if(!Number.isSafeInteger(total)||total>MAX_BACKUP_PHOTO_BYTES)
+        throw Error('backup_invalid_object_size');
+      // Copy: a producer is allowed to reuse the underlying chunk buffer.
+      chunks.push(new Uint8Array(value));
+    }
+  }finally{
+    if(!finished)await reader.cancel().catch(()=>{});
+    reader.releaseLock();
+  }
+  if(total===0 || (object.size!==undefined && total!==object.size))
+    throw Error('backup_invalid_object_size');
+  const output=new Uint8Array(total);
+  let offset=0;
+  for(const part of chunks){output.set(part,offset);offset+=part.byteLength;}
+  return output.buffer;
 }
 
 /** Read-back check of destination; R2 metadata/etag alone is insufficient. */
