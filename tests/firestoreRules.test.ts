@@ -846,3 +846,77 @@ describe('Firestore Emulator — concorrência dos locks de agenda', () => {
   });
 
 });
+
+
+describe('D4 — Firestore Rules para pedidos públicos não confirmados',()=>{
+  async function seedRequest(){
+    await env.withSecurityRulesDisabled(async context=>{
+      const db=context.firestore();
+      await Promise.all([
+        setDoc(doc(db,'tenants/A/openBookingRequests/req-a'),{
+          id:'req-a',tenantId:'A',name:'Paciente Fictício',phone:'11988887777',
+          email:'fake@example.test',preferredAt:'2026-11-10T14:00:00.000Z',
+          submittedAt:Timestamp.now(),status:'pending_review',
+        }),
+        setDoc(doc(db,'tenants/B/openBookingRequests/req-b'),{
+          id:'req-b',tenantId:'B',name:'Paciente Fictício B',phone:'11988887777',
+          email:'fakeb@example.test',preferredAt:'2026-11-10T14:00:00.000Z',
+          submittedAt:Timestamp.now(),status:'pending_review',
+        }),
+      ]);
+    });
+  }
+  it('bloqueia leitura, criação, alteração e exclusão anônimas; protege o outro tenant',async()=>{
+    await seedRequest();
+    const anon=env.unauthenticatedContext().firestore();
+    const reception=env.authenticatedContext('reception-a').firestore();
+    const other=env.authenticatedContext('dentist-b').firestore();
+    await assertFails(getDoc(doc(anon,'tenants/A/openBookingRequests/req-a')));
+    await assertFails(setDoc(doc(anon,'tenants/A/openBookingRequests/req-new'),{
+      tenantId:'A',status:'pending_review',name:'Injetado',
+    }));
+    await assertFails(deleteDoc(doc(anon,'tenants/A/openBookingRequests/req-a')));
+    await assertSucceeds(getDoc(doc(reception,'tenants/A/openBookingRequests/req-a')));
+    await assertSucceeds(getDocs(query(collection(reception,'tenants/A/openBookingRequests'),where('tenantId','==','A'))));
+    await assertFails(getDoc(doc(reception,'tenants/B/openBookingRequests/req-b')));
+    await assertFails(getDoc(doc(other,'tenants/A/openBookingRequests/req-a')));
+    await assertFails(updateDoc(doc(reception,'tenants/A/openBookingRequests/req-a'),{
+      status:'contacted',
+    })); // missing audit and actor: review cannot bypass workflow
+  });
+  it('permite registrar contato apenas com auditoria em batch e bloqueia replay',async()=>{
+    await seedRequest();
+    const reception=env.authenticatedContext('reception-a').firestore();
+    const entry=doc(reception,'tenants/A/openBookingRequests/req-a');
+    const audit=doc(reception,'tenants/A/auditLogs/review-open-a');
+    const batch=writeBatch(reception);
+    batch.update(entry,{
+      status:'contacted',reviewedAt:serverTimestamp(),reviewedBy:'reception-a',lastAuditLogId:audit.id,
+    });
+    batch.set(audit,{
+      tenantId:'A',actorId:'reception-a',actorRole:'receptionist',
+      action:'open_booking_request.review',resourceType:'openBookingRequest',
+      resourceId:'req-a',timestamp:serverTimestamp(),
+    });
+    await assertSucceeds(batch.commit());
+    expect((await getDoc(entry)).data()?.status).toBe('contacted');
+    await assertFails(updateDoc(entry,{status:'dismissed'}));
+    await assertFails(deleteDoc(entry));
+  });
+  it('somente o tenant owner altera publicProfile com flag opt-in auditada',async()=>{
+    const owner=env.authenticatedContext('tenant-owner-a').firestore();
+    const dentist=env.authenticatedContext('dentist-a').firestore();
+    const profile=doc(owner,'tenants/A/publicProfile/public');
+    const audit=doc(owner,'tenants/A/auditLogs/audit-optin');
+    const batch=writeBatch(owner);
+    batch.update(profile,{openBookingRequestsEnabled:true,lastAuditLogId:audit.id,updatedAt:serverTimestamp()});
+    batch.set(audit,{tenantId:'A',actorId:'tenant-owner-a',actorRole:'tenant_owner',
+      action:'publicProfile.update',resourceType:'publicProfile',resourceId:'public',
+      timestamp:serverTimestamp()});
+    await assertSucceeds(batch.commit());
+    expect((await getDoc(profile)).data()?.openBookingRequestsEnabled).toBe(true);
+    await assertFails(updateDoc(doc(dentist,'tenants/A/publicProfile/public'),{
+      openBookingRequestsEnabled:false,
+    }));
+  });
+});
