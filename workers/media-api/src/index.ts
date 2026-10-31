@@ -973,7 +973,7 @@ async function measureTenantMediaUsage(request: Request,env: Env,uid: string) {
   const tenantId=url.searchParams.get('tenantId')??'';
   const cursor=url.searchParams.get('cursor')??undefined;
   if(!/^[A-Za-z0-9_-]{1,128}$/.test(tenantId)
-    || (cursor!==undefined && (cursor.length<1 || cursor.length>2048 || /[\\x00-\\x1f]/.test(cursor))))
+    || (cursor!==undefined && (cursor.length<1 || cursor.length>2048 || /[\x00-\x1f]/.test(cursor))))
     throw new HttpError(400,'invalid_media_usage_scope');
   const token=await serviceAccountToken(env);
   const [tenant,membership]=await Promise.all([

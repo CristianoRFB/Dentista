@@ -514,6 +514,8 @@ describe('D5 — medição paginada e privada de bytes R2 por tenant',()=>{
     seedAccess({role:'tenant_owner',status:'inactive',permissions:['usage.read']});
     expect((await request('A')).status).toBe(403);
     expect((await request('../B')).status).toBe(400);
+    seedAccess({role:'tenant_owner',permissions:['usage.read']});
+    expect((await request('A','cursor-with-x1f')).status).toBe(200);
     const unauthenticated=await mediaWorker.fetch(new Request('https://worker.test/v1/media/usage?tenantId=A'),env);
     expect(unauthenticated.status).toBe(401);
     expect(env.CLINICAL_MEDIA.list).not.toHaveBeenCalled();
