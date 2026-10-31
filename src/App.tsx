@@ -9,6 +9,7 @@ import { OpenBookingRequestPage } from './modules/public/OpenBookingRequestPage'
 import { PlatformDashboard } from './modules/platform/PlatformDashboard';
 import { TenantShell } from './modules/tenant/TenantShell';
 import { TenantDashboard } from './modules/tenant/TenantDashboard';
+import { TenantHelpPage } from './modules/tenant/TenantHelpPage';
 import { AgendaPage } from './modules/scheduling/AgendaPage';
 import { ResourcesPage } from './modules/scheduling/ResourcesPage';
 import { RecallCenterPage } from './modules/recalls/RecallCenterPage';
@@ -45,6 +46,7 @@ export function App() {
         <Route path="/:tenantSlug/app" element={<TenantAccessProvider><TenantAccessGate /></TenantAccessProvider>}>
           <Route element={<TenantShell />}>
             <Route index element={<TenantDashboard />} />
+            <Route path="ajuda" element={<TenantHelpPage />} />
             <Route element={<TenantPermissionGate permission="appointments.read" feature="agenda" />}><Route path="agenda" element={<AgendaPage />} /></Route>
             <Route element={<TenantPermissionGate permission="resources.read" feature="physical_resources" />}><Route path="recursos" element={<ResourcesPage />} /></Route>
             <Route element={<TenantPermissionGate anyOf={['professionals.read','procedures.read']} anyFeature={['professionals','procedures']} />}><Route path="cadastros" element={<CatalogsPage />} /></Route>

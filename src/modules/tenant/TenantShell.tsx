@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
 import { useReadyTenantAccess } from './TenantContext';
 import { useAuth } from '../auth/AuthProvider';
 import { canUse } from '../../commercial/entitlementService';
+import {getWorkspaceNavigation,workspaceContext} from './workspaceNavigation';
 
 export function TenantShell() {
   const { tenantSlug = 'demo-clinica' } = useParams();
@@ -16,16 +17,8 @@ export function TenantShell() {
   const drawerRef=useRef<HTMLElement>(null);
   const dismissMenu=() => {setMenuOpen(false);triggerRef.current?.focus();};
   const base = '/' + tenantSlug + '/app';
-  const nav = [
-    {to:base,label:'Dashboard',icon:'▦',allowed:true,end:true},
-    {to:base+'/agenda',label:'Agenda',icon:'⌁',allowed:permissions.includes('appointments.read')&&canUse(tenant,'agenda')},
-    {to:base+'/pacientes',label:'Pacientes',icon:'◫',allowed:permissions.includes('patients.read')&&canUse(tenant,'patients')},
-    {to:base+'/retornos',label:'Retornos',icon:'↺',allowed:permissions.includes('recalls.read')&&canUse(tenant,'recall_center')},
-    {to:base+'/pre-cadastros',label:'Pré-cadastros',icon:'◇',allowed:permissions.includes('intake.read')&&canUse(tenant,'intake_link')},
-    {to:base+'/convites-agenda',label:'Convites de agenda',icon:'↗',allowed:permissions.includes('appointments.manage')&&canUse(tenant,'agenda')},
-    {to:base+'/recursos',label:'Cadeiras e salas',icon:'□',allowed:permissions.includes('resources.read')&&canUse(tenant,'physical_resources')},
-    {to:base+'/cadastros',label:'Cadastros',icon:'⚙',allowed:(permissions.includes('professionals.manage')||permissions.includes('procedures.manage'))&&canUse(tenant,'professionals')},
-  ];
+  const groups=getWorkspaceNavigation(base,tenant,permissions);
+  const locationLabel=workspaceContext(pathname,groups,base);
   useEffect(()=>setMenuOpen(false),[pathname]);
   useEffect(()=>{
     if(!menuOpen)return;
@@ -74,20 +67,38 @@ export function TenantShell() {
         <Link to={base} className="app-brand"><span className="brand-mark small">O</span><span><b>OdontoFlow</b><small>{tenant.branding?.publicName??tenant.name}</small></span></Link>
         <button type="button" ref={closeRef} className="app-menu-close" onClick={dismissMenu} aria-label="Fechar menu">×</button>
       </div>
-      <nav aria-label="Navegação da clínica">
-        {nav.filter(item=>item.allowed).map(item=><NavLink key={item.to} end={item.end} to={item.to}
-          className={({isActive})=>isActive?'sidebar-link-active':undefined} onClick={()=>setMenuOpen(false)}>
-          <span className="sidebar-symbol" aria-hidden="true">{item.icon}</span><span>{item.label}</span>
-        </NavLink>)}
+      <nav className="workspace-nav" aria-label="Navegação da clínica">
+        {groups.map(group=><section className="workspace-nav-group" key={group.id} aria-labelledby={'nav-'+group.id}>
+          <h2 id={'nav-'+group.id} className="workspace-nav-heading">{group.label}</h2>
+          {group.items.map(item=><NavLink key={item.to} end={item.end} to={item.to}
+            aria-label={item.label} title={item.description}
+            className={({isActive})=>isActive?'sidebar-link-active':undefined} onClick={()=>setMenuOpen(false)}>
+            <span className="sidebar-symbol" aria-hidden="true">{item.icon}</span><span>{item.label}</span>
+          </NavLink>)}
+        </section>)}
+        <section className="workspace-nav-group" aria-labelledby="nav-help">
+          <h2 id="nav-help" className="workspace-nav-heading">Orientações</h2>
+          <NavLink to={base+'/ajuda'} onClick={()=>setMenuOpen(false)}
+            className={({isActive})=>isActive?'sidebar-link-active':undefined}>
+            <span className="sidebar-symbol" aria-hidden="true">?</span><span>Como usar o sistema</span>
+          </NavLink>
+        </section>
       </nav>
       <div className="sidebar-bottom">
         {isDemo&&<span className="demo-banner">Modo demonstrativo · dados fictícios</span>}
+        <Link to={base+'/ajuda'}>Precisa de ajuda?</Link>
         {permissions.includes('intake.manage')&&canUse(tenant,'intake_link')&&
-          <Link to={base+'/pre-cadastros'}>↗ Links de pré-cadastro</Link>}
-        <Link to="/">⌂ Página inicial</Link>
+          <Link to={base+'/pre-cadastros'}>Pré-cadastros da clínica</Link>}
+        <Link to="/">Página pública do OdontoFlow</Link>
         <button className="sidebar-signout" type="button" onClick={()=>void signOutUser()}>Sair da conta</button>
       </div>
     </aside>
-    <main className="content" id="tenant-main-content" tabIndex={-1}><Outlet/></main>
+    <main className="content" id="tenant-main-content" tabIndex={-1}>
+      <div className="workspace-location" aria-label="Localização no sistema">
+        <span>Você está em: <strong>{locationLabel.label}</strong></span>
+        <Link to={base+'/ajuda'}>Ver orientações</Link>
+      </div>
+      <Outlet/>
+    </main>
   </div>;
 }
