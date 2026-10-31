@@ -5,6 +5,7 @@ import { verifyFirebaseIdToken } from './firebaseAuth';
 import { validatePhotoReview, photoTransition } from './mediaLifecycle';
 import { comparePatientMediaInventory, collectMediaInventoryPages, MEDIA_METADATA_PAGE_SIZE, MEDIA_R2_PAGE_SIZE, MAX_MEDIA_INVENTORY_ITEMS } from './mediaIntegrity';
 import { MEDIA_USAGE_PAGE_SIZE, summarizeMediaUsagePage } from './mediaUsage';
+import { backupKeyFor, boundedImageBytes, expectedMediaPrefix, sha256Hex, validateBackupInput, verifiedBackupBytes, type BackupInput } from './mediaBackup';
 import { canCreateCommercialCapacity, canUse, getLimit } from '../../../src/commercial/entitlementService';
 import {
   findScheduleConflict, isValidAppointmentWindow, MAX_CONFLICT_LOOKBACK_MS,
@@ -13,6 +14,7 @@ import {
 
 interface Env {
   CLINICAL_MEDIA: R2Bucket;
+  CLINICAL_MEDIA_BACKUP?: R2Bucket; // Optional; absent means fail-closed until separately provisioned.
   FIREBASE_PROJECT_ID: string;
   FIREBASE_SERVICE_ACCOUNT_EMAIL?: string;
   FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
@@ -1003,6 +1005,151 @@ async function measureTenantMediaUsage(request: Request,env: Env,uid: string) {
   }
 }
 
+
+function requireBackupBucket(env:Env):R2Bucket {
+  if(!env.CLINICAL_MEDIA_BACKUP || env.CLINICAL_MEDIA_BACKUP===env.CLINICAL_MEDIA)
+    throw new HttpError(503,'clinical_backup_bucket_not_configured');
+  return env.CLINICAL_MEDIA_BACKUP;
+}
+
+async function validateClinicalBackupScope(
+  env:Env,token:string,uid:string,input:BackupInput,transaction?:string,
+) {
+  const access=await verifyClinicalAccess(env,token,uid,input.tenantId,input.patientId,'clinical.write',transaction);
+  // Backup/recovery is a clinician operation, not an implicit platform-owner/admin privilege.
+  if(!access.membership || access.membership.role!=='dentist' ||
+    !hasRolePermission(access.membership,'clinical.write'))throw new HttpError(403,'clinical_backup_permission_required');
+  if(access.tenant.planId==='premium_demo'||access.tenant.subscriptionStatus==='demo')
+    throw new HttpError(409,'demo_read_only');
+  const photoPath='tenants/'+input.tenantId+'/patients/'+input.patientId+'/clinicalPhotos/'+input.photoId;
+  const photo=await getDocument(env,token,photoPath,transaction);
+  if(!photo || photo.id!==input.photoId || photo.tenantId!==input.tenantId ||
+    photo.patientId!==input.patientId || typeof photo.objectKey!=='string' ||
+    !photo.objectKey.startsWith(expectedMediaPrefix(input)) ||
+    photo.objectKey.includes('..') || photo.objectKey.endsWith('/'))
+    throw new HttpError(404,'clinical_photo_unavailable');
+  return {photo,photoPath,actorRole:access.actorRole};
+}
+
+async function manualBackupClinicalPhoto(env:Env,uid:string,payload:unknown) {
+  let input:BackupInput;
+  try{input=validateBackupInput(payload);}catch{throw new HttpError(400,'invalid_backup_request');}
+  const backupBucket=requireBackupBucket(env);
+  const token=await serviceAccountToken(env);
+  const scope=await validateClinicalBackupScope(env,token,uid,input);
+  // Source is immutable under the normal media lifecycle; any drift gets detected by digest.
+  const source=await env.CLINICAL_MEDIA.get(scope.photo.objectKey);
+  if(!source)throw new HttpError(409,'clinical_photo_source_missing');
+  let bytes:ArrayBuffer,digest:string;
+  try{bytes=await boundedImageBytes(source);digest=await sha256Hex(bytes);}
+  catch{throw new HttpError(409,'clinical_photo_source_unreadable');}
+  const backupKey=backupKeyFor(input,digest);
+  try{
+    const exists=await backupBucket.head(backupKey);
+    if(!exists){
+      const copied=await backupBucket.put(backupKey,bytes,{
+        sha256:digest,
+        httpMetadata:{contentType:typeof scope.photo.contentType==='string'?scope.photo.contentType:'application/octet-stream',
+          cacheControl:'private, no-store'},
+        customMetadata:{tenantId:input.tenantId,patientId:input.patientId,
+          photoId:input.photoId,sha256:digest},
+      });
+      if(!copied)throw Error('backup_put_unavailable');
+    }
+    await verifiedBackupBytes(backupBucket,backupKey,digest);
+  }catch{throw new HttpError(503,'clinical_backup_verification_failed');}
+
+  const backupPath=scope.photoPath+'/backups/'+digest;
+  const transaction=await beginTransaction(env,token);
+  try {
+    const verified=await validateClinicalBackupScope(env,token,uid,input,transaction);
+    if(verified.photo.objectKey!==scope.photo.objectKey)throw new HttpError(409,'clinical_photo_changed');
+    const already=await getDocument(env,token,backupPath,transaction);
+    if(already && (already.sha256!==digest || already.objectKey!==scope.photo.objectKey ||
+      already.backupKey!==backupKey || already.tenantId!==input.tenantId))
+      throw new HttpError(409,'backup_manifest_conflict');
+    const auditId=crypto.randomUUID(),now=new Date();
+    await commitTransaction(env,token,transaction,[
+      ...(!already?[documentWrite(env,backupPath,{
+        id:digest,tenantId:input.tenantId,patientId:input.patientId,photoId:input.photoId,
+        objectKey:scope.photo.objectKey,backupKey,sha256:digest,sizeBytes:bytes.byteLength,
+        createdAt:now,createdBy:uid,verification:'sha256_readback',
+      },true)]:[]),
+      documentWrite(env,'tenants/'+input.tenantId+'/auditLogs/'+auditId,{
+        tenantId:input.tenantId,patientId:input.patientId,actorId:uid,actorRole:verified.actorRole,
+        action:already?'clinical_photo.backup_verify':'clinical_photo.backup',
+        resourceType:'clinicalPhoto',resourceId:input.photoId,reason:input.reason,
+        backupDigest:digest,timestamp:now,
+      },true),
+    ]);
+    return {photoId:input.photoId,digest,sizeBytes:bytes.byteLength,
+      alreadyBackedUp:Boolean(already),verified:true,private:true};
+  }catch(e){await rollbackTransaction(env,token,transaction);throw e;}
+}
+
+async function manualRestoreClinicalPhoto(env:Env,uid:string,payload:unknown) {
+  let input:BackupInput;
+  try{input=validateBackupInput(payload,true);}catch{throw new HttpError(400,'invalid_restore_request');}
+  const backupBucket=requireBackupBucket(env);
+  const token=await serviceAccountToken(env);
+  const manifestPath='tenants/'+input.tenantId+'/patients/'+input.patientId+
+    '/clinicalPhotos/'+input.photoId+'/backups/'+input.digest;
+  const scope=await validateClinicalBackupScope(env,token,uid,input);
+  const manifest=await getDocument(env,token,manifestPath);
+  const correctKey=backupKeyFor(input,input.digest!);
+  if(!manifest || manifest.tenantId!==input.tenantId || manifest.patientId!==input.patientId ||
+    manifest.photoId!==input.photoId || manifest.sha256!==input.digest ||
+    manifest.objectKey!==scope.photo.objectKey || manifest.backupKey!==correctKey)
+    throw new HttpError(404,'verified_backup_manifest_unavailable');
+  let bytes:ArrayBuffer;
+  try{bytes=await verifiedBackupBytes(backupBucket,correctKey,input.digest!);}
+  catch{throw new HttpError(409,'backup_checksum_verification_failed');}
+  if(await env.CLINICAL_MEDIA.head(scope.photo.objectKey))
+    throw new HttpError(409,'original_media_still_exists');
+
+  // Commit audit intent BEFORE moving bytes. No R2 deletion, no silent unlogged recovery.
+  const transaction=await beginTransaction(env,token);
+  try{
+    const verified=await validateClinicalBackupScope(env,token,uid,input,transaction);
+    const current=await getDocument(env,token,manifestPath,transaction);
+    if(verified.photo.objectKey!==manifest.objectKey || !current ||
+      current.sha256!==input.digest || current.backupKey!==correctKey)
+      throw new HttpError(409,'recovery_preconditions_changed');
+    await commitTransaction(env,token,transaction,[
+      documentWrite(env,'tenants/'+input.tenantId+'/auditLogs/'+crypto.randomUUID(),{
+        tenantId:input.tenantId,patientId:input.patientId,actorId:uid,actorRole:verified.actorRole,
+        action:'clinical_photo.recovery_requested',resourceType:'clinicalPhoto',
+        resourceId:input.photoId,reason:input.reason,backupDigest:input.digest,timestamp:new Date(),
+      },true),
+    ]);
+  }catch(e){await rollbackTransaction(env,token,transaction);throw e;}
+  try{
+    // Recheck absence immediately before writing; restoration never intentionally overwrites.
+    if(await env.CLINICAL_MEDIA.head(scope.photo.objectKey))
+      throw new HttpError(409,'original_media_still_exists');
+    const result=await env.CLINICAL_MEDIA.put(scope.photo.objectKey,bytes,{
+      sha256:input.digest,
+      httpMetadata:{contentType:typeof scope.photo.contentType==='string'?scope.photo.contentType:'application/octet-stream',
+        cacheControl:'private, no-store'},
+      customMetadata:{tenantId:input.tenantId,patientId:input.patientId,recoveredBy:uid},
+    });
+    if(!result)throw Error('restore_put_failed');
+    await verifiedBackupBytes(env.CLINICAL_MEDIA,scope.photo.objectKey,input.digest!);
+  }catch(e){if(e instanceof HttpError)throw e;throw new HttpError(503,'clinical_restore_unverified');}
+  // If this log fails, "recovery_requested" remains for manual reconciliation.
+  const auditTransaction=await beginTransaction(env,token);
+  try{
+    await commitTransaction(env,token,auditTransaction,[
+      documentWrite(env,'tenants/'+input.tenantId+'/auditLogs/'+crypto.randomUUID(),{
+        tenantId:input.tenantId,patientId:input.patientId,actorId:uid,actorRole:scope.actorRole,
+        action:'clinical_photo.recovery_verified',resourceType:'clinicalPhoto',
+        resourceId:input.photoId,reason:input.reason,backupDigest:input.digest,timestamp:new Date(),
+      },true),
+    ]);
+  }catch(e){await rollbackTransaction(env,token,auditTransaction);throw new HttpError(503,'restore_completed_audit_unavailable');}
+  return {restored:true,verified:true,photoId:input.photoId,digest:input.digest};
+}
+
 async function downloadMedia(request: Request, env: Env, uid: string, photoId: string) {
   const url = new URL(request.url);
   const tenantId = url.searchParams.get('tenantId') ?? '';
@@ -1298,6 +1445,21 @@ async function handle(request: Request, env: Env) {
     return json(request, env, 200, result);
   }
 
+  if(request.method==='POST' && (url.pathname==='/v1/media/backups' ||
+    url.pathname==='/v1/media/backups/restore')) {
+    const length=Number(request.headers.get('Content-Length')??'0');
+    if(length>4096)throw new HttpError(413,'request_too_large');
+    let payload:unknown;
+    try{
+      const raw=await request.text();
+      if(raw.length>4096)throw new HttpError(413,'request_too_large');
+      payload=JSON.parse(raw);
+    }catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,'invalid_json');}
+    const data=url.pathname.endsWith('/restore')
+      ? await manualRestoreClinicalPhoto(env,user.uid,payload)
+      : await manualBackupClinicalPhoto(env,user.uid,payload);
+    return json(request,env,200,data);
+  }
   if(request.method==='GET' && url.pathname==='/v1/media/usage') {
     return json(request,env,200,await measureTenantMediaUsage(request,env,user.uid));
   }
