@@ -62,6 +62,7 @@ const env = {
   FIRESTORE_EMULATOR_HOST: '127.0.0.1:8081',
   APP_ORIGIN: 'https://app.test',
   CLINICAL_MEDIA: {
+    head: vi.fn(async (key:string) => storedObjects.has(key) ? {key} : null),
     put: vi.fn(async (key: string, stream: ReadableStream<Uint8Array>, options: { httpMetadata?: { contentType?: string } }) => {
       const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
       storedObjects.set(key, { bytes, contentType: options.httpMetadata?.contentType ?? 'application/octet-stream' });
@@ -133,6 +134,8 @@ beforeEach(() => {
   fetchCalls.length = 0;
   storedObjects.clear();
   failNextMediaTransactionStart = false;
+  delete (env as unknown as {CLINICAL_MEDIA_BACKUP?:unknown}).CLINICAL_MEDIA_BACKUP;
+  vi.mocked(env.CLINICAL_MEDIA.head).mockClear();
   vi.mocked(env.CLINICAL_MEDIA.put).mockClear();
   vi.mocked(env.CLINICAL_MEDIA.get).mockClear();
   vi.mocked(env.CLINICAL_MEDIA.delete).mockClear();
@@ -538,5 +541,128 @@ describe('D5 — medição paginada e privada de bytes R2 por tenant',()=>{
     const two=await next.json() as {bytes:number;objectCount:number;hasMore:boolean;complete:boolean};
     expect(two).toMatchObject({bytes:2,objectCount:1,hasMore:false,complete:true});
     expect(one.bytes+two.bytes).toBe(1002);
+  });
+});
+
+
+describe('D5 — cópias privadas verificadas e restauração manual sem sobrescrita',()=>{
+  const originalKey='tenants/A/patients/patient-a/photo-a.jpg';
+  const bytes=new Uint8Array([0xff,0xd8,0xff,0x00,0x01,0x02,0x03]);
+  const copied=new Map<string,Uint8Array>();
+  const backup={
+    head:vi.fn(async(key:string)=>copied.has(key)?{key}:null),
+    get:vi.fn(async(key:string)=>{
+      const data=copied.get(key);
+      return data?{body:new Blob([data]).stream()}:null;
+    }),
+    put:vi.fn(async(key:string,value:ArrayBuffer)=>{
+      copied.set(key,new Uint8Array(value));return {key};
+    }),
+    delete:vi.fn(async(key:string)=>{copied.delete(key);}),
+  };
+  const request=(path:string,body:Record<string,unknown>,authed=true)=>mediaWorker.fetch(new Request('https://worker.test'+path,{
+    method:'POST',headers:{Origin:'https://app.test','Content-Type':'application/json',...(authed?{Authorization:'Bearer test'}:{})},
+    body:JSON.stringify(body),
+  }),env);
+  const payload={tenantId:'A',patientId:'patient-a',photoId:'photo-a',
+    reason:'Verificação de contingência clínica autorizada'};
+  function fixture(){
+    copied.clear();
+    for(const spy of [backup.head,backup.get,backup.put,backup.delete])spy.mockClear();
+    (env as unknown as {CLINICAL_MEDIA_BACKUP:unknown}).CLINICAL_MEDIA_BACKUP=backup;
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a',{
+      id:'photo-a',tenantId:'A',patientId:'patient-a',objectKey:originalKey,contentType:'image/jpeg',
+    });
+    storedObjects.set(originalKey,{bytes,contentType:'image/jpeg'});
+  }
+  it('falha fechado quando o bucket secundário não está configurado',async()=>{
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a',{
+      id:'photo-a',tenantId:'A',patientId:'patient-a',objectKey:originalKey,
+    });
+    const r=await request('/v1/media/backups',payload);
+    expect(r.status).toBe(503);
+    expect(writes).toHaveLength(0);
+  });
+  it('faz cópia por hash, verifica por leitura de volta e audita sem divulgar URL privada',async()=>{
+    fixture();
+    const res=await request('/v1/media/backups',payload);
+    expect(res.status,await res.clone().text()).toBe(200);
+    const result=await res.json() as {digest:string;verified:boolean;private:boolean;alreadyBackedUp:boolean;sizeBytes:number;backupKey?:string};
+    expect(result).toMatchObject({verified:true,private:true,alreadyBackedUp:false,sizeBytes:bytes.length});
+    expect(result.digest).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.backupKey).toBeUndefined();
+    expect(copied.size).toBe(1);
+    expect(backup.put).toHaveBeenCalledOnce();
+    expect(backup.get).toHaveBeenCalledOnce();
+    expect(JSON.stringify(writes)).toContain('clinical_photo.backup');
+    expect(JSON.stringify(writes)).toContain(result.digest);
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+    expect(backup.delete).not.toHaveBeenCalled();
+  });
+  it('verifica snapshot existente sem sobrescrever e com auditLog append-only',async()=>{
+    fixture();
+    const first=await request('/v1/media/backups',payload);
+    const result=await first.json() as {digest:string};
+    const key=[...copied.keys()][0];
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a/backups/'+result.digest,{
+      id:result.digest,tenantId:'A',patientId:'patient-a',photoId:'photo-a',
+      sha256:result.digest,objectKey:originalKey,backupKey:key,
+    });
+    writes.length=0;backup.put.mockClear();
+    const second=await request('/v1/media/backups',payload);
+    expect(second.status,await second.clone().text()).toBe(200);
+    expect((await second.json() as {alreadyBackedUp:boolean}).alreadyBackedUp).toBe(true);
+    expect(backup.put).not.toHaveBeenCalled();
+    expect(JSON.stringify(writes)).toContain('clinical_photo.backup_verify');
+    expect(writes).toHaveLength(1);
+  });
+  it('recusa segundo bucket adulterado, acesso cruzado ou profissional sem autorização',async()=>{
+    fixture();
+    seedAccess({role:'receptionist',permissions:['clinical.read','clinical.write']});
+    expect((await request('/v1/media/backups',payload)).status).toBe(403);
+    seedAccess();
+    fixture();
+    expect((await request('/v1/media/backups',{...payload,tenantId:'B',patientId:'patient-b'})).status).toBe(403);
+    expect((await request('/v1/media/backups',{...payload,reason:'curto'})).status).toBe(400);
+    expect((await request('/v1/media/backups',payload,false)).status).toBe(401);
+    expect(writes).toHaveLength(0);
+  });
+  it('restaura somente original ausente de backup SHA-256 íntegro, com duas auditorias',async()=>{
+    fixture();
+    const backupResult=await request('/v1/media/backups',payload);
+    const {digest}=await backupResult.json() as {digest:string};
+    const backupKey=[...copied.keys()][0];
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a/backups/'+digest,{
+      tenantId:'A',patientId:'patient-a',photoId:'photo-a',sha256:digest,
+      objectKey:originalKey,backupKey,
+    });
+    storedObjects.delete(originalKey);
+    writes.length=0;vi.mocked(env.CLINICAL_MEDIA.put).mockClear();
+    const res=await request('/v1/media/backups/restore',{...payload,digest});
+    expect(res.status,await res.clone().text()).toBe(200);
+    expect(await res.json()).toMatchObject({restored:true,verified:true,photoId:'photo-a',digest});
+    expect(storedObjects.get(originalKey)?.bytes).toEqual(bytes);
+    expect(env.CLINICAL_MEDIA.put).toHaveBeenCalledOnce();
+    expect(JSON.stringify(writes)).toContain('clinical_photo.recovery_requested');
+    expect(JSON.stringify(writes)).toContain('clinical_photo.recovery_verified');
+    expect(backup.delete).not.toHaveBeenCalled();
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+  });
+  it('bloqueia sobrescrita de original existente e backup alterado sem qualquer PUT',async()=>{
+    fixture();
+    const backupResult=await request('/v1/media/backups',payload);
+    const {digest}=await backupResult.json() as {digest:string};
+    const key=[...copied.keys()][0];
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a/backups/'+digest,{
+      tenantId:'A',patientId:'patient-a',photoId:'photo-a',sha256:digest,
+      objectKey:originalKey,backupKey:key,
+    });
+    writes.length=0;vi.mocked(env.CLINICAL_MEDIA.put).mockClear();
+    expect((await request('/v1/media/backups/restore',{...payload,digest})).status).toBe(409);
+    storedObjects.delete(originalKey);
+    copied.set(key,new Uint8Array([0x01,0x02,0x03]));
+    expect((await request('/v1/media/backups/restore',{...payload,digest})).status).toBe(409);
+    expect(env.CLINICAL_MEDIA.put).not.toHaveBeenCalled();
+    expect(writes).toHaveLength(0);
   });
 });
