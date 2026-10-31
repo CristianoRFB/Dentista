@@ -768,6 +768,12 @@ service cloud.firestore {
           allow get, list: if clinicalRead(tenantId);
           // Media is uploaded by the authenticated R2 Worker after server-side authorization.
           allow create, update, delete: if false;
+
+          match /backups/{sha256Digest} {
+            // Private integrity manifests belong exclusively to the Worker service account.
+            // Neither dentists nor Platform Owners may access or forge this ledger via client SDK.
+            allow read, write: if false;
+          }
         }
       }
 

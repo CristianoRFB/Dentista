@@ -925,3 +925,25 @@ describe('D4 — Firestore Rules para pedidos públicos não confirmados',()=>{
     }));
   });
 });
+
+describe('D5 — proteção explícita dos manifestos privados de backup',()=>{
+  const path='tenants/A/patients/patient-a/clinicalPhotos/photo-a/backups/'+ 'a'.repeat(64);
+  it('nega leitura e gravação direta de manifestos ao dentista, dono, platform owner e anônimo',async()=>{
+    await env.withSecurityRulesDisabled(async context=>{
+      await setDoc(doc(context.firestore(),path),{
+        tenantId:'A',patientId:'patient-a',photoId:'photo-a',
+        sha256:'a'.repeat(64),verification:'sha256_readback',
+        backupKey:'snapshots/private',sizeBytes:3,
+      });
+    });
+    for(const auth of [env.authenticatedContext('dentist-a'),
+      env.authenticatedContext('tenant-owner-a'),env.authenticatedContext('platform-owner'),
+      env.unauthenticatedContext()]){
+      const db=auth.firestore(),entry=doc(db,path);
+      await assertFails(getDoc(entry));
+      await assertFails(setDoc(entry,{tenantId:'A',sha256:'forged'},{merge:true}));
+      await assertFails(deleteDoc(entry));
+    }
+    await assertFails(getDoc(doc(env.authenticatedContext('dentist-b').firestore(),path)));
+  });
+});
