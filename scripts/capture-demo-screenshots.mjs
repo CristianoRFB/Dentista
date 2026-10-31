@@ -8,6 +8,7 @@ import {spawn} from 'node:child_process';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {chromium} from 'playwright';
+import {createHash} from 'node:crypto';
 import {auditRenderedAccessibility} from './a11y-smoke-audit.mjs';
 
 const PORT=5174;
@@ -96,8 +97,10 @@ try{
           'Accessibility smoke failed: '+route.id+' ('+viewport.name+'): '+
           JSON.stringify(accessibilityScan.issues.slice(0,12))
         );
+        const file=route.id+'-'+viewport.name+'.png';
+        const sha256=createHash('sha256').update(await readFile(path.join(OUT,file))).digest('hex');
         results.push({route:route.displayUrl??route.url,viewport:viewport.name,size:`${viewport.width}x${viewport.height}`,
-          file:route.id+'-'+viewport.name+'.png',heading,classification:'SCREENSHOT_REAL_DEMO',containsOnlyFictitiousData:true});
+          file,sha256,heading,classification:'SCREENSHOT_REAL_DEMO',containsOnlyFictitiousData:true});
         // Functional smoke checks run AFTER capturing the unmodified real page.
         if(route.id==='dashboard'){
           const skip=page.locator('.skip-to-clinical-content');
@@ -159,6 +162,7 @@ try{
       }finally{await page.close();}
     }
   }finally{await ephemeralContext.close();}
+  if(results.length!==routes.length*viewports.length)throw new Error('Incomplete demo screenshot coverage');
   await writeFile(path.join(OUT,'ACCESSIBILITY_AUDIT.json'),JSON.stringify({
     classification:'ACCESSIBILITY_AUTOMATED_SMOKE',notWCAGCertification:true,
     notScreenReaderTest:true,notProduction:true,checkedPages:accessibility.length,
@@ -166,7 +170,8 @@ try{
     findings:accessibility,
   },null,2)+'\n');
   await writeFile(path.join(OUT,'SCREENSHOTS_MANIFEST.json'),JSON.stringify({
-    classification:'SCREENSHOT_REAL_DEMO',capturedAt:new Date().toISOString(),
+    classification:'SCREENSHOT_REAL_DEMO',capturedAt:new Date().toISOString(),sourceCommit:process.env.GITHUB_SHA??null,
+    expectedScreenshots:routes.length*viewports.length,sha256Checksums:true,
     source:'running Vite development server with VITE_USE_DEMO_DATA=true',
     notProduction:true,notClientData:true,notConceptArt:true,images:results,
   },null,2)+'\n');

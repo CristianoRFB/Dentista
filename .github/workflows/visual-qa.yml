@@ -45,4 +45,4 @@ jobs:
           name: odontoflow-real-demo-screenshots
           path: visual-smoke-artifacts/
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 30
