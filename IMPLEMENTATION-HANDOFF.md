@@ -100,3 +100,14 @@ D4 implementado neste lote: helper `personalInviteUrl.ts` cria URLs individuais 
 `/v1/booking/tokens/revoke` e `/v1/intake/tokens/revoke` permitem revogação transacional por equipe autorizada, com `revokedAt/revokedBy` e audit log; não apagam registros clínicos, submissões já recebidas ou consultas confirmadas. UI de recepção/agenda possui confirmação explícita. Testes incluem replay, used vs revoked, negação entre tenants, preservação e simulação correta de `updateMask`.
 
 Régua `docs/PRE_PC_COMPLETENESS.md`: D4 passa a 16/18, implementação interna estimada **90/100**, projeto até produção **~63%**. Permanecem por fazer o agendamento aberto sem convite com antiabuso, retenção e backup real de fotos, QA físico/a11y, screenshots canônicos, provisionamento Firebase/Worker/R2, staging e deploy. Sem billing automático; pricing e limites comerciais não foram modificados.
+
+## Checkpoint 31/10/2026 — código do agendamento e medição R2
+
+Prosseguir do SHA **`eb6f99f15798ac7a6037baed8409ca6622d4b662`**, CI push [#41222771170](https://github.com/CristianoRFB/Dentista/actions/runs/41222771170), CI PR [#41222774221](https://github.com/CristianoRFB/Dentista/actions/runs/41222774221) e Chromium [#41222771156](https://github.com/CristianoRFB/Dentista/actions/runs/41222771156) aprovados. Branch atual continua `chore/global-standard-v01-ci-20261027`, PR #1 aberto sem merge nem deploy.
+
+- D4: validação de horário local e DST via `bookingTime.ts`, limites no formulário e testes; agendamento aberto continua pendente.
+- D5: medição R2 de bytes por tenant, paginada e read-only, protegida por membership `usage.read`. UI dashboard em MiB com indicador de medição parcial/complete. Não executar limites/quota, backup automático ou cobrança baseado nessa medição.
+- D7: 26 screenshots **de demo fictício** e smoke de tokens removidos dos endereços.
+- Estimativa `docs/PRE_PC_COMPLETENESS.md`: implementação 91/100; preparo de produção ~64%, ambos heurísticos. Sem ambiente hospedado e backup/restore ainda.
+
+A próxima execução deve ler apenas o delta desde este SHA, não reanalisar D1–D3 nem alterar tabela de preços ou billing.

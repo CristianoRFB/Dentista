@@ -1,6 +1,6 @@
 # PRE-PC COMPLETENESS — OdontoFlow
 
-Atualização incremental: 2026-10-29. Fonte: branch `chore/global-standard-v01-ci-20261027`, não produção.
+Atualização incremental: 2026-10-31. Fonte: branch `chore/global-standard-v01-ci-20261027`, não produção.
 Não usar esta tabela como prova de homologação hospedada. Sem pacientes reais.
 
 | Módulo GOAL | Código principal | Teste verificável | Estado deste checkpoint |
@@ -9,7 +9,7 @@ Não usar esta tabela como prova de homologação hospedada. Sem pacientes reais
 | D2 Tratamento/orçamento | `src/domain/treatmentPlan.ts`, `src/lib/treatmentPlanData.ts`, `src/modules/clinical/PatientTreatmentPage.tsx`, `firestore.rules` | `tests/treatmentPlan.test.ts`, `tests/firestoreRules.test.ts` | CODE_COMPLETE — CI `b06af554` verde, versões append-only e orçamento Pro; ambiente real pendente |
 | D3 Central de Retorno | `src/lib/recallData.ts`, `src/lib/recallValidation.ts`, `src/modules/recalls/RecallCenterPage.tsx`, `firestore.rules` | `tests/recallValidation.test.ts`, `tests/firestoreRules.test.ts` | CODE_COMPLETE — CI `7108c582` verde; ambiente real pendente |
 | D4 Intake + booking público | `src/modules/public/PublicIntakePage.tsx`, `src/modules/tenant/IntakeReviewPage.tsx`, `src/modules/tenant/BookingInvitesPage.tsx`, `src/lib/publicBookingClient.ts`, `workers/media-api/src/publicBooking.ts`, `workers/media-api/src/index.ts` | `tests/appointmentWorker.test.ts`, `tests/firestoreRules.test.ts` | PARTIAL — pré-cadastro Pro e agendamento Essencial por convite individual, segredo em fragmento de URL com limpeza de histórico, revogação autenticada com auditoria e bloqueio de replay; agenda aberta anônima não habilitada e homologação hospedada pendente |
-| D5 Segurança + mídia | `workers/media-api/src/index.ts`, `workers/media-api/src/mediaLifecycle.ts`, `workers/media-api/src/mediaIntegrity.ts`, `src/modules/clinical-media/ClinicalPhotosPage.tsx` | `tests/mediaWorker.test.ts`, `tests/mediaLifecycle.test.ts`, `tests/mediaIntegrity.test.ts`, `tests/firestoreRules.test.ts` | PARTIAL — revisão reversível auditada e comparação paginada R2 × Firestore por paciente (100/500 por página, teto de 3.000 por origem), somente leitura; backup/retention e hospedagem pendentes |
+| D5 Segurança + mídia | `workers/media-api/src/index.ts`, `workers/media-api/src/mediaLifecycle.ts`, `workers/media-api/src/mediaIntegrity.ts`, `workers/media-api/src/mediaUsage.ts`, `src/modules/clinical-media/ClinicalPhotosPage.tsx` | `tests/mediaWorker.test.ts`, `tests/mediaLifecycle.test.ts`, `tests/mediaIntegrity.test.ts`, `tests/mediaUsage.test.ts`, `tests/firestoreRules.test.ts` | PARTIAL — revisão reversível auditada; diagnóstico R2 × Firestore por paciente e medição de bytes de fotos R2 por tenant com paginação autenticada `usage.read`, sem quota/billing. Backup/retention e hospedagem pendentes |
 | D6 UX clínica | Menu mobile acessível, pesquisa/paginação de pacientes, agenda por dia, tabelas responsivas e telas clínicas | `tests/patientList.test.ts`, `tests/agendaDate.test.ts`, visual Chromium demo | PARTIAL — foco modal mobile, atalho de pular conteúdo e smoke real Chromium comprovados; QA de leitor de tela/dispositivos físicos pendente |
 | D7 CI e sessão PC | `.github/workflows/ci.yml`, `.github/workflows/visual-qa.yml`, `scripts/capture-demo-screenshots.mjs` | GitHub Actions com unit, Rules/Emulator, build, docs e Chromium demo desktop/mobile | PARTIAL — 22 screenshots reais de **DEMO** e manifesto arquivados no Actions #40953800997; smoke de foco, Esc, menu e busca passou; screenshots canônicos/produção e sessão PC pendentes |
 
@@ -29,7 +29,7 @@ Checkout, gateway, billing automático, webhooks de cobrança, WhatsApp oficial,
 Essencial R$79,90; Pro R$129,90; Premium R$189,90 — contrato preservado.
 
 
-## Estimativa ponderada de avanço do código — 29/10/2026 (D6 acessibilidade / D7 22 capturas)
+## Estimativa ponderada de avanço do código — 31/10/2026 (D4 horários / D5 bytes R2 / D7 26 capturas)
 
 **Estimativa revisada, não certificação.** Escala fechada de 100 pontos de requisitos executáveis distribuídos por risco e complexidade; build/CI não representa homologação. Os pontos de D6 e D7 abaixo consideram a execução bem-sucedida de seus testes de navegador; se falharem, o valor deve ser reavaliado.
 
@@ -39,12 +39,12 @@ Essencial R$79,90; Pro R$129,90; Premium R$189,90 — contrato preservado.
 | D2 Tratamento/orçamento | 14 | 14 | Sem pendência P0 codificável constatada |
 | D3 Retornos | 10 | 10 | Sem pendência P0 codificável constatada |
 | D4 Intake/booking | 18 | 16 | Agendamento aberto sem convite + proteção antiabuso continuam pendentes |
-| D5 Mídia/documentos | 18 | 15 | Backup/retention operacionais, recovery e documentos avançados |
+| D5 Mídia/documentos | 18 | 16 | Backup/retention operacionais, recuperação e documentos avançados; medição R2 já codificada e testada, sem validação hospedada |
 | D6 UX/acessibilidade | 16 | 14 | Leitor de tela, cobertura das demais rotas e dispositivos físicos |
 | D7 CI/evidências | 10 | 7 | Persistência visual canônica, runtime hospedado, sessão PC |
-| **Total implementação** | **100** | **90** | **~90% estimado de implementação interna** |
+| **Total implementação** | **100** | **91** | **~91% estimado de implementação interna** |
 
-**Avanço geral até produção: ~63%** (90% × 70% = 63,0%), considerando peso 70% da implementação e 30% de infraestrutura, testes hospedados, backup, segurança operacional, LGPD e deploy ainda não demonstrados. É uma régua de planejamento conservadora, não um levantamento independente de todos os requisitos legais/clínicos.
+**Avanço geral até produção: ~64%** (91% × 70% = 63,7%, arredondado), considerando peso 70% da implementação e 30% de infraestrutura, testes hospedados, backup, segurança operacional, LGPD e deploy ainda não demonstrados. É uma régua de planejamento conservadora, não um levantamento independente de todos os requisitos legais/clínicos.
 
 **Evidência específica do D5:** `GET /v1/media/integrity` pagina Firestore em lotes de 100 e R2 em lotes de 500, com teto de 3.000 registros por origem, cursores verificados e nenhum DELETE. Falha sem resposta parcial acima do limite; não se trata de snapshot atômico. Os testes `tests/mediaIntegrity.test.ts` e `tests/mediaWorker.test.ts` abrangem paginação, falta de objeto, órfãos candidatos, tenant A × B e cap. Não há reparo/backup automático.
 
@@ -64,3 +64,12 @@ Essencial R$79,90; Pro R$129,90; Premium R$189,90 — contrato preservado.
 - **Estimativa interna:** D4 16/18; total 90/100 (antes 88/100). **Avanço geral conservador:** ~63%. São pontuações heurísticas, não homologação regulatória ou indicador automático.
 
 **Pendentes reais:** agendamento aberto sem convite exigiria controles antiabuso adicionais e definição de política de disponibilidade; retenção/backup clínicos, revisão em dispositivos, screenshots canônicos, Firebase/Workers/R2 provisionados e testes hospedados continuam sem comprovação. Sem deploy e sem billing automático.
+
+## Checkpoint D4/D5/D7 — 31/10/2026 (último lote confirmado)
+
+- **SHA de código testado:** `eb6f99f15798ac7a6037baed8409ca6622d4b662`. [CI push #41222771170](https://github.com/CristianoRFB/Dentista/actions/runs/41222771170) e [CI PR #41222774221](https://github.com/CristianoRFB/Dentista/actions/runs/41222774221): **success**. Unit/Worker, typecheck, Firestore Emulator, build e validação de padrões aprovados.
+- **D4:** `src/lib/bookingTime.ts` valida e converte horários locais, detecta datas impossíveis e exige janela futura 5 min–60 dias. `PublicBookingPage` usa limites visíveis no `datetime-local`. Teste `tests/bookingTime.test.ts`. Não substitui a validação de conflito/convite no Worker; **agendamento aberto anônimo permanece desabilitado**.
+- **D5:** `GET /v1/media/usage?tenantId=...` exige identidade, membership ativa e `usage.read`, conta objetos/bytes R2 do prefixo de pacientes do tenant em páginas de até 500. UI sob demanda no painel do responsável, com continuação de páginas (até 20 por chamada) e atualização de medição completa. Não expõe nomes de arquivos no JSON; rejeita parâmetros extras, escopo inválido, demo e tenants cruzados. Testes `tests/mediaUsage.test.ts`, `tests/mediaWorker.test.ts`. **Leitura sem snapshot atômico**: não equivale a billing, quota aprovada, prova de backup, retenção ou restauração.
+- **D7:** teste Chromium com **26 screenshots** do app em modo demonstrativo (13 rotas × desktop/mobile), incluindo formulários reais de agendamento e pré-cadastro por convite com **tokens exclusivamente fictícios** e removidos da barra antes da captura. [Visual QA #41222771156](https://github.com/CristianoRFB/Dentista/actions/runs/41222771156): **success**. São capturas `SCREENSHOT_REAL_DEMO`, não imagens canônicas nem produção.
+- **Régua conservadora atual:** D1 14/14, D2 14/14, D3 10/10, D4 16/18, **D5 16/18**, D6 14/16, D7 7/10. **Total 91/100 (~91% implementação interna); ~64% até produção**. Ganho de +1 ponto em D5 por medição implementada e testada. Capturas extras e validação local de horário não fecham os gates pendentes.
+- **Próximo código de maior risco:** política/versionamento de backup e recuperação R2; estratégia explícita antiabuso para agendamento sem convite; evidências de QA real em leitor de tela. **Infraestrutura hospedada, segredos, LGPD operacional, backup/restore e deploy continuam sem comprovação; não ativar produção sem validação.** Nenhum preço alterado e nenhum pagamento automático implementado.
