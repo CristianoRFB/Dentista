@@ -21,6 +21,7 @@ const app=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.
 });
 let stderr='';
 app.stderr.on('data',data=>{stderr+=String(data).slice(-3000);});
+const QA_INVITE_TOKEN='A'.repeat(43); // Fixture only; never a valid real invitation.
 const routes=[
   {id:'pricing',url:'/precos',heading:/Planos pensados/i},
   {id:'clinic-public',url:'/demo-clinica',heading:/Odontologia clara, humana e organizada/i},
@@ -33,6 +34,10 @@ const routes=[
   {id:'treatment',url:'/demo-clinica/app/pacientes/p1/tratamento',heading:/^Tratamento — Marina Souza$/i},
   {id:'clinical-photos',url:'/demo-clinica/app/pacientes/p1/fotos',heading:/^Fotos clínicas$/i},
   {id:'public-booking-demo',url:'/demo-clinica/agendar',heading:/Selecione um procedimento ilustrativo/i},
+  {id:'public-booking-invite',url:'/clinica-qa/agendar#token='+QA_INVITE_TOKEN,
+    displayUrl:'/clinica-qa/agendar',heading:/Selecione o horário/i},
+  {id:'public-intake-invite',url:'/clinica-qa/cadastro#token='+QA_INVITE_TOKEN,
+    displayUrl:'/clinica-qa/cadastro',heading:/^Pré-cadastro$/i},
 ];
 const viewports=[
   {name:'desktop',width:1365,height:850,isMobile:false},
@@ -65,8 +70,23 @@ try{
         if(['dashboard','agenda','patients','recalls','clinical-demo-notice','odontogram','treatment','clinical-photos'].includes(route.id)){
           await page.locator('main.content .demo-banner').first().waitFor({state:'visible',timeout:15000});
         }
+        if(route.id==='public-booking-invite'||route.id==='public-intake-invite'){
+          // Fake bearer data must be removed before a screenshot/manifest is archived.
+          await page.waitForFunction(()=>!location.search.includes('token=')&&!location.hash.includes('token='));
+          if(page.url().includes(QA_INVITE_TOKEN))throw new Error('Invite leaked into screenshot browser URL');
+          if(route.id==='public-booking-invite'){
+            const time=page.locator('#booking-time');
+            await time.waitFor({state:'visible'});
+            const attrs=await time.evaluate(el=>({min:el.getAttribute('min'),max:el.getAttribute('max'),
+              step:el.getAttribute('step'),type:el.getAttribute('type')}));
+            if(!attrs.min||!attrs.max||attrs.min>=attrs.max||attrs.step!=='60'||attrs.type!=='datetime-local')
+              throw new Error('Real booking form is missing bounded datetime input: '+JSON.stringify(attrs));
+          }else{
+            await page.getByRole('textbox',{name:'Nome completo'}).waitFor({state:'visible'});
+          }
+        }
         await page.screenshot({path:path.join(OUT,route.id+'-'+viewport.name+'.png'),fullPage:true,animations:'disabled'});
-        results.push({route:route.url,viewport:viewport.name,size:`${viewport.width}x${viewport.height}`,
+        results.push({route:route.displayUrl??route.url,viewport:viewport.name,size:`${viewport.width}x${viewport.height}`,
           file:route.id+'-'+viewport.name+'.png',heading,classification:'SCREENSHOT_REAL_DEMO',containsOnlyFictitiousData:true});
         // Functional smoke checks run AFTER capturing the unmodified real page.
         if(route.id==='dashboard'){
@@ -112,7 +132,7 @@ try{
     await context.close();
   }
   // Verify that capability-bearing public URLs are cleaned without submitting clinical data.
-  const singleUseToken='A'.repeat(43);
+  const singleUseToken=QA_INVITE_TOKEN;
   const ephemeralContext=await browser.newContext({locale:'pt-BR'});
   try {
     for(const item of [

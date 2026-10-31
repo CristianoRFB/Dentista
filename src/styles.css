@@ -124,3 +124,11 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible 
 .skip-to-clinical-content{position:fixed;top:10px;left:12px;z-index:120;padding:12px 16px;background:#fff;color:#102f2d;border:3px solid #e1a64c;border-radius:8px;font-weight:750;transform:translateY(-180%);transition:transform .12s}
 .skip-to-clinical-content:focus-visible{transform:translateY(0)}
 @media(prefers-reduced-motion:reduce){.skip-to-clinical-content{transition:none}}
+
+/* Convite individual: campo de data legível e utilizável em dispositivos móveis. */
+.booking-card .data-form{display:grid;gap:14px;margin-top:24px}
+.booking-card .data-form label{display:block;font-size:13px;font-weight:800}
+.booking-card .data-form input[type="datetime-local"]{width:100%;max-width:420px;min-height:48px;border:1px solid var(--line);border-radius:12px;padding:11px 13px;background:#fbfcfb;color:var(--ink);color-scheme:light}
+.booking-card .data-form .muted{line-height:1.65;font-size:13px}
+.booking-card .data-form .btn{justify-self:start}
+@media(max-width:600px){.booking-card .data-form input[type="datetime-local"],.booking-card .data-form .btn{max-width:none;width:100%}}
