@@ -557,3 +557,92 @@ describe('D4 — agendamento público protegido por convite de uso único', () =
     expect(invalid.status).toBe(400);
   });
 });
+
+
+describe('D4 — solicitação aberta de agendamento com Turnstile e recepção',()=>{
+  const requestPath='/v1/public/booking-requests';
+  const good={tenantSlug:'clinica-a',name:'Pessoa de Teste',phone:'11988776655',email:'anon@example.test',
+    preferredAt:new Date(Date.now()+60*60*1000).toISOString(),turnstileToken:'t'.repeat(48)};
+  function setup(){
+    documents.set('tenants/A',{...documents.get('tenants/A')!,slug:'clinica-a'});
+    documents.set('tenants/B',{...documents.get('tenants/B')!,slug:'clinica-b'});
+    documents.set('tenantSlugs/clinica-a',{tenantId:'A',slug:'clinica-a',status:'active'});
+    documents.set('tenantSlugs/clinica-b',{tenantId:'B',slug:'clinica-b',status:'active'});
+    documents.set('tenants/A/publicProfile/public',{tenantId:'A',openBookingRequestsEnabled:true});
+    documents.set('tenants/B/publicProfile/public',{tenantId:'B',openBookingRequestsEnabled:false});
+    const env=workerEnv as unknown as {TURNSTILE_SECRET_KEY?:string;OPEN_BOOKING_RATE_LIMITER?:{limit: ReturnType<typeof vi.fn>}};
+    env.TURNSTILE_SECRET_KEY='test-secret';
+    env.OPEN_BOOKING_RATE_LIMITER={limit:vi.fn(async()=>({success:true}))};
+    vi.stubGlobal('fetch',async(input:RequestInfo|URL,init?:RequestInit)=>{
+      const url=String(input);
+      if(url.includes('challenges.cloudflare.com/turnstile/v0/siteverify')){
+        return jsonResponse({success:true,hostname:'app.test',action:'open_booking_request'});
+      }
+      return fakeFirestoreFetch(input,init);
+    });
+    return env;
+  }
+  async function send(payload:Record<string,unknown>=good,opts?:{ip?:string;origin?:string}){
+    return appointmentWorker.fetch(new Request('https://worker.test'+requestPath,{
+      method:'POST',headers:{Origin:opts?.origin??'https://app.test','Content-Type':'application/json',
+        ...(opts?.ip===null?{}:{'CF-Connecting-IP':opts?.ip??'203.0.113.12'})},
+      body:JSON.stringify(payload),
+    }),workerEnv);
+  }
+  it('cria pedido pendente isolado e auditado, mas nunca consulta, patient ou scheduleLock',async()=>{
+    const env=setup();
+    const response=await send();
+    expect(response.status,await response.clone().text()).toBe(202);
+    expect(await response.json()).toMatchObject({received:true,notConfirmed:true});
+    const requests=[...documents.entries()].filter(([key])=>key.startsWith('tenants/A/openBookingRequests/'));
+    expect(requests).toHaveLength(1);
+    expect(requests[0][1]).toMatchObject({tenantId:'A',status:'pending_review',name:good.name,
+      phone:good.phone,preferredAt:good.preferredAt});
+    expect([...documents.values()].some(value=>value.action==='open_booking_request.create')).toBe(true);
+    expect([...documents.keys()].filter(key=>key.startsWith('tenants/A/appointments/'))).toHaveLength(2);
+    expect([...documents.keys()].filter(key=>key.startsWith('tenants/A/scheduleLocks/'))).toHaveLength(0);
+    expect(env.OPEN_BOOKING_RATE_LIMITER?.limit).toHaveBeenCalledOnce();
+    expect(response.headers.get('Cache-Control')).toContain('no-store');
+  });
+  it('falha fechado quando proteção, IP confiável, flag da clínica ou siteverify faltam',async()=>{
+    const env=setup();
+    env.TURNSTILE_SECRET_KEY=undefined;
+    expect((await send()).status).toBe(503);
+    env.TURNSTILE_SECRET_KEY='test-secret';
+    env.OPEN_BOOKING_RATE_LIMITER=undefined;
+    expect((await send()).status).toBe(503);
+    const binding=vi.fn(async()=>({success:true}));
+    env.OPEN_BOOKING_RATE_LIMITER={limit:binding};
+    expect((await send(good,{ip:null as unknown as string})).status).toBe(503);
+    binding.mockImplementationOnce(async()=>({success:false}));
+    expect((await send()).status).toBe(429);
+    documents.set('tenants/A/publicProfile/public',{tenantId:'A',openBookingRequestsEnabled:false});
+    expect((await send()).status).toBe(404);
+    expect([...documents.keys()].filter(key=>key.includes('/openBookingRequests/'))).toHaveLength(0);
+  });
+  it('rejeita contato inválido, tenant B, demo e origem externa sem criar registros',async()=>{
+    setup();
+    expect((await send({...good,name:'X'})).status).toBe(400);
+    expect((await send({...good,tenantSlug:'clinica-b'})).status).toBe(404);
+    documents.set('tenants/A',{...documents.get('tenants/A')!,planId:'premium_demo',subscriptionStatus:'demo'});
+    expect((await send()).status).toBe(404);
+    const other=await send(good,{origin:'https://evil.test'});
+    expect(other.status).toBe(403);
+    expect([...documents.keys()].filter(k=>k.includes('/openBookingRequests/'))).toHaveLength(0);
+  });
+  it('rejeita captcha sem sucesso, action divergente ou hostname diferente',async()=>{
+    setup();
+    for(const bad of [
+      {success:false,hostname:'app.test',action:'open_booking_request'},
+      {success:true,hostname:'evil.test',action:'open_booking_request'},
+      {success:true,hostname:'app.test',action:'login'},
+    ]){
+      vi.stubGlobal('fetch',async(input:RequestInfo|URL,init?:RequestInit)=>{
+        if(String(input).includes('challenges.cloudflare.com'))return jsonResponse(bad);
+        return fakeFirestoreFetch(input,init);
+      });
+      expect((await send()).status).toBe(403);
+    }
+    expect([...documents.keys()].filter(k=>k.includes('/openBookingRequests/'))).toHaveLength(0);
+  });
+});
