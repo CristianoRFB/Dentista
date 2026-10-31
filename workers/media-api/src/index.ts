@@ -1087,6 +1087,45 @@ async function manualBackupClinicalPhoto(env:Env,uid:string,payload:unknown) {
   }catch(e){await rollbackTransaction(env,token,transaction);throw e;}
 }
 
+
+/** Authorized, bounded listing of backup manifests; never returns bucket keys or image data. */
+async function listClinicalPhotoBackups(env:Env,uid:string,payload:unknown) {
+  if(!payload||typeof payload!=='object'||Array.isArray(payload))throw new HttpError(400,'invalid_backup_listing');
+  const params=payload as Record<string,unknown>;
+  if(Object.keys(params).some(key=>!['tenantId','patientId','photoId','pageToken'].includes(key)))
+    throw new HttpError(400,'invalid_backup_listing');
+  const input={tenantId:params.tenantId,patientId:params.patientId,photoId:params.photoId,
+    reason:'Consulta autorizada de snapshots'} as BackupInput;
+  // Role/tenant checks run before any list call and before returning collection metadata.
+  try{validateBackupInput(input);}catch{throw new HttpError(400,'invalid_backup_listing');}
+  if(params.pageToken!==undefined && (typeof params.pageToken!=='string'||
+    params.pageToken.length<1||params.pageToken.length>2048))throw new HttpError(400,'invalid_backup_listing');
+  const token=await serviceAccountToken(env);
+  await validateClinicalBackupScope(env,token,uid,input);
+  const parent='tenants/'+input.tenantId+'/patients/'+input.patientId+
+    '/clinicalPhotos/'+input.photoId+'/backups';
+  const url=new URL(firestoreRoot(env)+'/'+encodedDocumentPath(parent));
+  url.searchParams.set('pageSize','50');
+  if(typeof params.pageToken==='string')url.searchParams.set('pageToken',params.pageToken);
+  let result:{documents?:FsDocument[];nextPageToken?:string}|null;
+  try{result=await firestoreRequest(url.toString(),token);}
+  catch{throw new HttpError(503,'backup_manifest_list_unavailable');}
+  if(result?.documents && (!Array.isArray(result.documents)||result.documents.length>50))
+    throw new HttpError(503,'backup_manifest_list_invalid');
+  const records=(result?.documents??[]).map(doc=>{
+    const entry=decodeDocument(doc);
+    if(!entry || entry.tenantId!==input.tenantId || entry.patientId!==input.patientId ||
+      entry.photoId!==input.photoId || typeof entry.sha256!=='string' ||
+      !/^[a-f0-9]{64}$/.test(entry.sha256) ||
+      !Number.isSafeInteger(entry.sizeBytes) || entry.sizeBytes<1 ||
+      entry.verification!=='sha256_readback')
+      throw new HttpError(503,'backup_manifest_invalid');
+    return {digest:entry.sha256,sizeBytes:entry.sizeBytes,createdAt:entry.createdAt??null};
+  });
+  return {photoId:input.photoId,records,nextPageToken:result?.nextPageToken??null,
+    hasMore:Boolean(result?.nextPageToken),private:true};
+}
+
 async function manualRestoreClinicalPhoto(env:Env,uid:string,payload:unknown) {
   let input:BackupInput;
   try{input=validateBackupInput(payload,true);}catch{throw new HttpError(400,'invalid_restore_request');}
@@ -1445,6 +1484,15 @@ async function handle(request: Request, env: Env) {
     return json(request, env, 200, result);
   }
 
+  if(request.method==='POST' && url.pathname==='/v1/media/backups/list') {
+    let payload:unknown;
+    try{
+      const raw=await request.text();
+      if(raw.length>4096)throw new HttpError(413,'request_too_large');
+      payload=JSON.parse(raw);
+    }catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,'invalid_json');}
+    return json(request,env,200,await listClinicalPhotoBackups(env,user.uid,payload));
+  }
   if(request.method==='POST' && (url.pathname==='/v1/media/backups' ||
     url.pathname==='/v1/media/backups/restore')) {
     const length=Number(request.headers.get('Content-Length')??'0');
