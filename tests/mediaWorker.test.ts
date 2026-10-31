@@ -118,6 +118,15 @@ beforeAll(async () => {
       const marker = '/documents/';
       const index = url.pathname.indexOf(marker);
       const path = decodeURIComponent(url.pathname.slice(index + marker.length));
+      if(path.endsWith('/backups')){
+        const prefix=path+'/';
+        const rows=[...documents.entries()].filter(([name])=>name.startsWith(prefix) &&
+          !name.slice(prefix.length).includes('/')).sort(([a],[b])=>a.localeCompare(b));
+        const page=rows.slice(0,50);
+        return new Response(JSON.stringify({documents:page.map(([name,value])=>firestoreDoc(name,value))}),{
+          status:200,headers:{'Content-Type':'application/json'},
+        });
+      }
       const data = documents.get(path);
       return data
         ? new Response(JSON.stringify(firestoreDoc(path, data)), { status: 200, headers: { 'Content-Type': 'application/json' } })
@@ -665,5 +674,48 @@ describe('D5 — cópias privadas verificadas e restauração manual sem sobresc
     expect((await request('/v1/media/backups/restore',{...payload,digest})).status).toBe(409);
     expect(env.CLINICAL_MEDIA.put).not.toHaveBeenCalled();
     expect(writes).toHaveLength(0);
+  });
+});
+
+
+describe('D5 — catálogo de backups verificados sem vazamento de chaves R2',()=>{
+  const req=(payload:Record<string,unknown>,authed=true)=>mediaWorker.fetch(new Request('https://worker.test/v1/media/backups/list',{
+    method:'POST',headers:{Origin:'https://app.test','Content-Type':'application/json',
+      ...(authed?{Authorization:'Bearer test'}:{})},body:JSON.stringify(payload),
+  }),env);
+  const ids={tenantId:'A',patientId:'patient-a',photoId:'photo-a'};
+  const original='tenants/A/patients/patient-a/photo-a.jpg';
+  function seed(){
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a',{
+      id:'photo-a',tenantId:'A',patientId:'patient-a',objectKey:original,
+    });
+  }
+  it('lista manifestos verificados sem expor chaves R2, fotos ou motivo de auditoria',async()=>{
+    seed();
+    const digest='b'.repeat(64);
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a/backups/'+digest,{
+      id:digest,tenantId:'A',patientId:'patient-a',photoId:'photo-a',
+      sha256:digest,backupKey:'snapshots/private-opaque-key',
+      objectKey:original,sizeBytes:10,createdAt:'2026-10-31T14:30:00.000Z',
+      verification:'sha256_readback',
+    });
+    const response=await req(ids);
+    expect(response.status,await response.clone().text()).toBe(200);
+    const body=await response.text();
+    expect(body).not.toContain('snapshots/');
+    expect(body).not.toContain('private-opaque-key');
+    expect(body).not.toContain(original);
+    expect(JSON.parse(body)).toMatchObject({photoId:'photo-a',hasMore:false,private:true,
+      records:[{digest,sizeBytes:10}]});
+  });
+  it('nega visitante, clínica B, papel administrativo e campos extras',async()=>{
+    seed();
+    expect((await req(ids,false)).status).toBe(401);
+    expect((await req({...ids,tenantId:'B',patientId:'patient-b'})).status).toBe(403);
+    expect((await req({...ids,extra:'x'})).status).toBe(400);
+    expect((await req({...ids,pageToken:'a'.repeat(3000)})).status).toBe(400);
+    seedAccess({role:'tenant_owner',permissions:['clinical.read','clinical.write']});
+    seed();
+    expect((await req(ids)).status).toBe(403);
   });
 });
