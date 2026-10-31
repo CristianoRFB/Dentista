@@ -98,3 +98,11 @@ export const createPhotoBackup=(scope:BackupScope,reason:string)=>backupApi<{
 export const recoverMissingPhoto=(scope:BackupScope,digest:string,reason:string)=>backupApi<{
   photoId:string;digest:string;restored:true;verified:true;
 }>('/v1/media/backups/restore',{...scope,digest,reason});
+
+export interface BatchBackupReport {
+  succeeded:number;failed:number;complete:boolean;private:true;automatic:false;noOriginalsModified:true;
+  items:Array<{photoId:string;status:'verified'|'failed';digest?:string;alreadyBackedUp?:boolean;
+    sizeBytes?:number;error?:string}>;
+}
+export const createPatientBackupBatch=(tenantId:string,patientId:string,photoIds:string[],reason:string)=>
+  backupApi<BatchBackupReport>('/v1/media/backups/batch',{tenantId,patientId,photoIds,reason});

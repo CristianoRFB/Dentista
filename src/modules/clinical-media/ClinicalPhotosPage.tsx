@@ -1,7 +1,7 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { ClinicalPhoto } from '../../domain/types';
-import { createPhotoBackup, fetchClinicalPhoto, inspectClinicalPhotoIntegrity, listPhotoBackups, recoverMissingPhoto, reviewClinicalPhoto, uploadClinicalPhoto, type ClinicalBackupManifest, type MediaIntegrityReport } from './r2Client';
+import { createPatientBackupBatch, createPhotoBackup, fetchClinicalPhoto, inspectClinicalPhotoIntegrity, listPhotoBackups, recoverMissingPhoto, reviewClinicalPhoto, uploadClinicalPhoto, type ClinicalBackupManifest, type MediaIntegrityReport } from './r2Client';
 import { searchPhotoTags } from './catalog';
 import { listPatientRecords } from '../../lib/tenantData';
 import { useTenantAccess } from '../tenant/TenantContext';
@@ -34,6 +34,9 @@ export function ClinicalPhotosPage() {
   const [backupRecords,setBackupRecords]=useState<ClinicalBackupManifest[]>([]);
   const [backupNext,setBackupNext]=useState<string|null>(null);
   const [backupBusy,setBackupBusy]=useState(false);
+  const [batchReason,setBatchReason]=useState('');
+  const [batchBusy,setBatchBusy]=useState(false);
+  const [batchReport,setBatchReport]=useState<import('./r2Client').BatchBackupReport|null>(null);
   const [reason,setReason] = useState('');
   const [selectedTags,setSelectedTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,6 +157,23 @@ export function ClinicalPhotosPage() {
     finally{setBackupBusy(false);}
   }
 
+
+  async function backupVisibleBatch(){
+    if(session.status!=='ready'||session.isDemo||session.membership?.role!=='dentist')return;
+    const ids=displayed.slice(0,5).map(photo=>photo.id);
+    if(!ids.length||batchReason.trim().length<12)return;
+    if(!window.confirm('Criar ou verificar backups privados para '+ids.length+
+      ' imagem(ns)? Nenhum original será apagado.'))return;
+    setBatchBusy(true);setError('');setMessage('');setBatchReport(null);
+    try{
+      const report=await createPatientBackupBatch(session.tenant.id,patientId,ids,batchReason.trim());
+      setBatchReport(report);
+      if(report.failed)setError(report.failed+' imagem(ns) não tiveram backup verificado. Confira cada falha.');
+      else setMessage(report.succeeded+' cópia(s) verificadas por SHA-256, com auditoria individual.');
+    }catch(e){setError(e instanceof Error?e.message:'Falha no backup em lote.');}
+    finally{setBatchBusy(false);}
+  }
+
   const writable = session.status === 'ready' && !session.isDemo && session.permissions.includes('clinical.write');
   const backupAllowed=writable&&session.status==='ready'&&session.membership?.role==='dentist';
   const displayed=photos.filter(photo=>(visibility==='all' ||
@@ -200,6 +220,23 @@ export function ClinicalPhotosPage() {
         </div>}
       </section>
     </div>
+
+    {backupAllowed&&<section className="card data-form" aria-label="Backup de imagens em lote">
+      <h2>Backup de até cinco imagens</h2>
+      <p className="muted">Verifica as primeiras {Math.min(displayed.length,5)} imagens da seleção atual, na ordem exibida. Nenhuma exclusão é realizada.</p>
+      <label>Motivo administrativo do lote<textarea value={batchReason} minLength={12} maxLength={500} rows={2}
+        onChange={e=>setBatchReason(e.target.value)} placeholder="Justificativa sem dados de saúde"/></label>
+      <button className="btn secondary" type="button" disabled={batchBusy||backupBusy||busy||displayed.length===0||batchReason.trim().length<12}
+        onClick={()=>void backupVisibleBatch()}>{batchBusy?'Verificando cópias…':'Criar/verificar backup das primeiras cinco fotos'}</button>
+      {batchReport&&<div role="status">
+        <p><strong>{batchReport.succeeded} verificada(s), {batchReport.failed} falha(s).</strong>
+          {batchReport.complete?' Lote completo.':' Lote incompleto; confira as falhas.'}</p>
+        <ul>{batchReport.items.map(item=><li key={item.photoId}>
+          Foto {photos.find(photo=>photo.id===item.photoId)?.originalName??item.photoId}: {
+            item.status==='verified'?'SHA-256 conferido':'Falhou — confira o original e tente novamente'}
+        </li>)}</ul>
+      </div>}
+    </section>}
     <div className="card agenda-toolbar">
       <label>Exibição<select value={visibility} onChange={e=>setVisibility(e.target.value as typeof visibility)}>
         <option value="active">Ativas</option><option value="archived">Arquivadas</option><option value="all">Todas</option>

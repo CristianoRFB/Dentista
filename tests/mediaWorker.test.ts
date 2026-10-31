@@ -734,6 +734,67 @@ describe('D5 — cópias privadas verificadas e restauração manual sem sobresc
     expect(env.CLINICAL_MEDIA.put).not.toHaveBeenCalled();
     expect(writes).toHaveLength(0);
   });
+  it('faz backup de duas fotos do mesmo paciente e audita ambas sem exclusão',async()=>{
+    fixture();
+    const second='tenants/A/patients/patient-a/photo-b.jpg';
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-b',{
+      id:'photo-b',tenantId:'A',patientId:'patient-a',objectKey:second,contentType:'image/jpeg',
+    });
+    storedObjects.set(second,{bytes,contentType:'image/jpeg'});
+    const response=await request('/v1/media/backups/batch',{
+      tenantId:'A',patientId:'patient-a',photoIds:['photo-a','photo-b'],reason:payload.reason,
+    });
+    expect(response.status,await response.clone().text()).toBe(200);
+    const result=await response.json() as {succeeded:number;failed:number;complete:boolean;items:Array<{status:string;digest:string}>};
+    expect(result).toMatchObject({succeeded:2,failed:0,complete:true});
+    expect(result.items.every(item=>item.status==='verified'&&/^[a-f0-9]{64}$/.test(item.digest))).toBe(true);
+    expect(copied.size).toBe(2);
+    expect(JSON.stringify(writes).match(/clinical_photo.backup/g)?.length).toBe(2);
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+    expect(backup.delete).not.toHaveBeenCalled();
+  });
+  it('rejeita pré-validação de foto ausente sem copiar a primeira',async()=>{
+    fixture();
+    const response=await request('/v1/media/backups/batch',{
+      tenantId:'A',patientId:'patient-a',photoIds:['photo-a','not-found'],reason:payload.reason,
+    });
+    expect(response.status).toBe(404);
+    expect(backup.put).not.toHaveBeenCalled();
+    expect(writes).toHaveLength(0);
+  });
+  it('informa falha de um objeto R2 ausente sem mascarar sucesso da outra foto',async()=>{
+    fixture();
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-b',{
+      id:'photo-b',tenantId:'A',patientId:'patient-a',
+      objectKey:'tenants/A/patients/patient-a/photo-b.jpg',contentType:'image/jpeg',
+    });
+    const response=await request('/v1/media/backups/batch',{
+      tenantId:'A',patientId:'patient-a',photoIds:['photo-a','photo-b'],reason:payload.reason,
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({succeeded:1,failed:1,complete:false,
+      items:[{photoId:'photo-a',status:'verified'},{photoId:'photo-b',status:'failed',error:'source_unavailable_or_changed'}]});
+    expect(backup.put).toHaveBeenCalledOnce();
+  });
+  it('bloqueia lote duplicado, excessivo, cross-tenant e perfis sem clínica',async()=>{
+    fixture();
+    for(const ids of [[],['photo-a','photo-a'],['photo-a','b','c','d','e','f']])
+      expect((await request('/v1/media/backups/batch',{
+        tenantId:'A',patientId:'patient-a',photoIds:ids,reason:payload.reason,
+      })).status).toBe(400);
+    expect((await request('/v1/media/backups/batch',{
+      tenantId:'B',patientId:'patient-b',photoIds:['photo-a'],reason:payload.reason,
+    })).status).toBe(403);
+    expect((await request('/v1/media/backups/batch',{
+      tenantId:'A',patientId:'patient-a',photoIds:['photo-a'],reason:payload.reason,
+    },false)).status).toBe(401);
+    seedAccess({role:'receptionist',permissions:['clinical.read','clinical.write']});
+    expect((await request('/v1/media/backups/batch',{
+      tenantId:'A',patientId:'patient-a',photoIds:['photo-a'],reason:payload.reason,
+    })).status).toBe(403);
+    expect(backup.put).not.toHaveBeenCalled();
+  });
+
 });
 
 
