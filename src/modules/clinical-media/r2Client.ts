@@ -71,3 +71,30 @@ export async function inspectClinicalPhotoIntegrity(tenantId:string,patientId:st
   if(!result.ok)throw new Error('Não foi possível verificar o inventário privado.');
   return result.json() as Promise<MediaIntegrityReport>;
 }
+
+export interface ClinicalBackupManifest {digest:string;sizeBytes:number;createdAt:string|null}
+export interface ClinicalBackupList {
+  records:ClinicalBackupManifest[];nextPageToken:string|null;hasMore:boolean;photoId:string;private:true;
+}
+export interface BackupScope {tenantId:string;patientId:string;photoId:string}
+async function backupApi<T>(route:string,payload:Record<string,unknown>):Promise<T>{
+  if(!baseUrl)throw Error('API clínica não configurada.');
+  const token=await authHeaders();
+  const response=await fetch(baseUrl.replace(/\/$/,'')+route,{
+    method:'POST',headers:{...token,'Content-Type':'application/json'},cache:'no-store',
+    body:JSON.stringify(payload),
+  });
+  if(response.status===403)throw Error('Apenas dentistas autorizados podem executar operações de backup.');
+  if(response.status===409)throw Error('Ação bloqueada: verifique a integridade, o estado do arquivo e o manifesto.');
+  if(response.status===503)throw Error('Backup indisponível: configure um bucket R2 secundário privado e valide a API.');
+  if(!response.ok)throw Error('Operação de backup não concluída ('+response.status+').');
+  return response.json() as Promise<T>;
+}
+export const listPhotoBackups=(scope:BackupScope,pageToken?:string)=>backupApi<ClinicalBackupList>(
+  '/v1/media/backups/list',{...scope,...(pageToken?{pageToken}:{})});
+export const createPhotoBackup=(scope:BackupScope,reason:string)=>backupApi<{
+  photoId:string;digest:string;verified:true;alreadyBackedUp:boolean;
+}>('/v1/media/backups',{...scope,reason});
+export const recoverMissingPhoto=(scope:BackupScope,digest:string,reason:string)=>backupApi<{
+  photoId:string;digest:string;restored:true;verified:true;
+}>('/v1/media/backups/restore',{...scope,digest,reason});

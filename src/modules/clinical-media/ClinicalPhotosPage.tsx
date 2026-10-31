@@ -1,7 +1,7 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { ClinicalPhoto } from '../../domain/types';
-import { fetchClinicalPhoto, inspectClinicalPhotoIntegrity, reviewClinicalPhoto, uploadClinicalPhoto, type MediaIntegrityReport } from './r2Client';
+import { createPhotoBackup, fetchClinicalPhoto, inspectClinicalPhotoIntegrity, listPhotoBackups, recoverMissingPhoto, reviewClinicalPhoto, uploadClinicalPhoto, type ClinicalBackupManifest, type MediaIntegrityReport } from './r2Client';
 import { searchPhotoTags } from './catalog';
 import { listPatientRecords } from '../../lib/tenantData';
 import { useTenantAccess } from '../tenant/TenantContext';
@@ -29,6 +29,11 @@ export function ClinicalPhotosPage() {
   const [checkingIntegrity,setCheckingIntegrity] = useState(false);
   const [visibility,setVisibility] = useState<'active'|'archived'|'all'>('active');
   const [reviewId,setReviewId] = useState('');
+  const [backupPhotoId,setBackupPhotoId]=useState('');
+  const [backupReason,setBackupReason]=useState('');
+  const [backupRecords,setBackupRecords]=useState<ClinicalBackupManifest[]>([]);
+  const [backupNext,setBackupNext]=useState<string|null>(null);
+  const [backupBusy,setBackupBusy]=useState(false);
   const [reason,setReason] = useState('');
   const [selectedTags,setSelectedTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +55,7 @@ export function ClinicalPhotosPage() {
     } finally { setLoading(false); }
   }
   useEffect(() => { void refresh(); }, [session, patientId]);
+  useEffect(()=>{setBackupPhotoId('');setBackupRecords([]);setBackupNext(null);},[patientId]);
 
   // Keep browser object URLs out of clinical metadata, and release them on every refresh/unmount.
   useEffect(() => {
@@ -112,7 +118,44 @@ export function ClinicalPhotosPage() {
     catch(e){setError(e instanceof Error?e.message:'Não foi possível verificar o inventário.');}
     finally{setCheckingIntegrity(false);}
   }
+
+  async function openBackup(photoId:string,pageToken?:string){
+    if(session.status!=='ready'||session.isDemo)return;
+    setBackupBusy(true);setError('');
+    try {
+      const result=await listPhotoBackups({tenantId:session.tenant.id,patientId,photoId},pageToken);
+      setBackupPhotoId(photoId);
+      setBackupRecords(previous=>pageToken?[...previous,...result.records]:result.records);
+      setBackupNext(result.nextPageToken);
+    }catch(e){setError(e instanceof Error?e.message:'Falha no catálogo de backups.');}
+    finally{setBackupBusy(false);}
+  }
+  async function createBackup(){
+    if(session.status!=='ready'||!backupPhotoId)return;
+    if(backupReason.trim().length<12){setError('Descreva o motivo em pelo menos 12 caracteres.');return;}
+    setBackupBusy(true);setError('');setMessage('');
+    try{
+      const result=await createPhotoBackup({tenantId:session.tenant.id,patientId,photoId:backupPhotoId},backupReason.trim());
+      setMessage((result.alreadyBackedUp?'Cópia existente verificada.':'Cópia criada e verificada.')+' SHA-256: '+result.digest);
+      const latest=await listPhotoBackups({tenantId:session.tenant.id,patientId,photoId:backupPhotoId});
+      setBackupRecords(latest.records);setBackupNext(latest.nextPageToken);
+    }catch(e){setError(e instanceof Error?e.message:'Falha ao criar backup.');}
+    finally{setBackupBusy(false);}
+  }
+  async function restoreBackup(digest:string){
+    if(session.status!=='ready'||!backupPhotoId)return;
+    if(backupReason.trim().length<12){setError('Descreva o motivo em pelo menos 12 caracteres.');return;}
+    if(!window.confirm('Recuperar somente um arquivo R2 AUSENTE a partir do backup verificado? Esta operação é auditada.'))return;
+    setBackupBusy(true);setError('');setMessage('');
+    try{
+      await recoverMissingPhoto({tenantId:session.tenant.id,patientId,photoId:backupPhotoId},digest,backupReason.trim());
+      setMessage('Original ausente recuperado e verificado por SHA-256.');await refresh();
+    }catch(e){setError(e instanceof Error?e.message:'Falha na recuperação.');}
+    finally{setBackupBusy(false);}
+  }
+
   const writable = session.status === 'ready' && !session.isDemo && session.permissions.includes('clinical.write');
+  const backupAllowed=writable&&session.status==='ready'&&session.membership?.role==='dentist';
   const displayed=photos.filter(photo=>(visibility==='all' ||
     (visibility==='archived'?photo.lifecycleStatus==='archived':photo.lifecycleStatus!=='archived'))
     && (!q.trim() || (photo.originalName+' '+(photo.tags??[]).join(' ')).toLowerCase().includes(q.trim().toLowerCase())));
@@ -176,6 +219,9 @@ export function ClinicalPhotosPage() {
         {writable&&<button type="button" className="btn secondary" disabled={busy} onClick={()=>{
           setReviewId(photo.id);setReason('');setSelectedTags([...photo.tags??[]]);setError('');
         }}>Revisar imagem</button>}
+        {backupAllowed&&<button type="button" className="btn secondary" disabled={backupBusy}
+          onClick={()=>{setBackupReason('');setBackupRecords([]);setBackupNext(null);void openBackup(photo.id);}}>
+          Backups privados</button>}
       </article>)}
     </section>
     {displayed.length>visibleLimit&&<button type="button" className="btn secondary"
@@ -195,6 +241,29 @@ export function ClinicalPhotosPage() {
           onClick={()=>void perform(item.action)}>{item.label}</button>)}
         <button type="button" className="btn secondary" onClick={()=>setReviewId('')}>Cancelar</button>
       </div>
+    </section>}
+
+    {backupAllowed&&backupPhotoId&&<section className="card data-form" aria-label="Backups clínicos privados" style={{marginTop:16}}>
+      <h2>Backup e recuperação: {photos.find(p=>p.id===backupPhotoId)?.originalName??backupPhotoId}</h2>
+      <p className="muted">Cópias privadas em segundo bucket R2; verificadas com SHA-256. Não são criadas automaticamente e não substituem uma política de recuperação homologada.</p>
+      <label>Motivo obrigatório<textarea minLength={12} maxLength={500} rows={2} value={backupReason}
+        placeholder="Justificativa administrativa sem informações médicas"
+        onChange={e=>setBackupReason(e.target.value)}/></label>
+      <div className="row-actions">
+        <button type="button" className="btn primary" disabled={backupBusy||backupReason.trim().length<12}
+          onClick={()=>void createBackup()}>{backupBusy?'Verificando…':'Criar/verificar cópia'}</button>
+        <button type="button" className="btn secondary" onClick={()=>setBackupPhotoId('')}>Fechar</button>
+      </div>
+      <h3>Manifestos de backup</h3>
+      {backupRecords.length===0?<p className="muted">Nenhuma cópia registrada.</p>:<ul>{backupRecords.map(item=><li key={item.digest}>
+        <p>{(item.sizeBytes/1048576).toLocaleString('pt-BR',{maximumFractionDigits:2})} MiB · {item.createdAt?new Date(item.createdAt).toLocaleString('pt-BR'):'Data indisponível'}</p>
+        <p className="muted" style={{overflowWrap:'anywhere'}}>SHA-256: {item.digest}</p>
+        <button type="button" className="btn secondary" disabled={backupBusy||backupReason.trim().length<12}
+          onClick={()=>void restoreBackup(item.digest)}>Recuperar arquivo R2 ausente</button>
+      </li>)}</ul>}
+      {backupNext&&<button type="button" className="btn secondary" disabled={backupBusy}
+        onClick={()=>void openBackup(backupPhotoId,backupNext)}>Carregar mais</button>}
+      <p className="muted">A recuperação não sobrescreve originais existentes. Restaurar da lixeira lógica é outra ação.</p>
     </section>}
   </>;
 }
