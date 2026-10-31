@@ -1015,7 +1015,8 @@ function requireBackupBucket(env:Env):R2Bucket {
 async function validateClinicalBackupScope(
   env:Env,token:string,uid:string,input:BackupInput,transaction?:string,
 ) {
-  const access=await verifyClinicalAccess(env,token,uid,input.tenantId,input.patientId,'clinical.write',transaction);
+  // Recovery/backup preserves inactive patients' clinical records; still requires a dentist with clinical.write.
+  const access=await verifyClinicalAccess(env,token,uid,input.tenantId,input.patientId,'clinical.read',transaction);
   // Backup/recovery is a clinician operation, not an implicit platform-owner/admin privilege.
   if(!access.membership || access.membership.role!=='dentist' ||
     !hasRolePermission(access.membership,'clinical.write'))throw new HttpError(403,'clinical_backup_permission_required');

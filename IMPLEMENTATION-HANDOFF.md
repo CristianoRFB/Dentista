@@ -111,3 +111,9 @@ Prosseguir do SHA **`eb6f99f15798ac7a6037baed8409ca6622d4b662`**, CI push [#4122
 - Estimativa `docs/PRE_PC_COMPLETENESS.md`: implementação 91/100; preparo de produção ~64%, ambos heurísticos. Sem ambiente hospedado e backup/restore ainda.
 
 A próxima execução deve ler apenas o delta desde este SHA, não reanalisar D1–D3 nem alterar tabela de preços ou billing.
+
+## Checkpoint D5 — backup R2 codificado (31/10/2026)
+
+A partir do SHA de código `5b1a5f2e0bf032ba1881ebbe7714a6e9fe9fe0d5`, a branch possui endpoints manuais de backup, catálogo e recuperação de mídia clínica com checksum SHA-256, dupla trilha de auditoria para recuperação, segundo bucket **opcional e não configurado**, CAS atômico no R2, e UI restrita a dentistas. Testes cobrem escopo A×B, sem autorização, paciente inativo, hash adulterado, original existente e concorrência. Valide o HEAD e CI antes de afirmar implementação aprovada.
+
+Leia `docs/CLINICAL_MEDIA_BACKUP_RUNBOOK.md` antes de configurar bucket, jamais disponibilize dados reais em preview, nunca execute produção sem DR/retention e validação operacional. Não confundir arquivamento lógico do prontuário com backup/restore de arquivo. Métrica ajustada a 92% implementação, ~64% geral; nada na main/deploy.

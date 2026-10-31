@@ -39,12 +39,12 @@ Essencial R$79,90; Pro R$129,90; Premium R$189,90 — contrato preservado.
 | D2 Tratamento/orçamento | 14 | 14 | Sem pendência P0 codificável constatada |
 | D3 Retornos | 10 | 10 | Sem pendência P0 codificável constatada |
 | D4 Intake/booking | 18 | 16 | Agendamento aberto sem convite + proteção antiabuso continuam pendentes |
-| D5 Mídia/documentos | 18 | 16 | Backup/retention operacionais, recuperação e documentos avançados; medição R2 já codificada e testada, sem validação hospedada |
+| D5 Mídia/documentos | 18 | 17 | Backup e recuperação manuais por foto com SHA-256, auditoria e bucket R2 secundário opcional; automação/retention, DR integral e validação hospedada pendentes |
 | D6 UX/acessibilidade | 16 | 14 | Leitor de tela, cobertura das demais rotas e dispositivos físicos |
 | D7 CI/evidências | 10 | 7 | Persistência visual canônica, runtime hospedado, sessão PC |
-| **Total implementação** | **100** | **91** | **~91% estimado de implementação interna** |
+| **Total implementação** | **100** | **92** | **~92% estimado de implementação interna** |
 
-**Avanço geral até produção: ~64%** (91% × 70% = 63,7%, arredondado), considerando peso 70% da implementação e 30% de infraestrutura, testes hospedados, backup, segurança operacional, LGPD e deploy ainda não demonstrados. É uma régua de planejamento conservadora, não um levantamento independente de todos os requisitos legais/clínicos.
+**Avanço geral até produção: ~64%** (92% × 70% = 64,4%, arredondado), considerando peso 70% da implementação e 30% de infraestrutura, testes hospedados, backup, segurança operacional, LGPD e deploy ainda não demonstrados. É uma régua de planejamento conservadora, não um levantamento independente de todos os requisitos legais/clínicos.
 
 **Evidência específica do D5:** `GET /v1/media/integrity` pagina Firestore em lotes de 100 e R2 em lotes de 500, com teto de 3.000 registros por origem, cursores verificados e nenhum DELETE. Falha sem resposta parcial acima do limite; não se trata de snapshot atômico. Os testes `tests/mediaIntegrity.test.ts` e `tests/mediaWorker.test.ts` abrangem paginação, falta de objeto, órfãos candidatos, tenant A × B e cap. Não há reparo/backup automático.
 
@@ -73,3 +73,14 @@ Essencial R$79,90; Pro R$129,90; Premium R$189,90 — contrato preservado.
 - **D7:** teste Chromium com **26 screenshots** do app em modo demonstrativo (13 rotas × desktop/mobile), incluindo formulários reais de agendamento e pré-cadastro por convite com **tokens exclusivamente fictícios** e removidos da barra antes da captura. [Visual QA #41222771156](https://github.com/CristianoRFB/Dentista/actions/runs/41222771156): **success**. São capturas `SCREENSHOT_REAL_DEMO`, não imagens canônicas nem produção.
 - **Régua conservadora atual:** D1 14/14, D2 14/14, D3 10/10, D4 16/18, **D5 16/18**, D6 14/16, D7 7/10. **Total 91/100 (~91% implementação interna); ~64% até produção**. Ganho de +1 ponto em D5 por medição implementada e testada. Capturas extras e validação local de horário não fecham os gates pendentes.
 - **Próximo código de maior risco:** política/versionamento de backup e recuperação R2; estratégia explícita antiabuso para agendamento sem convite; evidências de QA real em leitor de tela. **Infraestrutura hospedada, segredos, LGPD operacional, backup/restore e deploy continuam sem comprovação; não ativar produção sem validação.** Nenhum preço alterado e nenhum pagamento automático implementado.
+
+## Checkpoint D5 backup clínico — 31/10/2026
+
+- **Último SHA de código deste lote (antes do checkpoint documental):** `5b1a5f2e0bf032ba1881ebbe7714a6e9fe9fe0d5`. Validação definitiva deve usar o CI do HEAD da branch; não aceitar apenas o teste verde do commit anterior.
+- Backup por foto: `POST /v1/media/backups` emite cópia R2 privada, em segundo bucket opcional, com SHA-256 do conteúdo e conferência após a escrita. Manifests em `tenants/{tenantId}/patients/{patientId}/clinicalPhotos/{photoId}/backups/{digest}`.
+- Catálogo privado paginado `POST /v1/media/backups/list`: somente hash, bytes e data; não retorna backupKey, objectKey, binário, nome clínico ou link público. A UI fica no módulo Fotos Clínicas para dentistas com `clinical.write`.
+- Recuperação `POST /v1/media/backups/restore`: exige manifesto, SHA-256 válido, imagem original ausente, justificativa e autorização. Registra intenção antes do R2 PUT e comprovante auditado após verificação. Usa `If-None-Match: *` no R2 para **não sobrescrever um original criado concorrentemente**.
+- Backup/recuperação podem operar sobre fotos de paciente inativo mantendo paciente/prontuário inalterados. Platform Owner não ganha acesso por ser administrador; sessão de suporte não concede esta operação.
+- **O binding `CLINICAL_MEDIA_BACKUP` não está provisionado nem ativado neste repositório.** Rota falha fechado (503) sem bucket separado. Não há backup automático, retenção, replicação independente de Firestore, restauração integral de tenant nem prova de operação hospedada.
+- Testes automáticos de negativas, perda de mídia, concorrência, checksum e isolamento. Runbook em `docs/CLINICAL_MEDIA_BACKUP_RUNBOOK.md`.
+- **Nova régua conservadora:** D5 17/18, código 92/100; avanço geral ~64%. Não equivale à homologação ou à prontidão de produção.

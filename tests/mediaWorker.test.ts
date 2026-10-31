@@ -587,6 +587,29 @@ describe('D5 — cópias privadas verificadas e restauração manual sem sobresc
     });
     storedObjects.set(originalKey,{bytes,contentType:'image/jpeg'});
   }
+  it('autoriza preservação de mídia de paciente inativo sem reativar nem alterar prontuário',async()=>{
+    fixture();
+    documents.set('tenants/A/patients/patient-a',{...documents.get('tenants/A/patients/patient-a')!,status:'inactive'});
+    const copy=await request('/v1/media/backups',payload);
+    expect(copy.status,await copy.clone().text()).toBe(200);
+    const {digest}=await copy.json() as {digest:string};
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a/backups/'+digest,{
+      tenantId:'A',patientId:'patient-a',photoId:'photo-a',sha256:digest,
+      objectKey:originalKey,backupKey:[...copied.keys()][0],
+    });
+    storedObjects.delete(originalKey);writes.length=0;
+    const recovered=await request('/v1/media/backups/restore',{...payload,digest});
+    expect(recovered.status,await recovered.clone().text()).toBe(200);
+    expect(documents.get('tenants/A/patients/patient-a')?.status).toBe('inactive');
+    expect(storedObjects.get(originalKey)?.bytes).toEqual(bytes);
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+  });
+  it('nega acesso clínico casual do platform_owner mesmo com sessão de suporte',async()=>{
+    fixture();seedPlatformSupport();
+    vi.mocked(verifyFirebaseIdToken).mockResolvedValueOnce({uid:'platform-owner'});
+    expect((await request('/v1/media/backups',payload)).status).toBe(403);
+    expect(backup.put).not.toHaveBeenCalled();
+  });
   it('falha fechado quando o bucket secundário não está configurado',async()=>{
     documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a',{
       id:'photo-a',tenantId:'A',patientId:'patient-a',objectKey:originalKey,
