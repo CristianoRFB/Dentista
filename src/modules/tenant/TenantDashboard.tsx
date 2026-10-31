@@ -24,7 +24,7 @@ export function TenantDashboard() {
   useEffect(()=>{setMediaUsage(null);setMediaUsageError('');},[session.tenant.id]);
   async function refreshMediaUsage(){
     setMediaUsageBusy(true);setMediaUsageError('');
-    try {setMediaUsage(await scanTenantMediaUsage(session,mediaUsage??undefined));}
+    try {setMediaUsage(await scanTenantMediaUsage(session,mediaUsage&&!mediaUsage.complete?mediaUsage:undefined));}
     catch(e){setMediaUsageError(e instanceof Error?e.message:'Falha ao medir R2.');}
     finally {setMediaUsageBusy(false);}
   }

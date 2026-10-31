@@ -516,6 +516,7 @@ describe('D5 — medição paginada e privada de bytes R2 por tenant',()=>{
     expect((await request('../B')).status).toBe(400);
     seedAccess({role:'tenant_owner',permissions:['usage.read']});
     expect((await request('A','cursor-with-x1f')).status).toBe(200);
+    vi.mocked(env.CLINICAL_MEDIA.list).mockClear(); // Authorized cursor-read above is not an anonymous request.
     const unauthenticated=await mediaWorker.fetch(new Request('https://worker.test/v1/media/usage?tenantId=A'),env);
     expect(unauthenticated.status).toBe(401);
     expect(env.CLINICAL_MEDIA.list).not.toHaveBeenCalled();
