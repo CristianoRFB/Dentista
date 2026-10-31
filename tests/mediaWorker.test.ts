@@ -800,6 +800,36 @@ describe('D5 — cópias privadas verificadas e restauração manual sem sobresc
     expect(backup.put).not.toHaveBeenCalled();
   });
 
+  it('verifica backup mesmo quando o original foi perdido, sem executar restauração',async()=>{
+    fixture();
+    const copiedResult=await request('/v1/media/backups',payload);
+    const {digest}=await copiedResult.json() as {digest:string};
+    const snapshotKey=[...copied.keys()][0];
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a/backups/'+digest,{
+      tenantId:'A',patientId:'patient-a',photoId:'photo-a',
+      sha256:digest,objectKey:originalKey,backupKey:snapshotKey,
+      verification:'sha256_readback',sizeBytes:bytes.length,
+    });
+    storedObjects.delete(originalKey);writes.length=0;
+    vi.mocked(env.CLINICAL_MEDIA.put).mockClear();
+    const result=await request('/v1/media/backups/verify',{...payload,digest});
+    expect(result.status,await result.clone().text()).toBe(200);
+    expect(await result.json()).toMatchObject({verified:true,originalPresent:false,
+      readOnly:true,noFilesModified:true,digest});
+    expect(env.CLINICAL_MEDIA.put).not.toHaveBeenCalled();
+    expect(writes).toHaveLength(0);
+    copied.set(snapshotKey,new Uint8Array([5,6,7]));
+    const tampered=await request('/v1/media/backups/verify',{...payload,digest});
+    expect(tampered.status).toBe(409);
+  });
+  it('nega verificação com digest sem manifesto, cross-tenant e usuário anônimo',async()=>{
+    fixture();
+    const digest='a'.repeat(64);
+    expect((await request('/v1/media/backups/verify',{...payload,digest})).status).toBe(404);
+    expect((await request('/v1/media/backups/verify',{...payload,tenantId:'B',patientId:'patient-b',digest})).status).toBe(403);
+    expect((await request('/v1/media/backups/verify',{...payload,digest},false)).status).toBe(401);
+  });
+
 });
 
 

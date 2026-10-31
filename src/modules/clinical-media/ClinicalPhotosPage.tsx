@@ -1,7 +1,7 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { ClinicalPhoto } from '../../domain/types';
-import { createPatientBackupBatch, createPhotoBackup, fetchClinicalPhoto, inspectClinicalPhotoIntegrity, listPhotoBackups, recoverMissingPhoto, reviewClinicalPhoto, uploadClinicalPhoto, type ClinicalBackupManifest, type MediaIntegrityReport } from './r2Client';
+import { createPatientBackupBatch, createPhotoBackup, fetchClinicalPhoto, inspectClinicalPhotoIntegrity, listPhotoBackups, verifyPhotoBackup, recoverMissingPhoto, reviewClinicalPhoto, uploadClinicalPhoto, type ClinicalBackupManifest, type MediaIntegrityReport } from './r2Client';
 import { searchPhotoTags } from './catalog';
 import { listPatientRecords } from '../../lib/tenantData';
 import { useTenantAccess } from '../tenant/TenantContext';
@@ -145,6 +145,19 @@ export function ClinicalPhotosPage() {
       const latest=await listPhotoBackups({tenantId:session.tenant.id,patientId,photoId:backupPhotoId});
       setBackupRecords(latest.records);setBackupNext(latest.nextPageToken);
     }catch(e){setError(e instanceof Error?e.message:'Falha ao criar backup.');}
+    finally{setBackupBusy(false);}
+  }
+
+  async function inspectBackup(digest:string){
+    if(session.status!=='ready'||!backupPhotoId)return;
+    if(backupReason.trim().length<12){setError('Informe um motivo de pelo menos 12 caracteres.');return;}
+    setBackupBusy(true);setError('');setMessage('');
+    try{
+      const result=await verifyPhotoBackup({tenantId:session.tenant.id,patientId,photoId:backupPhotoId},
+        digest,backupReason.trim());
+      setMessage('SHA-256 do backup verificado ('+result.sizeBytes+' bytes). Original R2: '+
+        (result.originalPresent?'presente':'ausente')+'. Nenhum arquivo foi alterado.');
+    }catch(e){setError(e instanceof Error?e.message:'Cópia privada não verificada.');}
     finally{setBackupBusy(false);}
   }
   async function restoreBackup(digest:string){
@@ -303,6 +316,8 @@ export function ClinicalPhotosPage() {
       {backupRecords.length===0?<p className="muted">Nenhuma cópia registrada.</p>:<ul>{backupRecords.map(item=><li key={item.digest}>
         <p>{(item.sizeBytes/1048576).toLocaleString('pt-BR',{maximumFractionDigits:2})} MiB · {item.createdAt?new Date(item.createdAt).toLocaleString('pt-BR'):'Data indisponível'}</p>
         <p className="muted" style={{overflowWrap:'anywhere'}}>SHA-256: {item.digest}</p>
+        <button type="button" className="btn secondary" disabled={backupBusy||backupReason.trim().length<12}
+          onClick={()=>void inspectBackup(item.digest)}>Verificar cópia sem restaurar</button>
         <button type="button" className="btn secondary" disabled={backupBusy||backupReason.trim().length<12}
           onClick={()=>void restoreBackup(item.digest)}>Recuperar arquivo R2 ausente</button>
       </li>)}</ul>}

@@ -1132,6 +1132,32 @@ async function batchBackupClinicalPhotos(env:Env,uid:string,payload:unknown) {
     items,private:true,automatic:false,noOriginalsModified:true};
 }
 
+
+/** D5: verify private snapshot against manifest even if the original R2 object is missing. */
+async function verifyStoredClinicalBackup(env:Env,uid:string,payload:unknown) {
+  let input:BackupInput;
+  try{input=validateBackupInput(payload,true);}catch{throw new HttpError(400,'invalid_backup_verification');}
+  const bucket=requireBackupBucket(env);
+  const token=await serviceAccountToken(env);
+  const scope=await validateClinicalBackupScope(env,token,uid,input);
+  const path=scope.photoPath+'/backups/'+input.digest;
+  const manifest=await getDocument(env,token,path);
+  const expectedKey=backupKeyFor(input,input.digest!);
+  if(!manifest || manifest.tenantId!==input.tenantId||
+    manifest.patientId!==input.patientId||manifest.photoId!==input.photoId||
+    manifest.objectKey!==scope.photo.objectKey||manifest.backupKey!==expectedKey||
+    manifest.sha256!==input.digest||manifest.verification!=='sha256_readback')
+    throw new HttpError(404,'verified_backup_manifest_unavailable');
+  let data:ArrayBuffer;
+  try{data=await verifiedBackupBytes(bucket,expectedKey,input.digest!);}
+  catch{throw new HttpError(409,'backup_checksum_verification_failed');}
+  if(data.byteLength!==manifest.sizeBytes)
+    throw new HttpError(409,'backup_size_verification_failed');
+  const originalPresent=Boolean(await env.CLINICAL_MEDIA.head(scope.photo.objectKey));
+  return {photoId:input.photoId,digest:input.digest,verified:true,
+    sizeBytes:data.byteLength,originalPresent,private:true,readOnly:true,noFilesModified:true};
+}
+
 /** Authorized, bounded listing of backup manifests; never returns bucket keys or image data. */
 async function listClinicalPhotoBackups(env:Env,uid:string,payload:unknown) {
   if(!payload||typeof payload!=='object'||Array.isArray(payload))throw new HttpError(400,'invalid_backup_listing');
@@ -1608,6 +1634,18 @@ async function handle(request: Request, env: Env) {
   }
 
 
+
+  if(request.method==='POST' && url.pathname==='/v1/media/backups/verify') {
+    if(Number(request.headers.get('Content-Length')??'0')>4096)
+      throw new HttpError(413,'request_too_large');
+    let payload:unknown;
+    try{
+      const raw=await request.text();
+      if(raw.length>4096)throw new HttpError(413,'request_too_large');
+      payload=JSON.parse(raw);
+    }catch(error){if(error instanceof HttpError)throw error;throw new HttpError(400,'invalid_json');}
+    return json(request,env,200,await verifyStoredClinicalBackup(env,user.uid,payload));
+  }
   if(request.method==='POST' && url.pathname==='/v1/media/backups/batch') {
     const length=Number(request.headers.get('Content-Length')??'0');
     if(length>4096)throw new HttpError(413,'request_too_large');

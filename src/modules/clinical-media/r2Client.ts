@@ -106,3 +106,9 @@ export interface BatchBackupReport {
 }
 export const createPatientBackupBatch=(tenantId:string,patientId:string,photoIds:string[],reason:string)=>
   backupApi<BatchBackupReport>('/v1/media/backups/batch',{tenantId,patientId,photoIds,reason});
+
+/** Verify an existing SHA-256 copy without modifying either R2 bucket. */
+export const verifyPhotoBackup=(scope:BackupScope,digest:string,reason:string)=>
+  backupApi<{photoId:string;digest:string;verified:true;sizeBytes:number;
+    originalPresent:boolean;readOnly:true;noFilesModified:true}>(
+    '/v1/media/backups/verify',{...scope,digest,reason});
