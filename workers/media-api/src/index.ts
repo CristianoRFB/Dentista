@@ -1441,8 +1441,19 @@ async function submitOpenBookingRequest(request:Request,env:Env,raw:unknown) {
     throw new HttpError(404,'open_booking_unavailable');
   const submissionId=crypto.randomUUID(),now=new Date(),auditId=crypto.randomUUID();
   const requestPath='tenants/'+tenantId+'/openBookingRequests/'+submissionId;
-  await firestoreRequest(firestoreRoot(env)+':commit',token,{
-    method:'POST',body:JSON.stringify({writes:[
+  const transaction=await beginTransaction(env,token);
+  try{
+    const [latestSlug,latestTenant,latestProfile]=await Promise.all([
+      getDocument(env,token,'tenantSlugs/'+data.tenantSlug,transaction),
+      getDocument(env,token,'tenants/'+tenantId,transaction),
+      getDocument(env,token,'tenants/'+tenantId+'/publicProfile/public',transaction),
+    ]);
+    if(!latestSlug||latestSlug.status!=='active'||latestSlug.tenantId!==tenantId||
+      !latestTenant||latestTenant.status!=='active'||latestTenant.subscriptionStatus==='demo'||
+      !canUse(latestTenant as any,'agenda')||!latestProfile||
+      latestProfile.openBookingRequestsEnabled!==true)
+      throw new HttpError(404,'open_booking_unavailable');
+    await commitTransaction(env,token,transaction,[
       documentWrite(env,requestPath,{
         id:submissionId,tenantId,status:'pending_review',name:data.name,phone:data.phone,
         email:data.email,preferredAt:data.preferredAt,submittedAt:now,
@@ -1453,8 +1464,8 @@ async function submitOpenBookingRequest(request:Request,env:Env,raw:unknown) {
         action:'open_booking_request.create',resourceType:'openBookingRequest',
         resourceId:submissionId,timestamp:now,
       },true),
-    ]}),
-  });
+    ]);
+  }catch(error){await rollbackTransaction(env,token,transaction);throw error;}
   return {received:true,notConfirmed:true};
 }
 
