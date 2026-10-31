@@ -66,6 +66,7 @@ const env = {
     put: vi.fn(async (key: string, stream: ReadableStream<Uint8Array>, options: { httpMetadata?: { contentType?: string } }) => {
       const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
       storedObjects.set(key, { bytes, contentType: options.httpMetadata?.contentType ?? 'application/octet-stream' });
+      return {key};
     }),
     get: vi.fn(async (key: string) => {
       const object = storedObjects.get(key);
