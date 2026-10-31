@@ -8,6 +8,7 @@ import {spawn} from 'node:child_process';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {chromium} from 'playwright';
+import {auditRenderedAccessibility} from './a11y-smoke-audit.mjs';
 
 const PORT=5174;
 const ORIGIN='http://127.0.0.1:'+PORT;
@@ -44,6 +45,7 @@ const viewports=[
   {name:'mobile',width:390,height:844,isMobile:true},
 ];
 const results=[];
+const accessibility=[];
 let browser;
 try{
   await mkdir(OUT,{recursive:true});
@@ -86,6 +88,14 @@ try{
           }
         }
         await page.screenshot({path:path.join(OUT,route.id+'-'+viewport.name+'.png'),fullPage:true,animations:'disabled'});
+        const accessibilityScan=await auditRenderedAccessibility(page);
+        accessibility.push({route:route.displayUrl??route.url,viewport:viewport.name,
+          checkedControls:accessibilityScan.checkedControls,
+          issueCount:accessibilityScan.issues.length,issues:accessibilityScan.issues});
+        if(accessibilityScan.issues.length)throw new Error(
+          'Accessibility smoke failed: '+route.id+' ('+viewport.name+'): '+
+          JSON.stringify(accessibilityScan.issues.slice(0,12))
+        );
         results.push({route:route.displayUrl??route.url,viewport:viewport.name,size:`${viewport.width}x${viewport.height}`,
           file:route.id+'-'+viewport.name+'.png',heading,classification:'SCREENSHOT_REAL_DEMO',containsOnlyFictitiousData:true});
         // Functional smoke checks run AFTER capturing the unmodified real page.
@@ -149,6 +159,12 @@ try{
       }finally{await page.close();}
     }
   }finally{await ephemeralContext.close();}
+  await writeFile(path.join(OUT,'ACCESSIBILITY_AUDIT.json'),JSON.stringify({
+    classification:'ACCESSIBILITY_AUTOMATED_SMOKE',notWCAGCertification:true,
+    notScreenReaderTest:true,notProduction:true,checkedPages:accessibility.length,
+    checkedControls:accessibility.reduce((sum,item)=>sum+item.checkedControls,0),
+    findings:accessibility,
+  },null,2)+'\n');
   await writeFile(path.join(OUT,'SCREENSHOTS_MANIFEST.json'),JSON.stringify({
     classification:'SCREENSHOT_REAL_DEMO',capturedAt:new Date().toISOString(),
     source:'running Vite development server with VITE_USE_DEMO_DATA=true',
