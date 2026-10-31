@@ -128,3 +128,11 @@ Começar de `e0201f3d0d615cb321a9acd19adf59d1b4686435` ou do SHA mais recente da
 4. Estimativas internas por peso: **94/100** código; **~66% geral**. Permanecem D4 open booking antiabuso, D5 DR e backup periódico, D6 testes assistivos físicos, D7 hosted/canonical. No merge/deploy.
 
 A próxima sessão deve ler somente alterações posteriores ao HEAD, preservar D1–D3, preços e regras de segurança.
+
+## Continuação D4 — 31/10/2026 (opt-in público protegido)
+
+**SHA de implementação:** `b74c321973a53e02007382365142a4ad6f612282`. CI push [#41241826209](https://github.com/CristianoRFB/Dentista/actions/runs/41241826209), PR [#41241830594](https://github.com/CristianoRFB/Dentista/actions/runs/41241830594), ambos aprovados. 160 testes unitários/Worker + 30 regras no emulador; screenshot QA Chromium deve ser checado separadamente.
+
+Novo `src/modules/public/OpenBookingRequestPage.tsx`, alterações em `TenantPublicSite`, `BookingInvitesPage`, `publicBookingClient`, `openBookingRequest.ts`, `Worker index.ts`, `firestore.rules` com proteção Turnstile/rate-limit/opt-in e transação; **solicitação de contato, sem confirmar horário**. Ciência para contato obrigatória. `docs/OPEN_BOOKING_REQUESTS_RUNBOOK.md` explica dependências de staging e riscos. Código interno estimado **95/100**, geral **~67%**.
+
+Últimos pontos de código: política segura para reserva pública anônima (não ativar sem disponibilidade comprovada, contato verificado e antifraude robusta), automação de backups/retention/DR, QA assistiva/hosted e evidência visual canônica. Não repetir D1–D3. Não merge/deploy; preços inalterados.

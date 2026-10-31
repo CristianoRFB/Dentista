@@ -38,13 +38,13 @@ Essencial R$79,90; Pro R$129,90; Premium R$189,90 — contrato preservado.
 | D1 Odontograma | 14 | 14 | Sem pendência P0 codificável constatada |
 | D2 Tratamento/orçamento | 14 | 14 | Sem pendência P0 codificável constatada |
 | D3 Retornos | 10 | 10 | Sem pendência P0 codificável constatada |
-| D4 Intake/booking | 18 | 16 | Agendamento aberto sem convite + proteção antiabuso continuam pendentes |
+| D4 Intake/booking | 18 | 17 | Solicitação aberta auditada com Turnstile/Rate Limit e fila de recepção; reserva anônima automaticamente confirmada continua intencionalmente bloqueada |
 | D5 Mídia/documentos | 18 | 17 | Backup e recuperação manuais por foto com SHA-256, auditoria e bucket R2 secundário opcional; automação/retention, DR integral e validação hospedada pendentes |
 | D6 UX/acessibilidade | 16 | 15 | Auditoria automatizada de 26 visualizações demo integrada ao navegador; ainda faltam leitor de tela, outras rotas e testes em dispositivos físicos |
 | D7 CI/evidências | 10 | 8 | Manifesto SHA-256, auditoria exportada e artefatos QA com retenção de 30 dias; persistência canônica, runtime hospedado e sessão PC ainda pendentes |
-| **Total implementação** | **100** | **94** | **~94% estimado de implementação interna** |
+| **Total implementação** | **100** | **95** | **~95% estimado de implementação interna** |
 
-**Avanço geral até produção: ~66%** (94% × 70% = 65,8%, arredondado), considerando peso 70% da implementação e 30% de infraestrutura, testes hospedados, backup, segurança operacional, LGPD e deploy ainda não demonstrados. É uma régua de planejamento conservadora, não um levantamento independente de todos os requisitos legais/clínicos.
+**Avanço geral até produção: ~67%** (95% × 70% = 66,5%, arredondado), considerando peso 70% da implementação e 30% de infraestrutura, testes hospedados, backup, segurança operacional, LGPD e deploy ainda não demonstrados. É uma régua de planejamento conservadora, não um levantamento independente de todos os requisitos legais/clínicos.
 
 **Evidência específica do D5:** `GET /v1/media/integrity` pagina Firestore em lotes de 100 e R2 em lotes de 500, com teto de 3.000 registros por origem, cursores verificados e nenhum DELETE. Falha sem resposta parcial acima do limite; não se trata de snapshot atômico. Os testes `tests/mediaIntegrity.test.ts` e `tests/mediaWorker.test.ts` abrangem paginação, falta de objeto, órfãos candidatos, tenant A × B e cap. Não há reparo/backup automático.
 
@@ -94,3 +94,14 @@ Essencial R$79,90; Pro R$129,90; Premium R$189,90 — contrato preservado.
 - **D7 evidência:** capturas são geradas por aplicativo real **em modo demo com dados fictícios**; `SCREENSHOTS_MANIFEST.json` contém SHA-256 por PNG, referência de commit de origem e contagem exata, com retenção configurada para 30 dias. **Não** é arquivamento canônico permanente, imagem de produção, teste assistivo real ou certificação WCAG.
 - **Heurística:** D1 14/14; D2 14/14; D3 10/10; D4 16/18; D5 17/18; **D6 15/16; D7 8/10; total 94/100**. Preparo geral estimado **~66%**. Nenhum ajuste de preço, billing, merge na main ou deploy.
 - **Próximo bloco realmente pendente:** agendamento aberto sem convite somente com proteção antiabuso e opt-in seguro (não liberado); QA com leitor de tela e dispositivos físicos; verificação do runtime hospedado; backups e retenção reais; evidência visual canônica com controle de privacidade.
+
+## Checkpoint D4 — 31/10/2026 (solicitação pública protegida, sem reserva automática)
+
+**SHA de código testado:** `b74c321973a53e02007382365142a4ad6f612282`. [CI push #41241826209](https://github.com/CristianoRFB/Dentista/actions/runs/41241826209) e [CI PR #41241830594](https://github.com/CristianoRFB/Dentista/actions/runs/41241830594) **SUCCESS**. Validação: **160 testes unitários/Worker e 30 Rules Emulator**, TypeScript, Worker e build aprovados. QA Chromium de 28 capturas tem execução separada; conferir status em HEAD.
+
+- **Novo fluxo sem convite:** `/:tenantSlug/solicitar-agendamento`, `POST /v1/public/booking-requests`, `tenants/{tenantId}/openBookingRequests/{uuid}`. Sem novo paciente, consulta ou lock. Resposta HTTP 202, claramente marcada como **não confirmada**.
+- **Defesa em profundidade:** rate-limit de IP/tenant na borda (aproximado, não global exato), Turnstile server-side (hostname + action), origin allowlist, validação estrita de contato/hora, recusa sem configuração de secret/binding, opt-in `publicProfile.openBookingRequestsEnabled` restrito a `tenant_owner`, revalidação atômica em Firestore transaction antes do commit. Token Turnstile e IP não persistem.
+- **Recepção:** fila privada com leitura por `appointments.read`, revisão `contacted/dismissed` auditada com `appointments.manage`, sem criar ou cancelar agendamentos automaticamente. Firestore Rules negam criação/exclusão cliente e isolam tenant A de B.
+- **Privacidade mínima:** ciência obrigatória do uso de dados para contato, sem campo clínico nem dados de saúde textual, sem alegação de conformidade LGPD automática. Requer política de retenção antes de produção.
+- **Configuração deliberadamente pendente e fail-closed:** sitekey frontend `VITE_TURNSTILE_SITE_KEY`, secret Worker `TURNSTILE_SECRET_KEY`, rate limiting binding `OPEN_BOOKING_RATE_LIMITER`, `APP_ORIGIN` hospedado. Instruções em `docs/OPEN_BOOKING_REQUESTS_RUNBOOK.md`; nenhuma chave ou binding de produção provisionado.
+- **Régua de planejamento:** D4 17/18 (+1), demais D1 14, D2 14, D3 10, D5 17, D6 15, D7 8; **95/100 código**, **~67% preparo geral**. 1 ponto D4 remanescente exige decisão de produto e operacional para auto-reserva anônima segura e verificada; não tratar interesse de contato como booking finalizado.
