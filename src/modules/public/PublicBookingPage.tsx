@@ -3,9 +3,9 @@ import { readInviteToken, scrubInviteTokenFromAddressBar } from '../../lib/perso
 import { Link,useParams } from 'react-router-dom';
 import { demoModeEnabled } from '../auth/AuthRoutes';
 import { submitPublicBooking } from '../../lib/publicBookingClient';
+import { bookingLocalBounds, parseBookingLocalInput } from '../../lib/bookingTime';
 
 const demoSlots=['09:00','10:30','14:00','15:30','17:00'];
-function validLocal(date:string){const time=new Date(date).getTime();return Number.isFinite(time);}
 export function PublicBookingPage(){
   const {tenantSlug=''}=useParams();
 
@@ -14,6 +14,7 @@ export function PublicBookingPage(){
   useEffect(()=>scrubInviteTokenFromAddressBar(),[]);
   const validToken=/^[A-Za-z0-9_-]{43}$/.test(token);
   const [dateTime,setDateTime]=useState('');
+  const [timeBounds]=useState(()=>bookingLocalBounds());
   const [selected,setSelected]=useState('14:00');
   const [step,setStep]=useState(1);
   const [busy,setBusy]=useState(false);
@@ -23,8 +24,7 @@ export function PublicBookingPage(){
   async function send(e:FormEvent) {
     e.preventDefault();setError('');setBusy(true);
     try{
-      if(!validLocal(dateTime))throw new Error('Selecione uma data e um horário válidos.');
-      const startsAt=new Date(dateTime).toISOString();
+      const startsAt=parseBookingLocalInput(dateTime);
       const result=await submitPublicBooking(tenantSlug,token,startsAt);
       setBooked(result.startsAt);
       setToken('');
@@ -46,8 +46,12 @@ export function PublicBookingPage(){
       <p className="muted">Horário no fuso do dispositivo: {browserZone}. Se estiver em outra região, confirme a diferença de fuso com a clínica.</p>
       {error&&<p className="form-error" role="alert">{error}</p>}
       <form className="data-form" onSubmit={e=>void send(e)}>
-        <label>Data e horário desejados<input type="datetime-local" required value={dateTime} onChange={e=>setDateTime(e.target.value)} /></label>
-        <p className="muted">Escolha um horário entre cinco minutos e 60 dias a partir de agora. O convite expira em sete dias ou após o primeiro uso.</p>
+        <label htmlFor="booking-time">Data e horário desejados</label>
+        <input id="booking-time" type="datetime-local" required step="60"
+          min={timeBounds.min} max={timeBounds.max} value={dateTime}
+          aria-describedby="booking-time-hint"
+          onChange={e=>{setDateTime(e.target.value);setError('');}} />
+        <p id="booking-time-hint" className="muted">Escolha um horário entre cinco minutos e 60 dias a partir de agora. O horário informado é interpretado no fuso do seu dispositivo e será conferido novamente pela clínica. O convite expira em sete dias ou após o primeiro uso.</p>
         <button className="btn primary large" disabled={busy} type="submit">{busy?'Conferindo disponibilidade…':'Confirmar horário disponível'}</button>
       </form>
       </>}
