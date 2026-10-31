@@ -1048,13 +1048,16 @@ async function manualBackupClinicalPhoto(env:Env,uid:string,payload:unknown) {
     const exists=await backupBucket.head(backupKey);
     if(!exists){
       const copied=await backupBucket.put(backupKey,bytes,{
+        // Cloudflare evaluates If-None-Match atomically at the R2 object write.
+        onlyIf:new Headers({'If-None-Match':'*'}),
         sha256:digest,
         httpMetadata:{contentType:typeof scope.photo.contentType==='string'?scope.photo.contentType:'application/octet-stream',
           cacheControl:'private, no-store'},
         customMetadata:{tenantId:input.tenantId,patientId:input.patientId,
           photoId:input.photoId,sha256:digest},
       });
-      if(!copied)throw Error('backup_put_unavailable');
+      // An identical snapshot may have been created concurrently. Verify it below.
+      if(!copied && !await backupBucket.head(backupKey))throw Error('backup_put_unavailable');
     }
     await verifiedBackupBytes(backupBucket,backupKey,digest);
   }catch{throw new HttpError(503,'clinical_backup_verification_failed');}
@@ -1167,12 +1170,13 @@ async function manualRestoreClinicalPhoto(env:Env,uid:string,payload:unknown) {
     if(await env.CLINICAL_MEDIA.head(scope.photo.objectKey))
       throw new HttpError(409,'original_media_still_exists');
     const result=await env.CLINICAL_MEDIA.put(scope.photo.objectKey,bytes,{
+      onlyIf:new Headers({'If-None-Match':'*'}),
       sha256:input.digest,
       httpMetadata:{contentType:typeof scope.photo.contentType==='string'?scope.photo.contentType:'application/octet-stream',
         cacheControl:'private, no-store'},
       customMetadata:{tenantId:input.tenantId,patientId:input.patientId,recoveredBy:uid},
     });
-    if(!result)throw Error('restore_put_failed');
+    if(!result)throw new HttpError(409,'original_media_raced_with_recovery');
     await verifiedBackupBytes(env.CLINICAL_MEDIA,scope.photo.objectKey,input.digest!);
   }catch(e){if(e instanceof HttpError)throw e;throw new HttpError(503,'clinical_restore_unverified');}
   // If this log fails, "recovery_requested" remains for manual reconciliation.

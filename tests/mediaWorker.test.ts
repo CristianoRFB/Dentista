@@ -63,7 +63,8 @@ const env = {
   APP_ORIGIN: 'https://app.test',
   CLINICAL_MEDIA: {
     head: vi.fn(async (key:string) => storedObjects.has(key) ? {key} : null),
-    put: vi.fn(async (key: string, stream: ReadableStream<Uint8Array>, options: { httpMetadata?: { contentType?: string } }) => {
+    put: vi.fn(async (key: string, stream: ReadableStream<Uint8Array>, options: { httpMetadata?: { contentType?: string }; onlyIf?: Headers }) => {
+      if(options?.onlyIf?.get('If-None-Match')==='*' && storedObjects.has(key))return null;
       const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
       storedObjects.set(key, { bytes, contentType: options.httpMetadata?.contentType ?? 'application/octet-stream' });
       return {key};
@@ -565,7 +566,8 @@ describe('D5 — cópias privadas verificadas e restauração manual sem sobresc
       const data=copied.get(key);
       return data?{body:new Blob([data]).stream()}:null;
     }),
-    put:vi.fn(async(key:string,value:ArrayBuffer)=>{
+    put:vi.fn(async(key:string,value:ArrayBuffer,options?:{onlyIf?:Headers})=>{
+      if(options?.onlyIf?.get('If-None-Match')==='*' && copied.has(key))return null;
       copied.set(key,new Uint8Array(value));return {key};
     }),
     delete:vi.fn(async(key:string)=>{copied.delete(key);}),
@@ -657,6 +659,40 @@ describe('D5 — cópias privadas verificadas e restauração manual sem sobresc
     expect(JSON.stringify(writes)).toContain('clinical_photo.recovery_verified');
     expect(backup.delete).not.toHaveBeenCalled();
     expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+  });
+
+  it('não sobrescreve uma foto criada entre o HEAD e o PUT condicional atômico',async()=>{
+    fixture();
+    const first=await request('/v1/media/backups',payload);
+    const {digest}=await first.json() as {digest:string};
+    const backupKey=[...copied.keys()][0];
+    documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a/backups/'+digest,{
+      tenantId:'A',patientId:'patient-a',photoId:'photo-a',sha256:digest,
+      objectKey:originalKey,backupKey,
+    });
+    storedObjects.delete(originalKey);
+    let calls=0;
+    vi.mocked(env.CLINICAL_MEDIA.head).mockImplementationOnce(async()=>{
+      calls++;
+      return null;
+    }).mockImplementationOnce(async()=>{
+      calls++;
+      return null;
+    });
+    // The concurrent writer wins immediately before the conditional PUT.
+    const ordinaryPut=vi.mocked(env.CLINICAL_MEDIA.put).getMockImplementation()!;
+    vi.mocked(env.CLINICAL_MEDIA.put).mockImplementationOnce(async(key,stream,options)=>{
+      storedObjects.set(key,{bytes:new Uint8Array([10,20,30]),contentType:'image/jpeg'});
+      return ordinaryPut(key,stream,options);
+    });
+    writes.length=0;
+    const result=await request('/v1/media/backups/restore',{...payload,digest});
+    expect(result.status,await result.clone().text()).toBe(409);
+    expect(storedObjects.get(originalKey)?.bytes).toEqual(new Uint8Array([10,20,30]));
+    expect(JSON.stringify(writes)).toContain('clinical_photo.recovery_requested');
+    expect(JSON.stringify(writes)).not.toContain('clinical_photo.recovery_verified');
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+    expect(calls).toBe(2);
   });
   it('bloqueia sobrescrita de original existente e backup alterado sem qualquer PUT',async()=>{
     fixture();
