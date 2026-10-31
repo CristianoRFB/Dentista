@@ -12,7 +12,7 @@ Categorias: PLATFORM, TENANT ADMIN, CLINICAL, RECEPTION, PATIENT e PUBLIC. Wiref
 | Agenda | `/{tenantSlug}/app/agenda` | persistência e conflito tratados pelo Worker | Não arquivada |
 | Pacientes | `/{tenantSlug}/app/pacientes` | CRUD mínimo e inativação sem delete | Não arquivada |
 | Prontuário | `/{tenantSlug}/app/pacientes/{patientId}/clinico` | notas append-only e adendos | Não arquivada |
-| Fotos clínicas | `/{tenantSlug}/app/pacientes/{patientId}/fotos` | upload/preview autenticados via Worker e R2 privado | Não arquivada |
+| Fotos clínicas | `/{tenantSlug}/app/pacientes/{patientId}/fotos` | upload/preview privados, listagem progressiva de 8 imagens, revisão clínica e diagnóstico R2 × Firestore limitado (somente leitura) | Não arquivada; homologação hospedada pendente |
 | Recursos | `/{tenantSlug}/app/recursos` | CRUD mínimo | Não arquivada |
 | Cadastros | `/{tenantSlug}/app/cadastros` | profissionais/procedimentos/equipe | Não arquivada |
 | Site público do tenant | `/{tenantSlug}` | perfil público real; agendamento e intake para tenants reais indisponíveis | Não arquivada |
@@ -24,4 +24,24 @@ O Vite foi executado em modo demo de desenvolvimento com dados fictícios. Nesta
 
 Não referenciar wireframe ou imagem conceitual como screenshot real. Os visuais em `generated/` são materiais de conceito separados.
 
-Central de Retorno permanece somente leitura. `/agendar` e `/cadastro` não persistem dados para tenants reais. Portal do paciente, odontograma e tratamento não são fluxos operacionais.
+Central de Retorno possui fluxo interno de criação/atualização por equipe autorizada na branch de implementação; captura de screenshot real ainda pendente. `/agendar#token=...` cria agendamento real por convite pessoal, com anti-double-booking e consumo transacional; `/app/convites-agenda` emite convites; agendamento aberto sem convite ainda não disponível; `/cadastro#token=...` recebe contatos via Worker e `/app/pre-cadastros` permite revisão autenticada Pro, sem screenshot real arquivada. Portal do paciente ainda não é fluxo operacional. Planos de tratamento e orçamentos Pro possuem rota persistida e auditada na branch, sem screenshot real arquivada. O odontograma FDI tem tela clínica e persistência append-only na branch de desenvolvimento, com screenshot real ainda não arquivada.
+
+
+## Cobertura automatizada de telas (implementação 29/10/2026)
+
+- `scripts/capture-demo-screenshots.mjs` abre Vite em modo desenvolvimento com `VITE_USE_DEMO_DATA=true`, e o workflow `.github/workflows/visual-qa.yml` aciona Chromium para visitar seis rotas reais de demonstração em desktop (1365×850) e mobile (390×844).
+- O script exige cabeçalho real da rota e estado fictício nas telas clínicas; caso haja erro ou redirecionamento indevido, o teste falha em vez de arquivar uma imagem enganosa.
+- Capturas são classificadas `SCREENSHOT_REAL_DEMO` no `SCREENSHOTS_MANIFEST.json` e mantidas em artefato temporário GitHub Actions, **não** dentro de `docs/screenshots/` enquanto não forem revisadas e persistidas na versão vigente.
+- Não capturar tokens de convite, contas reais, dados clínicos reais nem Platform Owner. Essas telas exigem homologação própria para gerar evidência verdadeira.
+
+**Execução comprovada em 29/10/2026:** [GitHub Actions visual QA #40949283614](https://github.com/CristianoRFB/Dentista/actions/runs/40949283614) — **SUCCESS** no SHA `492480dbf5fdc3d65219bdf14036a5019eeb2011`. Foram arquivados **12 screenshots reais de DEMO** + `SCREENSHOTS_MANIFEST.json` no artefato temporário [`odontoflow-real-demo-screenshots`](https://github.com/CristianoRFB/Dentista/actions/runs/40949283614/artifacts/12931220780), com retenção de 14 dias. Classificação: `SCREENSHOT_REAL_DEMO`. Não existe screenshot de produção nem arquivo de screenshot persistido no Git; revisão e arquivamento documental definitivo ainda pendentes.
+
+## Verificação Chromium ampliada — 29/10/2026
+
+- **SHA de código verificado:** `8b950a1b3f12569b16b81f0253fdc10e729ae9f7`.
+- **GitHub Actions visual:** [run #40953800997](https://github.com/CristianoRFB/Dentista/actions/runs/40953800997) — `success`.
+- **GitHub Actions principal:** [run #40953806462](https://github.com/CristianoRFB/Dentista/actions/runs/40953806462) — `success`.
+- **Artefato temporário:** [odontoflow-real-demo-screenshots](https://github.com/CristianoRFB/Dentista/actions/runs/40953800997/artifacts/12933500262), retenção de 14 dias.
+- **Cobertura efetiva:** 11 rotas × 2 viewports = **22 screenshots reais do Vite demo**, mais `SCREENSHOTS_MANIFEST.json`; incluem retornos, aviso de prontuário demo, odontograma, tratamento e fotos.
+- **Verificação de interação:** menu mobile com teclado/Shift+Tab e Escape, foco devolvido ao acionador, bloqueio da rolagem de fundo, atalho de pular para o conteúdo e busca de pacientes fictícios.
+- **Classificação obrigatória:** `SCREENSHOT_REAL_DEMO`; sem paciente real, prontuário real, screenshot de produção ou evidência de deploy. Os arquivos continuam no Actions, não estão arquivados em `docs/screenshots/` nem revisados como screenshots canônicos.

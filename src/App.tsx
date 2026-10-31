@@ -5,6 +5,7 @@ import { PricingPage } from './modules/public/PricingPage';
 import { PublicIntakePage } from './modules/public/PublicIntakePage';
 import { TenantPublicSite } from './modules/public/TenantPublicSite';
 import { PublicBookingPage } from './modules/public/PublicBookingPage';
+import { OpenBookingRequestPage } from './modules/public/OpenBookingRequestPage';
 import { PlatformDashboard } from './modules/platform/PlatformDashboard';
 import { TenantShell } from './modules/tenant/TenantShell';
 import { TenantDashboard } from './modules/tenant/TenantDashboard';
@@ -13,11 +14,15 @@ import { ResourcesPage } from './modules/scheduling/ResourcesPage';
 import { RecallCenterPage } from './modules/recalls/RecallCenterPage';
 import { PatientsPage } from './modules/patients/PatientsPage';
 import { PatientClinicalPage } from './modules/clinical/PatientClinicalPage';
+import { PatientOdontogramPage } from './modules/clinical/PatientOdontogramPage';
+import { PatientTreatmentPage } from './modules/clinical/PatientTreatmentPage';
 import { ClinicalPhotosPage } from './modules/clinical-media/ClinicalPhotosPage';
 import { LoginPage } from './modules/auth/LoginPage';
 import { AuthRequired, PlatformOwnerRequired } from './modules/auth/AuthRoutes';
 import { TenantAccessGate, TenantAccessProvider, TenantPermissionGate } from './modules/tenant/TenantContext';
 import { CatalogsPage } from './modules/tenant/CatalogsPage';
+import { IntakeReviewPage } from './modules/tenant/IntakeReviewPage';
+import { BookingInvitesPage } from './modules/tenant/BookingInvitesPage';
 
 export function App() {
   return (
@@ -31,6 +36,7 @@ export function App() {
       <Route path="/recursos/:feature" element={<FeaturePage />} />
       <Route path="/:tenantSlug" element={<TenantPublicSite />} />
       <Route path="/:tenantSlug/agendar" element={<PublicBookingPage />} />
+      <Route path="/:tenantSlug/solicitar-agendamento" element={<OpenBookingRequestPage />} />
       <Route path="/:tenantSlug/cadastro" element={<PublicIntakePage />} />
       <Route element={<AuthRequired />}>
         <Route element={<PlatformOwnerRequired />}>
@@ -43,8 +49,10 @@ export function App() {
             <Route element={<TenantPermissionGate permission="resources.read" feature="physical_resources" />}><Route path="recursos" element={<ResourcesPage />} /></Route>
             <Route element={<TenantPermissionGate anyOf={['professionals.read','procedures.read']} anyFeature={['professionals','procedures']} />}><Route path="cadastros" element={<CatalogsPage />} /></Route>
             <Route element={<TenantPermissionGate permission="recalls.read" feature="recall_center" />}><Route path="retornos" element={<RecallCenterPage />} /></Route>
+            <Route element={<TenantPermissionGate permission="intake.read" feature="intake_link" />}><Route path="pre-cadastros" element={<IntakeReviewPage />} /></Route>
+            <Route element={<TenantPermissionGate permission="appointments.manage" feature="agenda" />}><Route path="convites-agenda" element={<BookingInvitesPage />} /></Route>
             <Route element={<TenantPermissionGate permission="patients.read" feature="patients" />}><Route path="pacientes" element={<PatientsPage />} /></Route>
-            <Route element={<TenantPermissionGate permission="clinical.read" feature="clinical_records" />}><Route path="pacientes/:patientId/clinico" element={<PatientClinicalPage />} /></Route>
+            <Route element={<TenantPermissionGate permission="clinical.read" feature="clinical_records" />}><Route path="pacientes/:patientId/clinico" element={<PatientClinicalPage />} /><Route path="pacientes/:patientId/odontograma" element={<PatientOdontogramPage />} /><Route path="pacientes/:patientId/tratamento" element={<PatientTreatmentPage />} /></Route>
             <Route element={<TenantPermissionGate permission="clinical.read" feature="clinical_photos" />}><Route path="pacientes/:patientId/fotos" element={<ClinicalPhotosPage />} /></Route>
           </Route>
         </Route>

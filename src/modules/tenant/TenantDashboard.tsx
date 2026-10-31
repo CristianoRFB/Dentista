@@ -7,6 +7,7 @@ import { listTenantRecords } from '../../lib/tenantData';
 import { db } from '../../lib/firebase';
 import { useReadyTenantAccess } from './TenantContext';
 import { canUse } from '../../commercial/entitlementService';
+import { scanTenantMediaUsage, type TenantMediaUsageScan } from '../../lib/mediaUsageClient';
 
 export function TenantDashboard() {
   const { tenantSlug = 'demo-clinica' } = useParams();
@@ -17,6 +18,16 @@ export function TenantDashboard() {
   const [recalls, setRecalls] = useState<Recall[]>([]);
   const [resources, setResources] = useState<ScheduleResource[]>([]);
   const [error, setError] = useState('');
+  const [mediaUsage,setMediaUsage]=useState<TenantMediaUsageScan|null>(null);
+  const [mediaUsageBusy,setMediaUsageBusy]=useState(false);
+  const [mediaUsageError,setMediaUsageError]=useState('');
+  useEffect(()=>{setMediaUsage(null);setMediaUsageError('');},[session.tenant.id]);
+  async function refreshMediaUsage(){
+    setMediaUsageBusy(true);setMediaUsageError('');
+    try {setMediaUsage(await scanTenantMediaUsage(session,mediaUsage&&!mediaUsage.complete?mediaUsage:undefined));}
+    catch(e){setMediaUsageError(e instanceof Error?e.message:'Falha ao medir R2.');}
+    finally {setMediaUsageBusy(false);}
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -72,6 +83,18 @@ export function TenantDashboard() {
       {session.permissions.includes('recalls.read') && canUse(session.tenant, 'recall_center') && <div className="metric-card"><b>{recalls.length}</b><span>retornos pendentes</span></div>}
       {session.permissions.includes('resources.read') && <div className="metric-card"><b>{resources.length}</b><span>recursos ativos</span></div>}
     </div>
+    {!session.isDemo && session.permissions.includes('usage.read') && <section className="card" aria-label="Uso de armazenamento clínico R2" style={{marginTop:18}}>
+      <div className="card-title"><h2>Armazenamento de fotos clínicas (R2)</h2></div>
+      <p className="muted">Medição sob demanda, somente leitura e exclusiva desta clínica. Não representa limite do plano, cobrança ou backup.</p>
+      {mediaUsage && <p role="status"><strong>{(mediaUsage.bytes/1048576).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} MiB</strong>
+        {' em '+mediaUsage.objectCount.toLocaleString('pt-BR')+' objetos'}
+        {mediaUsage.complete?' (varredura concluída)':' (parcial; há mais páginas)'}</p>}
+      {mediaUsageError && <p className="form-error" role="alert">{mediaUsageError}</p>}
+      <button className="btn secondary" type="button" disabled={mediaUsageBusy} onClick={()=>void refreshMediaUsage()}>
+        {mediaUsageBusy?'Medindo armazenamento…':mediaUsage&&!mediaUsage.complete?'Continuar medição':'Medir armazenamento agora'}
+      </button>
+      <p className="muted" style={{marginTop:12,fontSize:12}}>Dados R2 podem mudar durante a varredura. Nenhum arquivo é movido ou excluído.</p>
+    </section>}
     {session.permissions.includes('appointments.read') && <div className="dashboard-layout">
       <div className="card"><div className="card-title"><h2>Próximos atendimentos</h2><Link to={base + '/agenda'}>ver agenda →</Link></div>
         {appointments.length === 0 ? <p className="muted">Nenhum atendimento marcado para hoje.</p> : appointments.map(appointment => <div className="dash-row" key={appointment.id}>

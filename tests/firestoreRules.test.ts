@@ -4,7 +4,7 @@ import {
   assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
-  collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch,
+  collection, deleteDoc, doc, getDoc, getDocs, query, where, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch,
   runTransaction,
 } from 'firebase/firestore';
 import { permissionTemplates } from '../src/domain/permissions';
@@ -498,6 +498,262 @@ describe('Firestore Rules — isolamento e autorização', () => {
     expect((await assertSucceeds(getDoc(doc(platformDb, 'tenants/A')))).data()?.planId).toBe('essential');
   });
 
+
+  it('D2: exige criação em lote, trilha de versões imutável e nega acesso A×B', async () => {
+    const dentist = env.authenticatedContext('dentist-a').firestore();
+    const other = env.authenticatedContext('dentist-b').firestore();
+    const receptionist = env.authenticatedContext('reception-a').firestore();
+    const root = doc(dentist,'tenants/A/treatmentPlans/plan-a');
+    const v1 = doc(dentist,'tenants/A/treatmentPlans/plan-a/versions/version-a1');
+    const log = doc(dentist,'tenants/A/auditLogs/plan-a-audit-1');
+    const item = {procedureId:'proc-a',description:'Consulta clínica',toothId:'16',stage:'planned',quantity:1,unitPriceCents:0};
+    const plan = {
+      id:'plan-a',tenantId:'A',patientId:'patient-a',professionalId:'prof-a',status:'draft',
+      currentVersion:1,versionId:v1.id,createdBy:'dentist-a',createdAt:serverTimestamp(),lastAuditLogId:log.id,
+    };
+    const version = {
+      id:v1.id,planId:root.id,tenantId:'A',patientId:'patient-a',version:1,status:'draft',
+      items:[item],quoteEnabled:false,note:'Plano clínico básico',appointmentId:'',
+      createdBy:'dentist-a',createdAt:serverTimestamp(),auditLogId:log.id,
+    };
+    await assertFails(setDoc(root,plan));
+    await assertSucceeds(runTransaction(dentist,async tx=>{
+      tx.set(root,plan);
+      tx.set(v1,version);
+      tx.set(log,{tenantId:'A',actorId:'dentist-a',actorRole:'dentist',action:'treatment_plan.create',
+        resourceType:'treatmentPlan',resourceId:root.id,timestamp:serverTimestamp()});
+    }));
+    expect((await assertSucceeds(getDoc(root))).data()?.currentVersion).toBe(1);
+    expect((await assertSucceeds(getDoc(v1))).data()?.items[0].unitPriceCents).toBe(0);
+    await assertFails(getDoc(doc(other,'tenants/A/treatmentPlans/plan-a')));
+    await assertFails(getDoc(doc(receptionist,'tenants/A/treatmentPlans/plan-a')));
+    await assertFails(updateDoc(v1,{note:'Mudar versão histórica'}));
+    await assertFails(deleteDoc(v1));
+    await assertFails(deleteDoc(root));
+
+    const v2 = doc(dentist,'tenants/A/treatmentPlans/plan-a/versions/version-a2');
+    const log2 = doc(dentist,'tenants/A/auditLogs/plan-a-audit-2');
+    const update = writeBatch(dentist);
+    update.update(root,{currentVersion:2,versionId:v2.id,status:'approved',lastAuditLogId:log2.id,updatedAt:serverTimestamp()});
+    update.set(v2,{...version,id:v2.id,version:2,status:'approved',auditLogId:log2.id});
+    update.set(log2,{tenantId:'A',actorId:'dentist-a',actorRole:'dentist',action:'treatment_plan.revise',
+      resourceType:'treatmentPlan',resourceId:root.id,timestamp:serverTimestamp()});
+    await assertSucceeds(update.commit());
+    expect((await getDoc(v1)).data()?.status).toBe('draft');
+    expect((await getDoc(root)).data()?.status).toBe('approved');
+
+    const v3 = doc(dentist,'tenants/A/treatmentPlans/plan-a/versions/version-a3');
+    const log3 = doc(dentist,'tenants/A/auditLogs/plan-a-audit-3');
+    const forged = writeBatch(dentist);
+    forged.update(root,{currentVersion:3,versionId:v3.id,status:'in_progress',lastAuditLogId:log3.id,updatedAt:serverTimestamp()});
+    forged.set(v3,{...version,id:v3.id,version:3,status:'in_progress',
+      items:[{...item,quantity:10}],auditLogId:log3.id});
+    forged.set(log3,{tenantId:'A',actorId:'dentist-a',actorRole:'dentist',action:'treatment_plan.revise',
+      resourceType:'treatmentPlan',resourceId:root.id,timestamp:serverTimestamp()});
+    await assertFails(forged.commit());
+    expect((await getDoc(root)).data()?.currentVersion).toBe(2);
+  });
+
+  it('D2: orçamento não pode ser criado no Essencial e exige Pro', async () => {
+    const dentist=env.authenticatedContext('dentist-a').firestore();
+    const submit=()=> {
+      const root=doc(dentist,'tenants/A/treatmentPlans/plan-quoted');
+      const rev=doc(dentist,'tenants/A/treatmentPlans/plan-quoted/versions/quote-v1');
+      const audit=doc(dentist,'tenants/A/auditLogs/quote-audit');
+      const batch=writeBatch(dentist);
+      batch.set(root,{id:root.id,tenantId:'A',patientId:'patient-a',professionalId:'prof-a',
+        currentVersion:1,versionId:rev.id,status:'draft',createdBy:'dentist-a',createdAt:serverTimestamp(),
+        lastAuditLogId:audit.id});
+      batch.set(rev,{id:rev.id,planId:root.id,tenantId:'A',patientId:'patient-a',
+        version:1,status:'draft',items:[{
+          procedureId:'proc-a',description:'Consulta clínica',toothId:'16',stage:'planned',quantity:1,unitPriceCents:12000,
+        }],quoteEnabled:true,note:'Proposta, sem cobrança',appointmentId:'',
+        createdBy:'dentist-a',createdAt:serverTimestamp(),auditLogId:audit.id});
+      batch.set(audit,{tenantId:'A',actorId:'dentist-a',actorRole:'dentist',action:'treatment_plan.create',
+        resourceType:'treatmentPlan',resourceId:root.id,timestamp:serverTimestamp()});
+      return batch.commit();
+    };
+    await assertFails(submit());
+    await env.withSecurityRulesDisabled(async context=>{
+      await updateDoc(doc(context.firestore(),'tenants/A'),{planId:'pro'});
+    });
+    await assertSucceeds(submit());
+    const quote=await assertSucceeds(getDoc(doc(dentist,'tenants/A/treatmentPlans/plan-quoted/versions/quote-v1')));
+    expect(quote.data()?.items[0].unitPriceCents).toBe(12000);
+    await assertFails(getDoc(doc(env.authenticatedContext('dentist-b').firestore(),'tenants/A/treatmentPlans/plan-quoted')));
+  });
+
+  it('odontograma cria somente evento clínico auditado e proíbe mutações ou acesso transversal', async () => {
+    const dentist = env.authenticatedContext('dentist-a').firestore();
+    const b = env.authenticatedContext('dentist-b').firestore();
+    const reception = env.authenticatedContext('reception-a').firestore();
+    const entry = doc(dentist, 'tenants/A/patients/patient-a/odontogramEvents/event-a');
+    const audit = doc(dentist, 'tenants/A/auditLogs/odontogram-event-a');
+    const input = {
+      id: 'event-a', tenantId: 'A', patientId: 'patient-a',
+      toothId: '16', surface: 'occlusal', finding: 'restoration',
+      note: 'Restauração previamente observada', createdBy: 'dentist-a',
+      createdAt: serverTimestamp(), auditLogId: audit.id,
+    };
+    await assertFails(setDoc(entry, input));
+    await assertSucceeds(runTransaction(dentist, async tx => {
+      tx.set(entry, input);
+      tx.set(audit, {
+        tenantId: 'A', actorId: 'dentist-a', actorRole: 'dentist',
+        action: 'odontogram_event.create', resourceType: 'odontogramEvent',
+        resourceId: entry.id, patientId: 'patient-a', timestamp: serverTimestamp(),
+      });
+    }));
+    expect((await assertSucceeds(getDoc(entry))).data()?.toothId).toBe('16');
+    await assertFails(getDoc(doc(b, 'tenants/A/patients/patient-a/odontogramEvents/event-a')));
+    await assertFails(getDoc(doc(reception, 'tenants/A/patients/patient-a/odontogramEvents/event-a')));
+    await assertFails(updateDoc(entry, { note: 'sobrescrever histórico' }));
+    await assertFails(deleteDoc(entry));
+    const correction = doc(dentist, 'tenants/A/patients/patient-a/odontogramEvents/event-correction');
+    const correctionAudit = doc(dentist, 'tenants/A/auditLogs/odontogram-correction');
+    await assertSucceeds(runTransaction(dentist, async tx => {
+      tx.set(correction, {
+        ...input, id: correction.id, supersedesEventId: entry.id,
+        note: 'Correção de descrição após revisão clínica', auditLogId: correctionAudit.id,
+      });
+      tx.set(correctionAudit, {
+        tenantId: 'A', actorId: 'dentist-a', actorRole: 'dentist',
+        action: 'odontogram_event.create', resourceType: 'odontogramEvent',
+        resourceId: correction.id, patientId: 'patient-a', timestamp: serverTimestamp(),
+      });
+    }));
+    expect((await getDoc(entry)).data()?.note).toBe('Restauração previamente observada');
+    expect((await getDoc(correction)).data()?.supersedesEventId).toBe(entry.id);
+    const cross = doc(dentist, 'tenants/A/patients/patient-a/odontogramEvents/cross-patient-event');
+    const crossAudit = doc(dentist, 'tenants/A/auditLogs/cross-patient-audit');
+    await assertFails(runTransaction(dentist, async tx => {
+      tx.set(cross, {
+        ...input, id: cross.id, toothId: '19',
+        supersedesEventId: 'event-from-other-tenant', auditLogId: crossAudit.id,
+      });
+      tx.set(crossAudit, {
+        tenantId: 'A', actorId: 'dentist-a', actorRole: 'dentist',
+        action: 'odontogram_event.create', resourceType: 'odontogramEvent',
+        resourceId: cross.id, patientId: 'patient-a', timestamp: serverTimestamp(),
+      });
+    }));
+  });
+
+
+  it('D4: token privado e fila de pré-cadastros isolada entre tenants e papéis', async () => {
+    await env.withSecurityRulesDisabled(async context => {
+      const db=context.firestore();
+      await updateDoc(doc(db,'tenants/A'),{planId:'pro'});
+      await setDoc(doc(db,'tenants/A/intakeTokens/hash-do-token'), {
+        tenantId:'A',createdBy:'reception-a',usedAt:null,
+        createdAt:serverTimestamp(),expiresAt:Timestamp.fromMillis(Date.now()+86400000),
+      });
+      await setDoc(doc(db,'tenants/A/patientIntakeSubmissions/intake-a'),{
+        id:'intake-a',tenantId:'A',tokenId:'hash-do-token',status:'pending_review',
+        name:'Pessoa Fictícia',phone:'(17) 99999-9999',email:'fake@example.test',submittedAt:serverTimestamp(),
+      });
+    });
+    const reception=env.authenticatedContext('reception-a').firestore();
+    const dentist=env.authenticatedContext('dentist-a').firestore();
+    const b=env.authenticatedContext('dentist-b').firestore();
+    const queue=doc(reception,'tenants/A/patientIntakeSubmissions/intake-a');
+    await assertSucceeds(getDoc(queue));
+    await assertSucceeds(getDocs(query(collection(reception,'tenants/A/patientIntakeSubmissions'),where('tenantId','==','A'))));
+    await assertFails(getDoc(doc(dentist,'tenants/A/patientIntakeSubmissions/intake-a')));
+    await assertFails(getDoc(doc(b,'tenants/A/patientIntakeSubmissions/intake-a')));
+    await assertFails(getDoc(doc(reception,'tenants/A/intakeTokens/hash-do-token')));
+    await assertFails(getDoc(doc(reception,'tenants/A/bookingTokens/secret-hash')));
+    await assertFails(setDoc(doc(reception,'tenants/A/bookingTokens/forged'),{tenantId:'A'}));
+    await assertFails(setDoc(doc(reception,'tenants/A/intakeTokens/forged'),{tenantId:'A'}));
+    await assertFails(setDoc(doc(reception,'tenants/A/patientIntakeSubmissions/forged'),{tenantId:'A',status:'approved'}));
+    await assertFails(updateDoc(queue,{status:'approved',name:'Alteração sem autorização'}));
+
+    const audit=doc(reception,'tenants/A/auditLogs/intake-review-audit');
+    const batch=writeBatch(reception);
+    batch.update(queue,{status:'approved',reviewedBy:'reception-a',reviewedAt:serverTimestamp(),lastAuditLogId:audit.id});
+    batch.set(audit,{tenantId:'A',actorId:'reception-a',actorRole:'receptionist',action:'intake.review',
+      resourceType:'intakeSubmission',resourceId:'intake-a',timestamp:serverTimestamp()});
+    await assertSucceeds(batch.commit());
+    expect((await getDoc(queue)).data()?.status).toBe('approved');
+    await assertFails(updateDoc(queue,{status:'pending_review'}));
+    await assertFails(deleteDoc(queue));
+  });
+
+  it('D4: Essencial não lê fila de pré-cadastro por link',async()=>{
+    const reception=env.authenticatedContext('reception-a').firestore();
+    await assertFails(getDocs(query(collection(reception,'tenants/A/patientIntakeSubmissions'),where('tenantId','==','A'))));
+  });
+
+  it('Central de Retorno Pro: cria/atualiza com auditoria, nega forgery e acesso cruzado', async () => {
+    await env.withSecurityRulesDisabled(async context => {
+      const db = context.firestore();
+      await Promise.all([
+        updateDoc(doc(db, 'tenants/A'), { planId: 'pro' }),
+        updateDoc(doc(db, 'tenants/B'), { planId: 'pro' }),
+      ]);
+    });
+    const owner = env.authenticatedContext('tenant-owner-a').firestore();
+    const receptionist = env.authenticatedContext('reception-a').firestore();
+    const assistant = env.authenticatedContext('assistant-a').firestore();
+    const record = doc(owner, 'tenants/A/recalls/recall-a');
+    const createAudit = doc(owner, 'tenants/A/auditLogs/recall-create-audit');
+    const draft = {
+      id: 'recall-a', tenantId: 'A', patientId: 'patient-a', reason: 'Retorno clínico programado',
+      dueAt: '2026-12-20T12:00:00.000Z', status: 'planned',
+      createdBy: 'tenant-owner-a', createdAt: serverTimestamp(), lastAuditLogId: createAudit.id,
+    };
+    await assertFails(setDoc(record, draft));
+    const createBatch = writeBatch(owner);
+    createBatch.set(record, draft);
+    createBatch.set(createAudit, {
+      tenantId: 'A', actorId: 'tenant-owner-a', actorRole: 'tenant_owner', action: 'recall.create',
+      resourceType: 'recall', resourceId: record.id, timestamp: serverTimestamp(),
+    });
+    await assertSucceeds(createBatch.commit());
+    expect((await assertSucceeds(getDoc(record))).data()?.status).toBe('planned');
+    await assertSucceeds(getDoc(doc(receptionist, 'tenants/A/recalls/recall-a')));
+    await assertFails(getDoc(doc(assistant, 'tenants/A/recalls/recall-a')));
+    await assertFails(getDoc(doc(owner, 'tenants/B/recalls/recall-a')));
+    await assertFails(setDoc(doc(owner, 'tenants/B/recalls/forged'), { ...draft, id: 'forged', tenantId: 'B' }));
+    await assertFails(deleteDoc(record));
+
+    const updateAudit = doc(owner, 'tenants/A/auditLogs/recall-update-audit');
+    const updateBatch = writeBatch(owner);
+    updateBatch.update(record, {
+      status: 'contacted', lastContactAt: serverTimestamp(), updatedAt: serverTimestamp(), lastAuditLogId: updateAudit.id,
+    });
+    updateBatch.set(updateAudit, {
+      tenantId: 'A', actorId: 'tenant-owner-a', actorRole: 'tenant_owner', action: 'recall.update',
+      resourceType: 'recall', resourceId: record.id, timestamp: serverTimestamp(),
+    });
+    await assertSucceeds(updateBatch.commit());
+    expect((await getDoc(record)).data()?.status).toBe('contacted');
+    await assertFails(updateDoc(record, { patientId: 'patient-b' }));
+    await assertFails(updateDoc(record, { status: 'dismissed' }));
+
+    const crossPatient = doc(owner, 'tenants/A/recalls/recall-cross');
+    const crossAudit = doc(owner, 'tenants/A/auditLogs/recall-cross-audit');
+    const crossBatch = writeBatch(owner);
+    crossBatch.set(crossPatient, {
+      ...draft, id: 'recall-cross', patientId: 'patient-b', lastAuditLogId: crossAudit.id,
+    });
+    crossBatch.set(crossAudit, {
+      tenantId: 'A', actorId: 'tenant-owner-a', actorRole: 'tenant_owner',
+      action: 'recall.create', resourceType: 'recall', resourceId: crossPatient.id, timestamp: serverTimestamp(),
+    });
+    await assertFails(crossBatch.commit());
+  });
+
+  it('Central de Retorno não abre no Essencial, mesmo com permissão de recepção', async () => {
+    const receptionist = env.authenticatedContext('reception-a').firestore();
+    await assertFails(getDocs(collection(receptionist, 'tenants/A/recalls')));
+    await assertFails(setDoc(doc(receptionist, 'tenants/A/recalls/essential-write'), {
+      tenantId: 'A', id: 'essential-write', patientId: 'patient-a', reason: 'Revisão',
+      dueAt: '2026-12-20T12:00:00.000Z', status: 'planned',
+      createdBy: 'reception-a', createdAt: serverTimestamp(), lastAuditLogId: 'none',
+    }));
+  });
+
   it('mantém a demo somente leitura mesmo com membership ativa', async () => {
     await env.withSecurityRulesDisabled(async context => {
       const db = context.firestore();
@@ -589,4 +845,105 @@ describe('Firestore Emulator — concorrência dos locks de agenda', () => {
     });
   });
 
+});
+
+
+describe('D4 — Firestore Rules para pedidos públicos não confirmados',()=>{
+  async function seedRequest(){
+    await env.withSecurityRulesDisabled(async context=>{
+      const db=context.firestore();
+      await Promise.all([
+        setDoc(doc(db,'tenants/A/openBookingRequests/req-a'),{
+          id:'req-a',tenantId:'A',name:'Paciente Fictício',phone:'11988887777',
+          email:'fake@example.test',preferredAt:'2026-11-10T14:00:00.000Z',
+          submittedAt:Timestamp.now(),status:'pending_review',
+        }),
+        setDoc(doc(db,'tenants/B/openBookingRequests/req-b'),{
+          id:'req-b',tenantId:'B',name:'Paciente Fictício B',phone:'11988887777',
+          email:'fakeb@example.test',preferredAt:'2026-11-10T14:00:00.000Z',
+          submittedAt:Timestamp.now(),status:'pending_review',
+        }),
+      ]);
+    });
+  }
+  it('bloqueia leitura, criação, alteração e exclusão anônimas; protege o outro tenant',async()=>{
+    await seedRequest();
+    const anon=env.unauthenticatedContext().firestore();
+    const reception=env.authenticatedContext('reception-a').firestore();
+    const other=env.authenticatedContext('dentist-b').firestore();
+    await assertFails(getDoc(doc(anon,'tenants/A/openBookingRequests/req-a')));
+    await assertFails(setDoc(doc(anon,'tenants/A/openBookingRequests/req-new'),{
+      tenantId:'A',status:'pending_review',name:'Injetado',
+    }));
+    await assertFails(deleteDoc(doc(anon,'tenants/A/openBookingRequests/req-a')));
+    await assertSucceeds(getDoc(doc(reception,'tenants/A/openBookingRequests/req-a')));
+    await assertSucceeds(getDocs(query(collection(reception,'tenants/A/openBookingRequests'),where('tenantId','==','A'))));
+    await assertFails(getDoc(doc(reception,'tenants/B/openBookingRequests/req-b')));
+    await assertFails(getDoc(doc(other,'tenants/A/openBookingRequests/req-a')));
+    await assertFails(updateDoc(doc(reception,'tenants/A/openBookingRequests/req-a'),{
+      status:'contacted',
+    })); // missing audit and actor: review cannot bypass workflow
+  });
+  it('permite registrar contato apenas com auditoria em batch e bloqueia replay',async()=>{
+    await seedRequest();
+    const reception=env.authenticatedContext('reception-a').firestore();
+    const entry=doc(reception,'tenants/A/openBookingRequests/req-a');
+    const audit=doc(reception,'tenants/A/auditLogs/review-open-a');
+    const batch=writeBatch(reception);
+    batch.update(entry,{
+      status:'contacted',reviewedAt:serverTimestamp(),reviewedBy:'reception-a',lastAuditLogId:audit.id,
+    });
+    batch.set(audit,{
+      tenantId:'A',actorId:'reception-a',actorRole:'receptionist',
+      action:'open_booking_request.review',resourceType:'openBookingRequest',
+      resourceId:'req-a',timestamp:serverTimestamp(),
+    });
+    await assertSucceeds(batch.commit());
+    expect((await getDoc(entry)).data()?.status).toBe('contacted');
+    await assertFails(updateDoc(entry,{status:'dismissed'}));
+    await assertFails(deleteDoc(entry));
+  });
+  it('somente o tenant owner altera publicProfile com flag opt-in auditada',async()=>{
+    // Legacy fixture bypasses Rules and has no prior audit; real public profiles have one.
+    await env.withSecurityRulesDisabled(async context=>{
+      const db=context.firestore();
+      await updateDoc(doc(db,'tenants/A/publicProfile/public'),{lastAuditLogId:'seed'});
+    });
+    const owner=env.authenticatedContext('tenant-owner-a').firestore();
+    const dentist=env.authenticatedContext('dentist-a').firestore();
+    const profile=doc(owner,'tenants/A/publicProfile/public');
+    const audit=doc(owner,'tenants/A/auditLogs/audit-optin');
+    const batch=writeBatch(owner);
+    batch.update(profile,{openBookingRequestsEnabled:true,lastAuditLogId:audit.id,updatedAt:serverTimestamp()});
+    batch.set(audit,{tenantId:'A',actorId:'tenant-owner-a',actorRole:'tenant_owner',
+      action:'publicProfile.update',resourceType:'publicProfile',resourceId:'public',
+      timestamp:serverTimestamp()});
+    await assertSucceeds(batch.commit());
+    expect((await getDoc(profile)).data()?.openBookingRequestsEnabled).toBe(true);
+    await assertFails(updateDoc(doc(dentist,'tenants/A/publicProfile/public'),{
+      openBookingRequestsEnabled:false,
+    }));
+  });
+});
+
+describe('D5 — proteção explícita dos manifestos privados de backup',()=>{
+  const path='tenants/A/patients/patient-a/clinicalPhotos/photo-a/backups/'+ 'a'.repeat(64);
+  it('nega leitura e gravação direta de manifestos ao dentista, dono, platform owner e anônimo',async()=>{
+    await env.withSecurityRulesDisabled(async context=>{
+      await setDoc(doc(context.firestore(),path),{
+        tenantId:'A',patientId:'patient-a',photoId:'photo-a',
+        sha256:'a'.repeat(64),verification:'sha256_readback',
+        backupKey:'snapshots/private',sizeBytes:3,
+      });
+    });
+    for(const auth of [env.authenticatedContext('dentist-a'),
+      env.authenticatedContext('tenant-owner-a'),env.authenticatedContext('platform-owner'),
+      env.unauthenticatedContext()]){
+      const db=auth.firestore(),entry=doc(db,path);
+      await assertFails(getDoc(entry));
+      await assertFails(setDoc(entry,{tenantId:'A',sha256:'forged'},{merge:true}));
+      await assertFails(deleteDoc(entry));
+    }
+    await assertFails(getDoc(doc(env.authenticatedContext('dentist-b').firestore(),path)));
+  });
 });

@@ -1,0 +1,48 @@
+name: OdontoFlow visual QA — real demo screenshots
+
+on:
+  push:
+    branches:
+      - chore/global-standard-v01-ci-20261027
+    paths:
+      - 'src/**'
+      - 'scripts/capture-demo-screenshots.mjs'
+      - '.github/workflows/visual-qa.yml'
+      - '.env.example'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: odontoflow-visual-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-demo-screenshots:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked app dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install isolated Chromium test runtime
+        run: |
+          npm install --no-save --package-lock=false --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Run real Vite demo and capture desktop/mobile screens
+        run: node scripts/capture-demo-screenshots.mjs
+      - name: Archive screenshots separately from conceptual imagery
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: odontoflow-real-demo-screenshots
+          path: visual-smoke-artifacts/
+          if-no-files-found: warn
+          retention-days: 30

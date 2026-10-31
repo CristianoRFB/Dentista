@@ -53,3 +53,11 @@ trial | active | past_due | suspended | cancelled | demo
 `tenants/{tenantId}/limitCounters/{professionals|resources|memberships}` é privado ao Worker e mantém contagem atômica para as quotas aplicadas. Não é fonte pública para UI.
 
 `UsageCounter` segue sem medição confiável de bytes R2. `storageBytes` retorna `null`; a hipótese interna de 10/50/200 GB não é aplicada ou anunciada.
+
+## D5 — ciclo de vida de ClinicalPhoto (runtime da branch)
+
+Em `tenants/{tenantId}/patients/{patientId}/clinicalPhotos/{photoId}` a metadata da imagem continua pertencendo a um único tenant e paciente. Os bytes permanecem no **bucket R2 privado** por chave `tenants/{tenantId}/patients/{patientId}/{photoId}.{ext}`.
+
+Campos novos, opcionais para documentos legados: `lifecycleStatus: active|archived`, `revision`, `archivedAt`, `archivedBy`, `updatedAt`, `updatedBy`, `lastAuditLogId`. O campo preexistente `status: unverified|verified|rejected` classifica a revisão, independentemente do arquivamento.
+
+Uma revisão autorizada modifica apenas os metadados acima e `tags`, junto a `auditLogs/{auditId}` com `clinical_photo.verify|reject|archive|restore` e motivo limitado. Arquivamento e restauração **não excluem** nem versionam fisicamente o conteúdo R2. O contrato atual **não afirma** retenção automatizada, limpeza segura de objetos órfãos, armazenamento medido ou recuperação de desastre.

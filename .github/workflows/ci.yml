@@ -1,0 +1,68 @@
+name: OdontoFlow CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'chore/**'
+      - 'feat/**'
+      - 'fix/**'
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: odontoflow-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Core P0 + Global Standard v01
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            workers/media-api/package-lock.json
+
+      - name: Java 21 for the Firestore Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install application dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Worker dependencies
+        run: npm ci --prefix workers/media-api --no-audit --no-fund
+
+      - name: Typecheck frontend and shared domain
+        run: npm run typecheck
+
+      - name: Typecheck Cloudflare Worker
+        run: npm run worker:typecheck
+
+      - name: Unit and Worker regression tests
+        run: npm test
+
+      - name: Tenant A x Tenant B and Firestore Rules Emulator
+        run: npm run test:rules
+
+      - name: Production build (no deploy)
+        run: npm run build
+
+      - name: Global/vertical standards validation
+        run: npm run check:standards
+
+      - name: Documentation, diagrams and screenshot references
+        run: npm run docs:check

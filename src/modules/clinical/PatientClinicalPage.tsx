@@ -75,7 +75,7 @@ export function PatientClinicalPage() {
   if (session.isDemo) return <main className="state-page"><p className="demo-banner">Modo demonstrativo · nenhum prontuário clínico fictício é exibido.</p><h1>Prontuário</h1><p>Conecte-se a um tenant de teste para consultar registros clínicos.</p></main>;
 
   return <>
-    <div className="page-head"><div><span className="eyebrow">Registro clínico protegido</span><h1>{patient?.name ?? 'Prontuário do paciente'}</h1><p className="muted">Registros são append-only. Correções entram como adendos com autoria e horário.</p></div><Link className="btn secondary" to={'/' + tenantSlug + '/app/pacientes'}>Voltar aos pacientes</Link></div>
+    <div className="page-head"><div><span className="eyebrow">Registro clínico protegido</span><h1>{patient?.name ?? 'Prontuário do paciente'}</h1><p className="muted">Registros são append-only. Correções entram como adendos com autoria e horário.</p></div><div className="row-actions"><Link className="btn secondary" to={'/' + tenantSlug + '/app/pacientes/' + patientId + '/odontograma'}>Abrir odontograma</Link><Link className="btn secondary" to={'/' + tenantSlug + '/app/pacientes/' + patientId + '/tratamento'}>Planos de tratamento</Link><Link className="btn secondary" to={'/' + tenantSlug + '/app/pacientes'}>Voltar aos pacientes</Link></div></div>
     {(error || message) && <p className={error ? 'form-error' : 'form-success'} role={error ? 'alert' : 'status'}>{error || message}</p>}
     {session.permissions.includes('clinical.write') && <form className="card data-form clinical-form" onSubmit={submitRecord}>
       <h2>Novo registro</h2><div className="form-grid">

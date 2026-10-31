@@ -70,7 +70,7 @@ service cloud.firestore {
     function featureImplemented(featureKey) {
       return featureKey in [
         'agenda','patients','professionals','procedures','physical_resources',
-        'clinical_records','clinical_photos','mini_site'
+        'clinical_records','clinical_photos','mini_site','recall_center','treatment_plans','quotes','intake_link'
       ];
     }
 
@@ -213,7 +213,7 @@ service cloud.firestore {
       return overrides is map
         && overrides.keys().hasOnly([
           'agenda','patients','professionals','procedures','physical_resources','clinical_records','clinical_photos',
-          'recall_center','mini_site','intake_link','treatment_plans','financial_reports','advanced_reports',
+          'recall_center','mini_site','intake_link','treatment_plans','quotes','financial_reports','advanced_reports',
           'patient_portal','automations','multi_unit'
         ])
         && (!('agenda' in overrides) || overrides.agenda is bool)
@@ -227,6 +227,7 @@ service cloud.firestore {
         && (!('mini_site' in overrides) || overrides.mini_site is bool)
         && (!('intake_link' in overrides) || overrides.intake_link is bool)
         && (!('treatment_plans' in overrides) || overrides.treatment_plans is bool)
+        && (!('quotes' in overrides) || overrides.quotes is bool)
         && (!('financial_reports' in overrides) || overrides.financial_reports is bool)
         && (!('advanced_reports' in overrides) || overrides.advanced_reports is bool)
         && (!('patient_portal' in overrides) || overrides.patient_portal is bool)
@@ -342,10 +343,117 @@ service cloud.firestore {
           : false);
     }
 
+    function intakeReviewAuditMutationMatches(tenantId, auditId, resourceId, data) {
+      let path = /databases/$(database)/documents/tenants/$(tenantId)/patientIntakeSubmissions/$(resourceId);
+      return data.action == 'intake.review' && exists(path) && existsAfter(path)
+        && get(path).data.status == 'pending_review'
+        && getAfter(path).data.status in ['approved','rejected']
+        && getAfter(path).data.lastAuditLogId == auditId;
+    }
+
+    function openBookingReviewAuditMutationMatches(tenantId, auditId, resourceId, data) {
+      let path = /databases/$(database)/documents/tenants/$(tenantId)/openBookingRequests/$(resourceId);
+      return data.action == 'open_booking_request.review' && exists(path) && existsAfter(path)
+        && get(path).data.status == 'pending_review'
+        && getAfter(path).data.status in ['contacted','dismissed']
+        && getAfter(path).data.lastAuditLogId == auditId;
+    }
+
+    function recallAuditMutationMatches(tenantId, auditId, resourceId, data) {
+      let path = /databases/$(database)/documents/tenants/$(tenantId)/recalls/$(resourceId);
+      return existsAfter(path) && getAfter(path).data.lastAuditLogId == auditId
+        && (data.action == 'recall.create' ? !exists(path)
+          : data.action == 'recall.update' ? exists(path) && get(path).data.lastAuditLogId != auditId
+          : false);
+    }
+
+
+    function validTreatmentItem(item, quoted) {
+      return item is map && item.keys().hasOnly(['procedureId','description','toothId','stage','quantity','unitPriceCents'])
+        && item.keys().hasAll(['procedureId','description','toothId','stage','quantity','unitPriceCents'])
+        && item.procedureId is string && item.procedureId.matches('^[A-Za-z0-9:_-]{1,128}$')
+        && item.description is string && item.description.size() >= 3 && item.description.size() <= 160
+        && item.toothId is string && item.toothId.matches('^([1-4][1-8]|[5-8][1-5]|)$')
+        && item.stage in ['planned','in_progress','completed','cancelled']
+        && item.quantity is int && item.quantity >= 1 && item.quantity <= 20
+        && item.unitPriceCents is int && item.unitPriceCents >= 0 && item.unitPriceCents <= 100000000
+        && (quoted || item.unitPriceCents == 0);
+    }
+
+    function validTreatmentItems(items, quoted) {
+      return items is list && items.size() >= 1 && items.size() <= 12
+        && validTreatmentItem(items[0], quoted)
+        && (items.size() < 2 || validTreatmentItem(items[1], quoted))
+        && (items.size() < 3 || validTreatmentItem(items[2], quoted))
+        && (items.size() < 4 || validTreatmentItem(items[3], quoted))
+        && (items.size() < 5 || validTreatmentItem(items[4], quoted))
+        && (items.size() < 6 || validTreatmentItem(items[5], quoted))
+        && (items.size() < 7 || validTreatmentItem(items[6], quoted))
+        && (items.size() < 8 || validTreatmentItem(items[7], quoted))
+        && (items.size() < 9 || validTreatmentItem(items[8], quoted))
+        && (items.size() < 10 || validTreatmentItem(items[9], quoted))
+        && (items.size() < 11 || validTreatmentItem(items[10], quoted))
+        && (items.size() < 12 || validTreatmentItem(items[11], quoted));
+    }
+
+    function sameApprovedItem(a,b) {
+      return a.procedureId == b.procedureId && a.description == b.description
+        && a.toothId == b.toothId && a.quantity == b.quantity
+        && a.unitPriceCents == b.unitPriceCents;
+    }
+
+    function sameApprovedItems(a,b) {
+      return a.size() == b.size()
+        && sameApprovedItem(a[0],b[0])
+        && (a.size() < 2 || sameApprovedItem(a[1],b[1]))
+        && (a.size() < 3 || sameApprovedItem(a[2],b[2]))
+        && (a.size() < 4 || sameApprovedItem(a[3],b[3]))
+        && (a.size() < 5 || sameApprovedItem(a[4],b[4]))
+        && (a.size() < 6 || sameApprovedItem(a[5],b[5]))
+        && (a.size() < 7 || sameApprovedItem(a[6],b[6]))
+        && (a.size() < 8 || sameApprovedItem(a[7],b[7]))
+        && (a.size() < 9 || sameApprovedItem(a[8],b[8]))
+        && (a.size() < 10 || sameApprovedItem(a[9],b[9]))
+        && (a.size() < 11 || sameApprovedItem(a[10],b[10]))
+        && (a.size() < 12 || sameApprovedItem(a[11],b[11]));
+    }
+
+    function treatmentTransition(fromStatus, toStatus) {
+      return fromStatus == toStatus
+        || (fromStatus == 'draft' && toStatus in ['approved','cancelled'])
+        || (fromStatus == 'approved' && toStatus in ['in_progress','cancelled'])
+        || (fromStatus == 'in_progress' && toStatus in ['completed','cancelled']);
+    }
+
+    function treatmentRootPath(tenantId,planId) {
+      return /databases/$(database)/documents/tenants/$(tenantId)/treatmentPlans/$(planId);
+    }
+
+    function treatmentVersionPath(tenantId,planId,versionId) {
+      return /databases/$(database)/documents/tenants/$(tenantId)/treatmentPlans/$(planId)/versions/$(versionId);
+    }
+
+    function treatmentPlanAuditMutationMatches(tenantId,auditId,resourceId,data) {
+      let path = treatmentRootPath(tenantId,resourceId);
+      return existsAfter(path) && getAfter(path).data.lastAuditLogId == auditId
+        && (data.action == 'treatment_plan.create'
+          ? !exists(path) && getAfter(path).data.currentVersion == 1
+          : data.action == 'treatment_plan.revise'
+            ? exists(path) && get(path).data.currentVersion + 1 == getAfter(path).data.currentVersion
+            : false);
+    }
+
     function clinicalRecordAuditMutationMatches(tenantId, auditId, resourceId, data) {
       let path = /databases/$(database)/documents/tenants/$(tenantId)/patients/$(data.patientId)/clinicalRecords/$(resourceId);
       return data.action == 'clinical_record.create'
         && existsAfter(path) && getAfter(path).data.auditLogId == auditId && !exists(path);
+    }
+
+    function odontogramAuditMutationMatches(tenantId, auditId, resourceId, data) {
+      let path = /databases/$(database)/documents/tenants/$(tenantId)/patients/$(data.patientId)/odontogramEvents/$(resourceId);
+      return data.action == 'odontogram_event.create'
+        && existsAfter(path) && !exists(path)
+        && getAfter(path).data.auditLogId == auditId;
     }
 
     function clinicalAmendmentAuditMutationMatches(tenantId, auditId, resourceId, data) {
@@ -375,7 +483,12 @@ service cloud.firestore {
         : data.resourceType == 'professional' ? professionalAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'procedure' ? procedureAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'scheduleResource' ? scheduleResourceAuditMutationMatches(tenantId, auditId, resourceId, data)
+        : data.resourceType == 'intakeSubmission' ? intakeReviewAuditMutationMatches(tenantId, auditId, resourceId, data)
+        : data.resourceType == 'openBookingRequest' ? openBookingReviewAuditMutationMatches(tenantId,auditId,resourceId,data)
+        : data.resourceType == 'recall' ? recallAuditMutationMatches(tenantId, auditId, resourceId, data)
+        : data.resourceType == 'treatmentPlan' ? treatmentPlanAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'clinicalRecord' ? clinicalRecordAuditMutationMatches(tenantId, auditId, resourceId, data)
+        : data.resourceType == 'odontogramEvent' ? odontogramAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'clinicalAmendment' ? clinicalAmendmentAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'publicProfile' ? publicProfileAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'supportAccess' ? supportAccessAuditMutationMatches(tenantId, auditId, resourceId)
@@ -405,7 +518,7 @@ service cloud.firestore {
       return data.tenantId == tenantId
         && data.keys().hasOnly([
           'tenantId','publicName','tagline','description','phone','email','address','primaryColor',
-          'accentColor','logoUrl','lastAuditLogId','updatedAt'
+          'accentColor','logoUrl','openBookingRequestsEnabled','lastAuditLogId','updatedAt'
         ])
         && data.publicName is string && data.publicName.size() <= 160
         && data.tagline is string && data.tagline.size() <= 240
@@ -415,7 +528,8 @@ service cloud.firestore {
         && data.address is string && data.address.size() <= 300
         && data.primaryColor is string && data.primaryColor.matches('^#[0-9A-Fa-f]{6}$')
         && data.accentColor is string && data.accentColor.matches('^#[0-9A-Fa-f]{6}$')
-        && data.logoUrl is string && data.logoUrl.size() <= 500;
+        && data.logoUrl is string && data.logoUrl.size() <= 500
+        && data.get('openBookingRequestsEnabled', false) is bool;
     }
 
     match /platformOwners/{uid} {
@@ -602,6 +716,35 @@ service cloud.firestore {
           allow update, delete: if false;
         }
 
+        match /odontogramEvents/{eventId} {
+          allow get, list: if clinicalRead(tenantId) && patientBelongsToTenant(tenantId, patientId);
+          allow create: if !isPremiumDemoTenant(tenantId) && clinicalWrite(tenantId)
+            && patientBelongsToTenant(tenantId, patientId)
+            && get(tenantPatientPath(tenantId, patientId)).data.status == 'active'
+            && request.resource.data.keys().hasOnly([
+              'id','tenantId','patientId','toothId','surface','finding','note',
+              'supersedesEventId','createdBy','createdAt','auditLogId'
+            ])
+            && request.resource.data.id == eventId
+            && request.resource.data.tenantId == tenantId
+            && request.resource.data.patientId == patientId
+            && request.resource.data.toothId is string
+            && request.resource.data.toothId.matches('^([1-4][1-8]|[5-8][1-5])$')
+            && request.resource.data.surface in ['whole','mesial','distal','occlusal','incisal','buccal','lingual','palatal']
+            && request.resource.data.finding in ['observed','caries','restoration','missing','endodontic','prosthetic','other']
+            && request.resource.data.note is string && request.resource.data.note.size() <= 4000
+            && (!('supersedesEventId' in request.resource.data) || (
+              request.resource.data.supersedesEventId is string
+              && request.resource.data.note.size() >= 5
+              && exists(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(patientId)/odontogramEvents/$(request.resource.data.supersedesEventId))
+              && get(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(patientId)/odontogramEvents/$(request.resource.data.supersedesEventId)).data.toothId == request.resource.data.toothId
+            ))
+            && request.resource.data.createdBy == request.auth.uid
+            && request.resource.data.createdAt == request.time
+            && auditAfterMatches(tenantId, request.resource.data.auditLogId, 'odontogram_event.create', 'odontogramEvent', eventId);
+          allow update, delete: if false;
+        }
+
         match /clinicalRecordAmendments/{amendmentId} {
           allow get, list: if clinicalRead(tenantId);
           allow create: if !isPremiumDemoTenant(tenantId) && clinicalWrite(tenantId)
@@ -625,6 +768,12 @@ service cloud.firestore {
           allow get, list: if clinicalRead(tenantId);
           // Media is uploaded by the authenticated R2 Worker after server-side authorization.
           allow create, update, delete: if false;
+
+          match /backups/{sha256Digest} {
+            // Private integrity manifests belong exclusively to the Worker service account.
+            // Neither dentists nor Platform Owners may access or forge this ledger via client SDK.
+            allow read, write: if false;
+          }
         }
       }
 
@@ -652,21 +801,107 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      function validRecall(tenantId, recallId, data) {
+        let patientPath = /databases/$(database)/documents/tenants/$(tenantId)/patients/$(data.patientId);
+        let appointmentId = data.get('appointmentId', null);
+        return data.keys().hasOnly([
+            'id','tenantId','patientId','reason','dueAt','status','appointmentId',
+            'lastContactAt','createdAt','createdBy','updatedAt','lastAuditLogId'
+          ])
+          && data.id == recallId
+          && data.tenantId == tenantId
+          && data.patientId is string
+          && exists(patientPath)
+          && get(patientPath).data.tenantId == tenantId
+          && get(patientPath).data.status == 'active'
+          && data.reason is string && data.reason.size() >= 3 && data.reason.size() <= 500
+          && data.dueAt is string && data.dueAt.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T12:00:00[.]000Z$')
+          && data.status in ['planned','due','contacted','scheduled','dismissed']
+          && (data.get('lastContactAt', null) == null || data.lastContactAt is timestamp)
+          && (appointmentId == null || (
+            appointmentId is string
+            && exists(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(appointmentId))
+            && get(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(appointmentId)).data.patientId == data.patientId
+            && get(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(appointmentId)).data.tenantId == tenantId
+            && !(get(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(appointmentId)).data.status in ['cancelled','no_show'])
+          ))
+          && (data.status != 'scheduled' || appointmentId != null);
+      }
+
       match /recalls/{recallId} {
         allow get, list: if hasPermission(tenantId, 'recalls.read') && hasCommercialFeature(tenantId, 'recall_center', 'pro');
-        allow create, update: if !isPremiumDemoTenant(tenantId)
+        allow create: if !isPremiumDemoTenant(tenantId)
           && hasPermission(tenantId, 'recalls.manage') && hasCommercialFeature(tenantId, 'recall_center', 'pro')
-          && request.resource.data.tenantId == tenantId
-          && request.resource.data.patientId is string
-          && exists(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(request.resource.data.patientId))
-          && get(/databases/$(database)/documents/tenants/$(tenantId)/patients/$(request.resource.data.patientId)).data.tenantId == tenantId;
+          && validRecall(tenantId, recallId, request.resource.data)
+          && request.resource.data.status == 'planned'
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.get('lastContactAt', null) == null
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'recall.create', 'recall', recallId);
+        allow update: if !isPremiumDemoTenant(tenantId)
+          && hasPermission(tenantId, 'recalls.manage') && hasCommercialFeature(tenantId, 'recall_center', 'pro')
+          && validRecall(tenantId, recallId, request.resource.data)
+          && resource.data.tenantId == tenantId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'reason','dueAt','status','appointmentId','lastContactAt','updatedAt','lastAuditLogId'
+          ])
+          && resource.data.status != 'dismissed'
+          && request.resource.data.updatedAt == request.time
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'recall.update', 'recall', recallId);
         allow delete: if false;
       }
 
+      match /openBookingRequests/{requestId} {
+        allow get, list: if hasPermission(tenantId,'appointments.read')
+          && hasCommercialFeature(tenantId,'agenda','essential')
+          && resource.data.tenantId == tenantId;
+        // Anonymous writes only through the backend after Turnstile and edge throttling.
+        allow create, delete: if false;
+        allow update: if !isPremiumDemoTenant(tenantId)
+          && hasPermission(tenantId,'appointments.manage')
+          && resource.data.tenantId==tenantId
+          && resource.data.status=='pending_review'
+          && request.resource.data.tenantId==tenantId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status','reviewedAt','reviewedBy','lastAuditLogId'
+          ])
+          && request.resource.data.status in ['contacted','dismissed']
+          && request.resource.data.reviewedAt==request.time
+          && request.resource.data.reviewedBy==request.auth.uid
+          && auditAfterMatches(tenantId,request.resource.data.lastAuditLogId,
+            'open_booking_request.review','openBookingRequest',requestId);
+      }
+
+      match /bookingTokens/{tokenHash} {
+        allow read, write: if false;
+      }
+
+      match /intakeTokens/{tokenHash} {
+        // Tokens are created/consumed only through the authorized Worker using Admin credentials.
+        allow read, write: if false;
+      }
+
       match /patientIntakeSubmissions/{submissionId} {
-        allow get, list: if hasPermission(tenantId, 'intake.read') && resource.data.tenantId == tenantId;
-        allow create: if false;
-        allow update, delete: if false;
+        allow get, list: if hasPermission(tenantId, 'intake.read')
+          && hasCommercialFeature(tenantId, 'intake_link', 'pro')
+          && resource.data.tenantId == tenantId;
+        // Public submission is Worker-only; no unauthenticated Firestore client writes.
+        allow create, delete: if false;
+        allow update: if !isPremiumDemoTenant(tenantId)
+          && hasPermission(tenantId, 'intake.manage')
+          && hasCommercialFeature(tenantId, 'intake_link', 'pro')
+          && resource.data.tenantId == tenantId
+          && resource.data.status == 'pending_review'
+          && request.resource.data.tenantId == tenantId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'reviewedAt', 'reviewedBy', 'lastAuditLogId'
+          ])
+          && request.resource.data.status in ['approved', 'rejected']
+          && request.resource.data.reviewedBy == request.auth.uid
+          && request.resource.data.reviewedAt == request.time
+          && request.resource.data.lastAuditLogId is string
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId,
+            'intake.review', 'intakeSubmission', submissionId);
       }
 
       match /usageCounters/{counterId} {
@@ -679,8 +914,97 @@ service cloud.firestore {
       }
 
       match /treatmentPlans/{planId} {
-        allow get, list: if hasPermission(tenantId, 'treatment.read') || clinicalRead(tenantId);
-        allow create, update, delete: if false;
+        function validPlanRoot(data) {
+          return data.keys().hasOnly(['id','tenantId','patientId','professionalId','currentVersion','versionId',
+            'status','createdBy','createdAt','updatedAt','lastAuditLogId'])
+            && data.keys().hasAll(['id','tenantId','patientId','professionalId','currentVersion','versionId',
+            'status','createdBy','createdAt','lastAuditLogId'])
+            && data.id == planId && data.tenantId == tenantId
+            && data.patientId is string && patientBelongsToTenant(tenantId,data.patientId)
+            && data.professionalId is string
+            && exists(/databases/$(database)/documents/tenants/$(tenantId)/professionals/$(data.professionalId))
+            && get(/databases/$(database)/documents/tenants/$(tenantId)/professionals/$(data.professionalId)).data.tenantId == tenantId
+            && data.currentVersion is int && data.currentVersion > 0 && data.currentVersion <= 99999
+            && data.versionId is string && data.versionId.matches('^[A-Za-z0-9_-]{1,128}$')
+            && data.status in ['draft','approved','in_progress','completed','cancelled']
+            && data.lastAuditLogId is string;
+        }
+        function versionAfterMatches(data) {
+          let version = getAfter(treatmentVersionPath(tenantId,planId,data.versionId)).data;
+          return existsAfter(treatmentVersionPath(tenantId,planId,data.versionId))
+            && version.planId == planId && version.patientId == data.patientId
+            && version.tenantId == tenantId && version.version == data.currentVersion
+            && version.status == data.status && version.auditLogId == data.lastAuditLogId;
+        }
+        allow get, list: if clinicalRead(tenantId);
+        allow create: if clinicalWrite(tenantId) && !isPremiumDemoTenant(tenantId)
+          && hasCommercialFeature(tenantId,'treatment_plans','essential')
+          && validPlanRoot(request.resource.data)
+          && request.resource.data.currentVersion == 1 && request.resource.data.status == 'draft'
+          && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time
+          && get(tenantPatientPath(tenantId,request.resource.data.patientId)).data.status == 'active'
+          && get(/databases/$(database)/documents/tenants/$(tenantId)/professionals/$(request.resource.data.professionalId)).data.status == 'active'
+          && versionAfterMatches(request.resource.data)
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId,'treatment_plan.create','treatmentPlan',planId);
+        allow update: if clinicalWrite(tenantId) && !isPremiumDemoTenant(tenantId)
+          && hasCommercialFeature(tenantId,'treatment_plans','essential')
+          && validPlanRoot(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'currentVersion','versionId','status','lastAuditLogId','updatedAt'
+          ])
+          && request.resource.data.currentVersion == resource.data.currentVersion + 1
+          && request.resource.data.versionId != resource.data.versionId
+          && request.resource.data.updatedAt == request.time
+          && treatmentTransition(resource.data.status,request.resource.data.status)
+          && versionAfterMatches(request.resource.data)
+          && (resource.data.status == 'draft' || (
+            get(treatmentVersionPath(tenantId,planId,resource.data.versionId)).data.quoteEnabled
+              == getAfter(treatmentVersionPath(tenantId,planId,request.resource.data.versionId)).data.quoteEnabled
+            && sameApprovedItems(
+              get(treatmentVersionPath(tenantId,planId,resource.data.versionId)).data.items,
+              getAfter(treatmentVersionPath(tenantId,planId,request.resource.data.versionId)).data.items
+            )
+          ))
+          && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId,'treatment_plan.revise','treatmentPlan',planId);
+        allow delete: if false;
+
+        match /versions/{versionId} {
+          function validVersion(v) {
+            let root = getAfter(treatmentRootPath(tenantId,planId)).data;
+            return v.keys().hasOnly([
+              'id','planId','tenantId','patientId','version','status','items','quoteEnabled','note',
+              'appointmentId','createdBy','createdAt','auditLogId'
+            ])
+            && v.keys().hasAll([
+              'id','planId','tenantId','patientId','version','status','items','quoteEnabled','note',
+              'appointmentId','createdBy','createdAt','auditLogId'
+            ])
+            && v.id == versionId && v.planId == planId && v.tenantId == tenantId
+            && v.patientId == root.patientId
+            && v.version is int && v.version == root.currentVersion
+            && root.versionId == versionId && root.status == v.status
+            && v.status in ['draft','approved','in_progress','completed','cancelled']
+            && v.quoteEnabled is bool
+            && (!v.quoteEnabled || hasCommercialFeature(tenantId,'quotes','pro'))
+            && v.note is string && v.note.size() <= 2000
+            && v.appointmentId is string
+            && (v.appointmentId == '' || (
+              exists(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(v.appointmentId))
+              && get(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(v.appointmentId)).data.patientId == v.patientId
+              && get(/databases/$(database)/documents/tenants/$(tenantId)/appointments/$(v.appointmentId)).data.tenantId == tenantId
+            ))
+            && validTreatmentItems(v.items,v.quoteEnabled)
+            && v.createdBy == request.auth.uid && v.createdAt == request.time
+            && v.auditLogId == root.lastAuditLogId;
+          }
+          allow get, list: if clinicalRead(tenantId);
+          allow create: if clinicalWrite(tenantId) && !isPremiumDemoTenant(tenantId)
+            && hasCommercialFeature(tenantId,'treatment_plans','essential')
+            && existsAfter(treatmentRootPath(tenantId,planId))
+            && validVersion(request.resource.data)
+            && !exists(treatmentVersionPath(tenantId,planId,versionId)); // Root requires the paired audit in the same atomic batch.
+          allow update, delete: if false;
+        }
       }
 
       match /quotes/{quoteId} {

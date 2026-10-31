@@ -6,7 +6,7 @@ import { db } from '../../lib/firebase';
 import { demoTenants } from '../../sample/demoData';
 import { demoModeEnabled } from '../auth/AuthRoutes';
 
-interface PublicTenantProfile extends TenantBranding { tenantId: string; }
+interface PublicTenantProfile extends TenantBranding { tenantId: string; openBookingRequestsEnabled?:boolean; }
 
 function demoTenantForSlug(slug: string) {
   const tenant = demoTenants.find(item => item.slug === slug);
@@ -24,9 +24,9 @@ export function TenantPublicSite() {
       setState('loading'); setProfile(null);
       if (demoModeEnabled()) {
         const demo = demoTenantForSlug(tenantSlug);
-        if (!cancelled && demo) {
-          setProfile({ tenantId: demo.id, ...(demo.branding ?? {}) });
-          setState('ready');
+        if (!cancelled) {
+          if (demo) setProfile({ tenantId: demo.id, ...(demo.branding ?? {}) });
+          setState(demo ? 'ready' : 'not-found');
         }
         return;
       }
@@ -54,15 +54,16 @@ export function TenantPublicSite() {
   const publicName = profile.publicName || 'Clínica';
   const style = { '--brand': profile.primaryColor || '#163d3a', '--accent': profile.accentColor || '#72b9ad' } as React.CSSProperties;
   const hasContact = !!(profile.phone || profile.email || profile.address);
+  const canRequest = profile.openBookingRequestsEnabled===true && Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY);
   return <main className="tenant-public" style={style}>
     {demoModeEnabled() && demoTenantForSlug(tenantSlug) && <p className="demo-banner public-demo-banner">Modo demonstrativo · conteúdo fictício.</p>}
     <header className="tenant-public-nav marketing-container"><Link className="brand" to={'/' + tenantSlug}><span className="brand-mark">{publicName.slice(0, 1).toUpperCase()}</span><span>{publicName}</span></Link>
-      <nav aria-label="Navegação pública"><a href="#sobre">Sobre</a>{hasContact && <a href="#contato">Contato</a>}</nav>
+      <nav aria-label="Navegação pública"><a href="#sobre">Sobre</a>{hasContact && <a href="#contato">Contato</a>}{canRequest && <Link to={'/'+tenantSlug+'/solicitar-agendamento'}>Solicitar horário</Link>}</nav>
       {profile.email ? <a className="btn primary" href={'mailto:' + profile.email}>Fale com a clínica</a> : profile.phone ? <a className="btn primary" href={'tel:' + profile.phone}>Ligar</a> : <Link className="btn secondary" to="/login">Acesso da equipe</Link>}
     </header>
     <section className="tenant-public-hero marketing-container">
       <div><span className="eyebrow">Odontologia</span><h1>{profile.tagline || 'Cuidado odontológico com acompanhamento próximo.'}</h1><p>{profile.description || 'Conheça a clínica e entre em contato para saber mais sobre os atendimentos.'}</p>
-        <div className="hero-actions">{profile.email ? <a className="btn primary large" href={'mailto:' + profile.email}>Enviar mensagem</a> : profile.phone ? <a className="btn primary large" href={'tel:' + profile.phone}>Entrar em contato</a> : <Link className="btn secondary large" to="/login">Acesso da equipe</Link>}</div>
+        <div className="hero-actions">{canRequest&&<Link className="btn primary large" to={'/'+tenantSlug+'/solicitar-agendamento'}>Solicitar agendamento</Link>}{profile.email ? <a className="btn primary large" href={'mailto:' + profile.email}>Enviar mensagem</a> : profile.phone ? <a className="btn primary large" href={'tel:' + profile.phone}>Entrar em contato</a> : <Link className="btn secondary large" to="/login">Acesso da equipe</Link>}</div>
       </div>
       <div className="clinic-visual" aria-hidden="true"><div className="clinic-card"><span>OdontoFlow</span><b>{publicName}</b><small>Informações públicas fornecidas pela clínica.</small></div></div>
     </section>
