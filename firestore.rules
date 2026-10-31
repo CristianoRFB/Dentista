@@ -509,7 +509,7 @@ service cloud.firestore {
       return data.tenantId == tenantId
         && data.keys().hasOnly([
           'tenantId','publicName','tagline','description','phone','email','address','primaryColor',
-          'accentColor','logoUrl','lastAuditLogId','updatedAt'
+          'accentColor','logoUrl','openBookingRequestsEnabled','lastAuditLogId','updatedAt'
         ])
         && data.publicName is string && data.publicName.size() <= 160
         && data.tagline is string && data.tagline.size() <= 240
@@ -519,7 +519,8 @@ service cloud.firestore {
         && data.address is string && data.address.size() <= 300
         && data.primaryColor is string && data.primaryColor.matches('^#[0-9A-Fa-f]{6}$')
         && data.accentColor is string && data.accentColor.matches('^#[0-9A-Fa-f]{6}$')
-        && data.logoUrl is string && data.logoUrl.size() <= 500;
+        && data.logoUrl is string && data.logoUrl.size() <= 500
+        && data.get('openBookingRequestsEnabled', false) is bool;
     }
 
     match /platformOwners/{uid} {
@@ -833,6 +834,27 @@ service cloud.firestore {
           && request.resource.data.updatedAt == request.time
           && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'recall.update', 'recall', recallId);
         allow delete: if false;
+      }
+
+      match /openBookingRequests/{requestId} {
+        allow get, list: if hasPermission(tenantId,'appointments.read')
+          && hasCommercialFeature(tenantId,'agenda','essential')
+          && resource.data.tenantId == tenantId;
+        // Anonymous writes only through the backend after Turnstile and edge throttling.
+        allow create, delete: if false;
+        allow update: if !isPremiumDemoTenant(tenantId)
+          && hasPermission(tenantId,'appointments.manage')
+          && resource.data.tenantId==tenantId
+          && resource.data.status=='pending_review'
+          && request.resource.data.tenantId==tenantId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status','reviewedAt','reviewedBy','lastAuditLogId'
+          ])
+          && request.resource.data.status in ['contacted','dismissed']
+          && request.resource.data.reviewedAt==request.time
+          && request.resource.data.reviewedBy==request.auth.uid
+          && auditAfterMatches(tenantId,request.resource.data.lastAuditLogId,
+            'open_booking_request.review','openBookingRequest',requestId);
       }
 
       match /bookingTokens/{tokenHash} {

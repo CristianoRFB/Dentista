@@ -2,6 +2,7 @@ import { importPKCS8, SignJWT } from 'jose';
 import { createIntakeSecret, intakeTokenHash, validatePublicIntake } from './intakeValidation';
 import { BOOKING_TTL_MS, validateBookingInvite, validatePublicBooking } from './publicBooking';
 import { verifyFirebaseIdToken } from './firebaseAuth';
+import { trustedClientIp, validateOpenBookingRequest, verifyOpenBookingTurnstile, type RateLimitBinding } from './openBookingRequest';
 import { validatePhotoReview, photoTransition } from './mediaLifecycle';
 import { comparePatientMediaInventory, collectMediaInventoryPages, MEDIA_METADATA_PAGE_SIZE, MEDIA_R2_PAGE_SIZE, MAX_MEDIA_INVENTORY_ITEMS } from './mediaIntegrity';
 import { MEDIA_USAGE_PAGE_SIZE, summarizeMediaUsagePage } from './mediaUsage';
@@ -14,6 +15,8 @@ import {
 
 interface Env {
   CLINICAL_MEDIA: R2Bucket;
+  OPEN_BOOKING_RATE_LIMITER?: RateLimitBinding;
+  TURNSTILE_SECRET_KEY?: string;
   CLINICAL_MEDIA_BACKUP?: R2Bucket; // Optional; absent means fail-closed until separately provisioned.
   FIREBASE_PROJECT_ID: string;
   FIREBASE_SERVICE_ACCOUNT_EMAIL?: string;
@@ -1398,6 +1401,63 @@ async function revokePublicBookingInvite(env:Env,uid:string,body:unknown) {
   }catch(error){await rollbackTransaction(env,token,transaction);throw error;}
 }
 
+
+/**
+ * Optional, opt-in public request. No appointment, lock or patient is created.
+ * Every request must pass Turnstile AND edge throttling before touching Firestore.
+ */
+async function submitOpenBookingRequest(request:Request,env:Env,raw:unknown) {
+  let data:ReturnType<typeof validateOpenBookingRequest>;
+  try{data=validateOpenBookingRequest(raw);}catch{throw new HttpError(400,'invalid_open_booking_request');}
+  if(!env.OPEN_BOOKING_RATE_LIMITER||!env.TURNSTILE_SECRET_KEY)
+    throw new HttpError(503,'open_booking_protection_not_configured');
+  let ip:string;
+  try{ip=trustedClientIp(request);}catch{throw new HttpError(503,'open_booking_edge_identity_unavailable');}
+  let allowed:boolean;
+  try{
+    const limit=await env.OPEN_BOOKING_RATE_LIMITER.limit({key:'booking:'+data.tenantSlug+':'+ip});
+    allowed=limit.success===true;
+  }catch{throw new HttpError(503,'open_booking_rate_unavailable');}
+  if(!allowed)throw new HttpError(429,'open_booking_too_many_requests');
+  const allowedOrigins=(env.APP_ORIGIN??'http://localhost:5173').split(',').map(s=>s.trim()).filter(Boolean);
+  const verified=await verifyOpenBookingTurnstile(
+    data.turnstileToken,env.TURNSTILE_SECRET_KEY,ip,allowedOrigins
+  );
+  if(!verified)throw new HttpError(403,'open_booking_human_verification_failed');
+  const token=await serviceAccountToken(env);
+  const slug=await getDocument(env,token,'tenantSlugs/'+data.tenantSlug);
+  if(!slug||slug.slug!==data.tenantSlug||slug.status!=='active'||
+    typeof slug.tenantId!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(slug.tenantId))
+    throw new HttpError(404,'open_booking_unavailable');
+  const tenantId=slug.tenantId;
+  const [tenant,profile]=await Promise.all([
+    getDocument(env,token,'tenants/'+tenantId),
+    getDocument(env,token,'tenants/'+tenantId+'/publicProfile/public'),
+  ]);
+  if(!tenant||tenant.id!==tenantId||tenant.slug!==data.tenantSlug||
+    tenant.status!=='active'||tenant.subscriptionStatus==='demo'||
+    tenant.planId==='premium_demo'||!canUse(tenant as any,'agenda')||
+    !profile||profile.tenantId!==tenantId||profile.openBookingRequestsEnabled!==true)
+    throw new HttpError(404,'open_booking_unavailable');
+  const submissionId=crypto.randomUUID(),now=new Date(),auditId=crypto.randomUUID();
+  const requestPath='tenants/'+tenantId+'/openBookingRequests/'+submissionId;
+  await firestoreRequest(firestoreRoot(env)+':commit',token,{
+    method:'POST',body:JSON.stringify({writes:[
+      documentWrite(env,requestPath,{
+        id:submissionId,tenantId,status:'pending_review',name:data.name,phone:data.phone,
+        email:data.email,preferredAt:data.preferredAt,submittedAt:now,
+        createdBy:'anonymous_turnstile',lastAuditLogId:auditId,
+      },true),
+      documentWrite(env,'tenants/'+tenantId+'/auditLogs/'+auditId,{
+        tenantId,actorId:'public_request',actorRole:'public_request',
+        action:'open_booking_request.create',resourceType:'openBookingRequest',
+        resourceId:submissionId,timestamp:now,
+      },true),
+    ]}),
+  });
+  return {received:true,notConfirmed:true};
+}
+
 async function savePublicBooking(env:Env,payload:unknown) {
   let data:ReturnType<typeof validatePublicBooking>;
   try{data=validatePublicBooking(payload);}catch{throw new HttpError(400,'invalid_booking_time_or_link');}
@@ -1431,6 +1491,16 @@ async function handle(request: Request, env: Env) {
     } catch(e) { if(e instanceof HttpError) throw e; throw new HttpError(400, 'invalid_json'); }
     return response(request,env,202,JSON.stringify(await submitPublicIntake(env,body)),
       {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
+  }
+
+  if(request.method==='POST'&&url.pathname==='/v1/public/booking-requests'){
+    let raw:unknown;
+    try{
+      const text=await request.text();
+      if(text.length>4096)throw new HttpError(413,'request_too_large');
+      raw=JSON.parse(text);
+    }catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,'invalid_json');}
+    return json(request,env,202,await submitOpenBookingRequest(request,env,raw));
   }
 
   if (request.method==='POST' && url.pathname==='/v1/public/booking') {
