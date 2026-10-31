@@ -5,6 +5,7 @@ import { PricingPage } from './modules/public/PricingPage';
 import { PublicIntakePage } from './modules/public/PublicIntakePage';
 import { TenantPublicSite } from './modules/public/TenantPublicSite';
 import { PublicBookingPage } from './modules/public/PublicBookingPage';
+import { OpenBookingRequestPage } from './modules/public/OpenBookingRequestPage';
 import { PlatformDashboard } from './modules/platform/PlatformDashboard';
 import { TenantShell } from './modules/tenant/TenantShell';
 import { TenantDashboard } from './modules/tenant/TenantDashboard';
@@ -35,6 +36,7 @@ export function App() {
       <Route path="/recursos/:feature" element={<FeaturePage />} />
       <Route path="/:tenantSlug" element={<TenantPublicSite />} />
       <Route path="/:tenantSlug/agendar" element={<PublicBookingPage />} />
+      <Route path="/:tenantSlug/solicitar-agendamento" element={<OpenBookingRequestPage />} />
       <Route path="/:tenantSlug/cadastro" element={<PublicIntakePage />} />
       <Route element={<AuthRequired />}>
         <Route element={<PlatformOwnerRequired />}>

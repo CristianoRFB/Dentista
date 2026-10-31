@@ -63,3 +63,22 @@ export async function revokeBookingLink(session:TenantAccessState,url:string) {
   if(!response.ok)throw new Error('Não foi possível revogar o convite.');
   return true;
 }
+
+
+/** No anonymous reservation: this sends contact interest to a protected review queue. */
+export async function submitOpenBookingRequest(data:{
+  tenantSlug:string;name:string;phone:string;email:string;preferredAt:string;turnstileToken:string;
+}){
+  if(!BASE)throw new Error('API pública de solicitações ainda não configurada.');
+  const r=await fetch(BASE.replace(/\/$/,'')+'/v1/public/booking-requests',{
+    method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',
+    body:JSON.stringify(data),
+  });
+  if(r.status===429)throw Error('Muitas solicitações neste momento. Tente mais tarde.');
+  if(r.status===403)throw Error('Verificação humana recusada. Atualize o desafio e tente novamente.');
+  if(r.status===404)throw Error('A clínica não habilitou solicitações online.');
+  if(r.status===503)throw Error('Proteção de agendamentos indisponível. Contate a clínica diretamente.');
+  if(r.status===400)throw Error('Confira os dados e o horário informado.');
+  if(!r.ok)throw Error('Solicitação não recebida ('+r.status+').');
+  return r.json() as Promise<{received:true;notConfirmed:true}>;
+}
