@@ -3,7 +3,7 @@ import { canUse } from '../../commercial/entitlementService';
 
 export interface WorkspaceLink {id:string;label:string;description:string;to:string;icon:string;end?:boolean}
 export interface WorkspaceGroup {id:string;label:string;items:WorkspaceLink[]}
-type Area={id:string;label:string;description:string;icon:string;path:string;permission?:string;anyPermission?:string[];feature?:Parameters<typeof canUse>[1];end?:boolean};
+type Area={id:string;label:string;description:string;icon:string;path:string;permission?:string;anyPermission?:string[];feature?:Parameters<typeof canUse>[1];anyFeature?:Array<Parameters<typeof canUse>[1]>;end?:boolean};
 const areas:ReadonlyArray<{id:string;label:string;items:Area[]}>= [
   {id:'inicio',label:'Visão geral',items:[
     {id:'inicio',label:'Início',description:'Acompanhe os atendimentos e veja por onde começar.',icon:'⌂',path:'',end:true},
@@ -20,7 +20,7 @@ const areas:ReadonlyArray<{id:string;label:string;items:Area[]}>= [
   {id:'configuracao',label:'Organização da clínica',items:[
     {id:'recursos',label:'Cadeiras e salas',description:'Confira os recursos usados pela agenda.',icon:'□',path:'/recursos',permission:'resources.read',feature:'physical_resources'},
     {id:'cadastros',label:'Equipe e procedimentos',description:'Consulte profissionais e serviços cadastrados.',icon:'⚙',path:'/cadastros',
-      anyPermission:['professionals.read','procedures.read','professionals.manage','procedures.manage'],feature:'professionals'},
+      anyPermission:['professionals.read','procedures.read','professionals.manage','procedures.manage'],anyFeature:['professionals','procedures']},
   ]},
 ];
 
@@ -30,7 +30,8 @@ export function getWorkspaceNavigation(base:string,tenant:Tenant,permissions:rea
     items:group.items.filter(item=>
       (!item.permission||permissions.includes(item.permission)) &&
       (!item.anyPermission||item.anyPermission.some(permission=>permissions.includes(permission))) &&
-      (!item.feature||canUse(tenant,item.feature))
+      (!item.feature||canUse(tenant,item.feature)) &&
+      (!item.anyFeature||item.anyFeature.some(feature=>canUse(tenant,feature)))
     ).map(item=>({id:item.id,label:item.label,description:item.description,
       icon:item.icon,to:base+item.path,end:item.end})),
   })).filter(group=>group.items.length>0);

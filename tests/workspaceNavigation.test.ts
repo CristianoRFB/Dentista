@@ -22,6 +22,11 @@ describe('UX — navegação guiada pelas permissões, sem atalhos indevidos',()
     expect(ctx.label).toBe('Pacientes');
     expect(JSON.stringify(ctx)).not.toContain('p1');
   });
+  it('mantém procedimentos quando há acesso a serviços mas não a profissionais',()=>{
+    const onlyProcedures={...tenant,features:{...tenant.features,professionals:false,procedures:true}};
+    const groups=getWorkspaceNavigation(base,onlyProcedures,['procedures.read']);
+    expect(groups.flatMap(g=>g.items).map(item=>item.id)).toContain('cadastros');
+  });
   it('mantém a ajuda localizável mesmo se o perfil só vê o início',()=>{
     expect(workspaceContext(base+'/ajuda',getWorkspaceNavigation(base,tenant,[]),base).label)
       .toBe('Ajuda e orientações');

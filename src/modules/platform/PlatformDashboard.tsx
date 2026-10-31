@@ -11,6 +11,7 @@ import {
 } from '../../lib/platformData';
 import { isValidTenantSlug } from '../tenant/tenantResolver';
 import { useAuth } from '../auth/AuthProvider';
+import {filterClinicRows} from './clinicSearch';
 
 type SupportRow = { tenantId: string; actorId: string; reason: string; expiresAt?: { toDate?: () => Date }; revokedAt?: unknown };
 
@@ -146,12 +147,7 @@ export function PlatformDashboard() {
   }
 
   const activeSupport = supportRows.filter(row => !row.revokedAt && (row.expiresAt?.toDate?.().getTime() ?? 0) > Date.now());
-  const visibleTenants=useMemo(()=>{
-    const normalized=clinicSearch.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
-    if(!normalized)return tenants;
-    return tenants.filter(tenant=>(tenant.name+' '+tenant.slug+' '+(tenant.branding?.publicName??''))
-      .normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes(normalized));
-  },[tenants,clinicSearch]);
+  const visibleTenants=useMemo(()=>filterClinicRows(tenants,clinicSearch),[tenants,clinicSearch]);
 
   return <main className="content platform-page">
     <div className="page-head"><div><span className="eyebrow">Administração geral</span><h1>Gerenciar clínicas</h1><p className="muted">Cadastre clínicas, acompanhe planos e organize suporte. O acesso clínico é separado e auditado.</p></div><button className="btn secondary" type="button" onClick={() => void signOutUser()}>Sair</button></div>
