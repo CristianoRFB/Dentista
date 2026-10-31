@@ -45,8 +45,8 @@ export function PublicIntakePage() {
       <p>{demo?'Este é um formulário fictício.':'A clínica irá revisar os dados. O envio não confirma consulta nem cria prontuário automaticamente.'}</p>
       <Link className="btn primary" to={'/'+tenantSlug}>Voltar à clínica</Link>
     </> : <>
-      <span className="eyebrow">Convite de uso único</span><h1>Pré-cadastro</h1>
-      <p>Informe apenas seu contato. Não envie informações clínicas ou dados de saúde neste formulário.</p>
+      <span className="eyebrow">Etapa única · Convite individual</span><h1>Pré-cadastro</h1>
+      <p>Preencha seu nome e telefone para que a clínica possa conferir o contato. O envio não marca uma consulta. Não escreva informações de saúde neste formulário.</p>
       {error && <p className="form-error" role="alert">{error}</p>}
       <form className="intake-form" onSubmit={e=>void send(e)}>
         <label>Nome completo<input autoComplete="name" required minLength={2} maxLength={160} value={name} onChange={e=>setName(e.target.value)} /></label>

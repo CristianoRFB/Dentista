@@ -9,6 +9,15 @@ on:
       - 'scripts/capture-demo-screenshots.mjs'
       - '.github/workflows/visual-qa.yml'
       - '.env.example'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'scripts/capture-demo-screenshots.mjs'
+      - 'scripts/a11y-smoke-audit.mjs'
+      - '.github/workflows/visual-qa.yml'
+      - '.env.example'
   workflow_dispatch:
 
 permissions:

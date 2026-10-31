@@ -61,7 +61,7 @@ export function TenantDashboard() {
         setResources(allResources.filter(item => item.active));
         setError('');
       } catch {
-        if (!cancelled) setError('Não foi possível carregar os dados operacionais deste tenant.');
+        if (!cancelled) setError('Não foi possível atualizar o resumo desta clínica. Tente acessar a área desejada pelo menu ou atualize a página.');
       }
     }
     void load();
@@ -72,10 +72,25 @@ export function TenantDashboard() {
   const supportOnly = session.isPlatformOwner && !session.membership;
 
   return <>
-    <div className="page-head"><div><span className="eyebrow">{session.tenant.branding?.publicName ?? session.tenant.name}</span><h1>{supportOnly ? 'Sessão de suporte clínico' : 'Painel da clínica'}</h1><p className="muted">{supportOnly ? 'Acesso temporário com motivo e expiração auditados.' : 'Resumo operacional dos dados deste tenant.'}</p></div>
+    <div className="page-head"><div><span className="eyebrow">{session.tenant.branding?.publicName ?? session.tenant.name}</span><h1>{supportOnly ? 'Sessão de suporte clínico' : 'Painel da clínica'}</h1><p className="muted">{supportOnly ? 'Acesso temporário com motivo e expiração auditados.' : 'Veja os atendimentos de hoje e escolha sua próxima tarefa.'}</p></div>
       {!supportOnly && session.permissions.includes('appointments.manage') && <Link className="btn primary" to={base + '/agenda'}>Abrir agenda</Link>}
     </div>
     {session.isDemo && <p className="demo-banner">Modo demonstrativo · Clínica Aurora e registros fictícios.</p>}
+    {!supportOnly&&<section className="card workspace-get-started" aria-labelledby="get-started-title">
+      <div><h2 id="get-started-title">O que você precisa fazer?</h2>
+        <p className="muted">Escolha uma tarefa. As opções exibidas respeitam as permissões do seu perfil.</p></div>
+      <div className="workspace-action-grid">
+        {session.permissions.includes('appointments.read')&&canUse(session.tenant,'agenda')&&
+          <Link to={base+'/agenda'}><strong>Ver agenda</strong><span>Consultar os horários e atendimentos.</span></Link>}
+        {session.permissions.includes('patients.read')&&canUse(session.tenant,'patients')&&
+          <Link to={base+'/pacientes'}><strong>Encontrar paciente</strong><span>Buscar um cadastro e abrir o prontuário autorizado.</span></Link>}
+        {session.permissions.includes('appointments.manage')&&canUse(session.tenant,'agenda')&&
+          <Link to={base+'/convites-agenda'}><strong>Enviar convite</strong><span>Gerar links ou analisar pedidos de agendamento.</span></Link>}
+        {session.permissions.includes('intake.read')&&canUse(session.tenant,'intake_link')&&
+          <Link to={base+'/pre-cadastros'}><strong>Revisar pré-cadastro</strong><span>Conferir informações enviadas por pacientes.</span></Link>}
+        <Link to={base+'/ajuda'}><strong>Aprender a usar</strong><span>Entender as áreas disponíveis e como começar.</span></Link>
+      </div>
+    </section>}
     {error && <p className="form-error" role="alert">{error}</p>}
     <div className="grid cols-4">
       {session.permissions.includes('appointments.read') && <div className="metric-card"><b>{appointments.length}</b><span>consultas hoje</span></div>}
@@ -96,13 +111,13 @@ export function TenantDashboard() {
       <p className="muted" style={{marginTop:12,fontSize:12}}>Dados R2 podem mudar durante a varredura. Nenhum arquivo é movido ou excluído.</p>
     </section>}
     {session.permissions.includes('appointments.read') && <div className="dashboard-layout">
-      <div className="card"><div className="card-title"><h2>Próximos atendimentos</h2><Link to={base + '/agenda'}>ver agenda →</Link></div>
-        {appointments.length === 0 ? <p className="muted">Nenhum atendimento marcado para hoje.</p> : appointments.map(appointment => <div className="dash-row" key={appointment.id}>
+      <div className="card"><div className="card-title"><h2>Atendimentos de hoje</h2><Link to={base + '/agenda'}>ver agenda →</Link></div>
+        {appointments.length === 0 ? <p className="muted">Nenhum atendimento encontrado para hoje. Confira outros dias na agenda.</p> : appointments.map(appointment => <div className="dash-row" key={appointment.id}>
           <span>{new Date(appointment.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
           <b>{patientName(appointment.patientId)}</b><small>{appointment.status}</small>
         </div>)}
       </div>
-      <div className="card"><div className="card-title"><h2>Atalhos</h2></div><div className="shortcut-grid">
+      <div className="card"><div className="card-title"><h2>Outras áreas</h2></div><div className="shortcut-grid">
         {session.permissions.includes('patients.read') && <Link to={base + '/pacientes'}>Pacientes <span>→</span></Link>}
         {session.permissions.includes('recalls.read') && canUse(session.tenant, 'recall_center') && <Link to={base + '/retornos'}>Central de retorno <span>→</span></Link>}
         {session.permissions.includes('resources.read') && <Link to={base + '/recursos'}>Cadeiras e salas <span>→</span></Link>}

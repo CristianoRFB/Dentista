@@ -80,13 +80,16 @@ export function PatientsPage() {
     <div className="page-head"><div><span className="eyebrow">Cadastro do tenant</span><h1>Pacientes</h1><p className="muted">Cada cadastro fica no tenant atual; inativar preserva o histórico.</p></div></div>
     {session.isDemo && <p className="demo-banner" role="note">Modo demonstrativo · registros fictícios e somente leitura.</p>}
     {(error || message) && <p className={error ? 'form-error' : 'form-success'} role={error ? 'alert' : 'status'}>{error || message}</p>}
-    {session.permissions.includes('patients.manage') && !session.isDemo && <form className="card data-form inline-form" onSubmit={createPatient}>
-      <h2>Novo paciente</h2>
-      <label>Nome completo<input required maxLength={160} value={name} onChange={event => setName(event.target.value)} /></label>
-      <label>Telefone<input maxLength={40} value={phone} onChange={event => setPhone(event.target.value)} /></label>
-      <label>E-mail<input maxLength={254} type="email" value={email} onChange={event => setEmail(event.target.value)} /></label>
+    {session.permissions.includes('patients.manage') && !session.isDemo && <details className="card admin-disclosure patient-create">
+      <summary>Adicionar paciente <span>Abrir formulário de novo cadastro</span></summary>
+      <form className="data-form inline-form" onSubmit={createPatient}>
+      <h2>Dados básicos</h2><p className="muted">Informe o nome. Telefone e e-mail são opcionais. Não registre informações clínicas nesta etapa.</p>
+      <label>Nome completo<input required autoComplete="name" maxLength={160} value={name} onChange={event => setName(event.target.value)} /></label>
+      <label>Telefone<input autoComplete="tel" maxLength={40} value={phone} onChange={event => setPhone(event.target.value)} /></label>
+      <label>E-mail<input autoComplete="email" maxLength={254} type="email" value={email} onChange={event => setEmail(event.target.value)} /></label>
       <button className="btn primary" disabled={saving} type="submit">{saving ? 'Salvando…' : 'Cadastrar paciente'}</button>
-    </form>}
+      </form>
+    </details>}
     <div className="card table-card">
       <div className="clinical-list-toolbar">
         <label>Buscar paciente
@@ -103,7 +106,13 @@ export function PatientsPage() {
       <table className="table clinical-stack-table"><caption className="sr-only">Pacientes do tenant atual, filtrados e paginados</caption><thead>
         <tr><th>Paciente</th><th>Contato</th><th>Estado</th><th>Ações</th></tr></thead><tbody>
         {loading ? <tr><td colSpan={4}>Carregando pacientes…</td></tr>
-        : filtered.length === 0 ? <tr><td colSpan={4}>Nenhum paciente corresponde aos filtros.</td></tr>
+        : filtered.length === 0 ? <tr><td colSpan={4}>
+          <p>{patients.length===0?'Ainda não há pacientes cadastrados.':'Nenhum paciente corresponde à busca ou ao filtro.'}</p>
+          {patients.length>0&&(query||stateFilter!=='active')&&
+            <button type="button" className="btn secondary" onClick={()=>{setQuery('');setStateFilter('all');}}>
+              Limpar busca e mostrar todos
+            </button>}
+        </td></tr>
         : paginated.rows.map(patient=><tr key={patient.id}>
           <td data-label="Paciente"><b>{patient.name}</b></td>
           <td data-label="Contato">{patient.phone || patient.email || '—'}</td>

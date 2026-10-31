@@ -28,6 +28,7 @@ const routes=[
   {id:'pricing',url:'/precos',heading:/Planos pensados/i},
   {id:'clinic-public',url:'/demo-clinica',heading:/Odontologia clara, humana e organizada/i},
   {id:'dashboard',url:'/demo-clinica/app',heading:/Painel da clínica/i},
+  {id:'help',url:'/demo-clinica/app/ajuda',heading:/^Como usar o OdontoFlow$/i},
   {id:'agenda',url:'/demo-clinica/app/agenda',heading:/^Agenda$/i},
   {id:'patients',url:'/demo-clinica/app/pacientes',heading:/^Pacientes$/i},
   {id:'recalls',url:'/demo-clinica/app/retornos',heading:/^Central de retorno$/i},
@@ -71,7 +72,7 @@ try{
         const heading=(await page.locator('h1').first().textContent())?.trim()??'';
         if(!route.heading.test(heading))throw new Error('Unexpected real heading on '+route.url+': '+heading);
         // Ensure demo runtime rendered; exclude auth/permission error pages as evidence.
-        if(['dashboard','agenda','patients','recalls','clinical-demo-notice','odontogram','treatment','clinical-photos'].includes(route.id)){
+        if(['dashboard','help','agenda','patients','recalls','clinical-demo-notice','odontogram','treatment','clinical-photos'].includes(route.id)){
           await page.locator('main.content .demo-banner').first().waitFor({state:'visible',timeout:15000});
         }
         if(route.id==='public-booking-invite'||route.id==='public-intake-invite'){
@@ -103,7 +104,19 @@ try{
         results.push({route:route.displayUrl??route.url,viewport:viewport.name,size:`${viewport.width}x${viewport.height}`,
           file,sha256,heading,classification:'SCREENSHOT_REAL_DEMO',containsOnlyFictitiousData:true});
         // Functional smoke checks run AFTER capturing the unmodified real page.
+        if(route.id==='help'){
+          const tasks=await page.locator('.help-task a').allTextContents();
+          if(!tasks.some(text=>text.toLocaleLowerCase('pt-BR').includes('agenda'))||
+            !tasks.some(text=>text.toLocaleLowerCase('pt-BR').includes('pacientes')))
+            throw new Error('Onboarding route did not show authorized clinical actions');
+          if(await page.getByRole('heading',{level:1,name:'Acesso negado',exact:true}).count())throw new Error('Help gated incorrectly');
+        }
         if(route.id==='dashboard'){
+          const groups=await page.locator('.workspace-nav-heading').allTextContents();
+          if(!groups.some(text=>text.includes('Atendimento'))||!groups.some(text=>text.includes('Solicitações')))
+            throw new Error('Workspace navigation lacks understandable task groups');
+          const help=page.getByRole('link',{name:'Ver orientações'}).first();
+          if(!(await help.isVisible()))throw new Error('Contextual assistance link not visible');
           const skip=page.locator('.skip-to-clinical-content');
           await skip.focus();
           const displayed=await skip.evaluate(el=>el.getBoundingClientRect().bottom>0);

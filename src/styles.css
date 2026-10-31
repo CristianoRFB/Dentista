@@ -132,3 +132,77 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible 
 .booking-card .data-form .muted{line-height:1.65;font-size:13px}
 .booking-card .data-form .btn{justify-self:start}
 @media(max-width:600px){.booking-card .data-form input[type="datetime-local"],.booking-card .data-form .btn{max-width:none;width:100%}}
+
+
+/* UX 2026: task-first wayfinding, consistent touch targets and progressive disclosure. */
+.workspace-nav{display:grid;gap:15px;margin-top:22px}
+.workspace-nav-group{display:grid;gap:4px;min-width:0}
+.workspace-nav-heading{font-size:11px;letter-spacing:.055em;text-transform:uppercase;
+  color:#b7d1cb;padding:6px 13px 2px;margin:0;font-weight:800}
+.workspace-nav-group a{min-height:44px}
+.workspace-nav-group .sidebar-link-active{font-weight:800}
+.workspace-location{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:10px 14px;margin-bottom:20px;border:1px solid #dce8e3;background:#fff;
+  border-radius:12px;font-size:13px;color:#536864}
+.workspace-location strong{color:#163d3a}
+.workspace-location a{color:#17564e;font-weight:800;text-decoration:underline;text-underline-offset:3px;
+  min-height:40px;display:inline-flex;align-items:center}
+.workspace-get-started{margin-bottom:16px}
+.workspace-get-started h2{font-size:19px;margin-bottom:6px}
+.workspace-action-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:10px;margin-top:14px}
+.workspace-action-grid a{display:flex;flex-direction:column;gap:5px;padding:15px 16px;
+  border:1px solid #cbded8;background:#f9fcfb;border-radius:12px;min-height:88px}
+.workspace-action-grid a:hover,.help-task a:hover{background:#eaf4ef;border-color:#86b7aa}
+.workspace-action-grid a strong{font-size:14px;color:#163d3a}
+.workspace-action-grid a span{font-size:12px;color:#52645f;line-height:1.45}
+.help-page{max-width:1120px}
+.help-start{margin:0 0 20px}
+.help-start p,.help-task p,.help-safety li{line-height:1.6}
+.help-group{margin-bottom:24px}
+.help-group>h2{font-size:19px;margin:0 0 12px}
+.help-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}
+.help-task{display:flex;flex-direction:column;gap:6px}
+.help-task h3{font-size:16px;margin:0}
+.help-task p{color:#52645f;flex:1;margin:0 0 10px}
+.help-task .btn{align-self:flex-start}
+.help-safety ul{padding-left:22px;margin-bottom:0}
+.platform-jump-nav{display:flex;flex-wrap:wrap;gap:9px;margin:16px 0}
+.platform-jump-nav a{min-height:44px;padding:10px 14px;display:inline-flex;align-items:center;
+  border:1px solid #cbded8;border-radius:10px;color:#17564e;font-weight:750;font-size:13px}
+.platform-jump-nav a:hover{background:#eaf4ef}
+.admin-disclosure{margin:16px 0;scroll-margin-top:20px}
+.admin-disclosure>summary{cursor:pointer;font-size:17px;font-weight:800;color:#163d3a;
+  min-height:48px;display:list-item;padding:10px 0}
+.admin-disclosure>summary span{display:block;font-weight:450;color:#556b65;font-size:12px;margin-top:5px}
+.admin-disclosure[open]>summary{margin-bottom:18px;border-bottom:1px solid #e0e8e5;padding-bottom:16px}
+.admin-disclosure form{display:grid;gap:12px}
+.admin-clinic-search{display:grid;gap:8px;font-weight:750;font-size:13px;margin:12px 0;
+  max-width:420px}
+.admin-clinic-search input{width:100%;border:1px solid #b9d0c9;border-radius:10px;
+  min-height:46px;padding:11px 13px;background:#fff}
+.admin-configurations{padding-top:8px;scroll-margin-top:25px}
+.admin-configurations>h2{font-size:21px}
+.admin-configurations>p{margin-bottom:16px}
+.admin-configurations details.card{margin-bottom:14px}
+.admin-advanced-options{grid-column:1/-1;border:1px dashed #b9cdc6;border-radius:12px;padding:12px 16px}
+.admin-advanced-options summary{cursor:pointer;font-size:13px;color:#174d46;font-weight:800;
+  min-height:36px;padding:8px 0}
+.admin-advanced-options>label{display:grid;gap:6px;margin:12px 0}
+.patient-create{margin-bottom:16px}
+:where(.app-shell,.platform-page,.booking-page,.intake-page) :is(button,a,input,select,textarea,summary):focus-visible{
+  outline:3px solid #e1a64c;outline-offset:3px
+}
+@media(max-width:760px){
+  .workspace-nav{display:grid!important;grid-template-columns:1fr!important;margin-top:12px!important}
+  .app-shell .sidebar .workspace-nav-group{display:grid;grid-template-columns:1fr}
+  .app-shell .sidebar .workspace-nav-heading{display:block;color:#bed9d3;margin:4px 0}
+  .workspace-location{align-items:flex-start;flex-wrap:wrap}
+  .platform-jump-nav{display:grid;grid-template-columns:1fr 1fr}
+  .platform-jump-nav a{justify-content:center;text-align:center}
+  .admin-disclosure{padding:16px}
+  .help-grid{grid-template-columns:1fr}
+}
+@media(max-width:420px){.platform-jump-nav{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){
+  .workspace-action-grid a,.platform-jump-nav a{transition:none}
+}

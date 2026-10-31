@@ -41,7 +41,7 @@ export function PublicBookingPage(){
       <p>Data informada: <b>{new Date(booked).toLocaleString('pt-BR')}</b></p>
       <p className="muted">Em caso de mudança ou cancelamento, entre em contato diretamente com a clínica. Não há cobrança neste formulário.</p>
       <Link className="btn primary" to={'/'+tenantSlug}>Voltar à clínica</Link></>:<>
-      <span className="eyebrow">Link individual e de uso único</span><h1>Selecione o horário</h1>
+      <span className="eyebrow">Etapa única · Convite individual</span><h1>Selecione o horário</h1>
       <p>O profissional, o procedimento e a duração já foram definidos pela clínica. A disponibilidade é conferida ao enviar a reserva; horários concorrentes são recusados.</p>
       <p className="muted">Horário no fuso do dispositivo: {browserZone}. Se estiver em outra região, confirme a diferença de fuso com a clínica.</p>
       {error&&<p className="form-error" role="alert">{error}</p>}
@@ -52,7 +52,8 @@ export function PublicBookingPage(){
           aria-describedby="booking-time-hint"
           onChange={e=>{setDateTime(e.target.value);setError('');}} />
         <p id="booking-time-hint" className="muted">Escolha um horário entre cinco minutos e 60 dias a partir de agora. O horário informado é interpretado no fuso do seu dispositivo e será conferido novamente pela clínica. O convite expira em sete dias ou após o primeiro uso.</p>
-        <button className="btn primary large" disabled={busy} type="submit">{busy?'Conferindo disponibilidade…':'Confirmar horário disponível'}</button>
+        <p className="muted" role="note">Você ainda não tem uma consulta marcada. A confirmação acontece somente após a clínica validar este horário ao enviar.</p>
+        <button className="btn primary large" disabled={busy} type="submit">{busy?'Conferindo disponibilidade…':'Solicitar confirmação deste horário'}</button>
       </form>
       </>}
   </section></main>;
