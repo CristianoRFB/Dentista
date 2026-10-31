@@ -514,6 +514,17 @@ service cloud.firestore {
         && auditMutationMatches(tenantId, auditId, data);
     }
 
+    // A platform operator may edit branding, but cannot switch public booking intake
+    // on or off without the clinic's own active tenant_owner membership.
+    function publicBookingOptInAuthorized(tenantId, previous, proposed) {
+      return previous.get('openBookingRequestsEnabled', false) ==
+          proposed.get('openBookingRequestsEnabled', false)
+        || (hasMembership(tenantId)
+          && get(membershipPath(tenantId)).data.role == 'tenant_owner'
+          && hasPermission(tenantId, 'tenant.manage')
+          && hasCommercialFeature(tenantId, 'agenda', 'essential'));
+    }
+
     function publicProfileValid(data, tenantId) {
       return data.tenantId == tenantId
         && data.keys().hasOnly([
@@ -618,6 +629,7 @@ service cloud.firestore {
         allow create: if profileId == 'public'
           && !isPremiumDemoTenant(tenantId)
           && publicProfileValid(request.resource.data, tenantId)
+          && request.resource.data.get('openBookingRequestsEnabled', false) == false
           && request.resource.data.lastAuditLogId is string
           && (isPlatformOwner() || hasPermission(tenantId, 'tenant.manage'))
           && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'publicProfile.create', 'publicProfile', profileId);
@@ -627,6 +639,7 @@ service cloud.firestore {
           && request.resource.data.lastAuditLogId is string
           && request.resource.data.lastAuditLogId != resource.data.lastAuditLogId
           && (isPlatformOwner() || hasPermission(tenantId, 'tenant.manage'))
+          && publicBookingOptInAuthorized(tenantId, resource.data, request.resource.data)
           && auditAfterMatches(tenantId, request.resource.data.lastAuditLogId, 'publicProfile.update', 'publicProfile', profileId);
         allow delete: if false;
       }
