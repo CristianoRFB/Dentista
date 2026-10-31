@@ -106,7 +106,8 @@ try{
         // Functional smoke checks run AFTER capturing the unmodified real page.
         if(route.id==='help'){
           const tasks=await page.locator('.help-task a').allTextContents();
-          if(!tasks.some(text=>text.includes('Agenda'))||!tasks.some(text=>text.includes('Pacientes')))
+          if(!tasks.some(text=>text.toLocaleLowerCase('pt-BR').includes('agenda'))||
+            !tasks.some(text=>text.toLocaleLowerCase('pt-BR').includes('pacientes')))
             throw new Error('Onboarding route did not show authorized clinical actions');
           if(await page.locator('.help-page').getByText('Acesso negado').count())throw new Error('Help gated incorrectly');
         }
