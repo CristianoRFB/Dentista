@@ -109,7 +109,7 @@ try{
           if(!tasks.some(text=>text.toLocaleLowerCase('pt-BR').includes('agenda'))||
             !tasks.some(text=>text.toLocaleLowerCase('pt-BR').includes('pacientes')))
             throw new Error('Onboarding route did not show authorized clinical actions');
-          if(await page.locator('.help-page').getByText('Acesso negado').count())throw new Error('Help gated incorrectly');
+          if(await page.getByRole('heading',{level:1,name:'Acesso negado',exact:true}).count())throw new Error('Help gated incorrectly');
         }
         if(route.id==='dashboard'){
           const groups=await page.locator('.workspace-nav-heading').allTextContents();
