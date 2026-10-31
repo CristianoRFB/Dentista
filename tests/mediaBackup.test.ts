@@ -23,10 +23,11 @@ describe('D5 — validação de backup privado',()=>{
 
 describe('D5 — bounded streaming verification of R2 originals',()=>{
   it('rejects declared oversized data before reading a single chunk',async()=>{
-    let reads=0;
-    const body=new ReadableStream<Uint8Array>({pull(controller){reads++;controller.enqueue(new Uint8Array([1]));controller.close();}});
+    let calls=0;
+    // This stub cannot read: real ReadableStreams may pull eagerly on construction.
+    const body={getReader:()=>{calls++;throw Error('unexpected read');}} as unknown as ReadableStream<Uint8Array>;
     await expect(boundedImageBytes({body,size:MAX_BACKUP_PHOTO_BYTES+1})).rejects.toThrow(/size/);
-    expect(reads).toBe(0);
+    expect(calls).toBe(0);
   });
   it('cancels untrusted streams as soon as a limit is breached',async()=>{
     let cancelled=false;
