@@ -351,6 +351,14 @@ service cloud.firestore {
         && getAfter(path).data.lastAuditLogId == auditId;
     }
 
+    function openBookingReviewAuditMutationMatches(tenantId, auditId, resourceId, data) {
+      let path = /databases/$(database)/documents/tenants/$(tenantId)/openBookingRequests/$(resourceId);
+      return data.action == 'open_booking_request.review' && exists(path) && existsAfter(path)
+        && get(path).data.status == 'pending_review'
+        && getAfter(path).data.status in ['contacted','dismissed']
+        && getAfter(path).data.lastAuditLogId == auditId;
+    }
+
     function recallAuditMutationMatches(tenantId, auditId, resourceId, data) {
       let path = /databases/$(database)/documents/tenants/$(tenantId)/recalls/$(resourceId);
       return existsAfter(path) && getAfter(path).data.lastAuditLogId == auditId
@@ -476,6 +484,7 @@ service cloud.firestore {
         : data.resourceType == 'procedure' ? procedureAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'scheduleResource' ? scheduleResourceAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'intakeSubmission' ? intakeReviewAuditMutationMatches(tenantId, auditId, resourceId, data)
+        : data.resourceType == 'openBookingRequest' ? openBookingReviewAuditMutationMatches(tenantId,auditId,resourceId,data)
         : data.resourceType == 'recall' ? recallAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'treatmentPlan' ? treatmentPlanAuditMutationMatches(tenantId, auditId, resourceId, data)
         : data.resourceType == 'clinicalRecord' ? clinicalRecordAuditMutationMatches(tenantId, auditId, resourceId, data)

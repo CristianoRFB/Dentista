@@ -1,6 +1,6 @@
 import { useEffect,useState } from 'react';
 import { listTenantRecords } from '../../lib/tenantData';
-import { issueBookingLink, revokeBookingLink } from '../../lib/publicBookingClient';
+import { changeOpenBookingRequestsEnabled, issueBookingLink, listOpenBookingQueue, openBookingRequestsEnabled, reviewOpenBookingRequest, revokeBookingLink, type OpenBookingQueueItem } from '../../lib/publicBookingClient';
 import type { Patient,Professional,Procedure,ScheduleResource } from '../../domain/types';
 import { useReadyTenantAccess } from './TenantContext';
 
@@ -21,6 +21,10 @@ export function BookingInvitesPage() {
   const [message,setMessage]=useState('');
   const [error,setError]=useState('');
   const [loaded,setLoaded]=useState(false);
+  const [openRequests,setOpenRequests]=useState<OpenBookingQueueItem[]>([]);
+  const [acceptOpen,setAcceptOpen]=useState(false);
+  const [requestsBusy,setRequestsBusy]=useState(false);
+  const mayToggle=!session.isDemo&&session.membership?.role==='tenant_owner'&&session.permissions.includes('tenant.manage');
   useEffect(()=>{
     let active=true;
     async function load() {
@@ -39,6 +43,40 @@ export function BookingInvitesPage() {
     if(!session.isDemo)void load();else setLoaded(true);
     return ()=>{active=false;};
   },[session]);
+
+  async function loadOpenRequests(){
+    if(session.isDemo)return;
+    setRequestsBusy(true);
+    try{
+      const [rows,enabled]=await Promise.all([
+        listOpenBookingQueue(session),openBookingRequestsEnabled(session),
+      ]);
+      setOpenRequests(rows);setAcceptOpen(enabled);
+    }catch(e){setError(e instanceof Error?e.message:'Não foi possível carregar solicitações.');}
+    finally{setRequestsBusy(false);}
+  }
+  useEffect(()=>{if(!session.isDemo)void loadOpenRequests();},[session]);
+  async function toggleOpenRequests(){
+    setRequestsBusy(true);setError('');setMessage('');
+    try{
+      await changeOpenBookingRequestsEnabled(session,!acceptOpen);
+      setAcceptOpen(!acceptOpen);setMessage(!acceptOpen
+        ?'Solicitações públicas habilitadas na clínica. O Worker ainda exige Turnstile e limitador operacional.'
+        :'Solicitações públicas desativadas. Pedidos anteriores ficam preservados.');
+    }catch(e){setError(e instanceof Error?e.message:'Falha ao atualizar o mini-site.');}
+    finally{setRequestsBusy(false);}
+  }
+  async function markRequest(id:string,status:'contacted'|'dismissed'){
+    setRequestsBusy(true);setError('');setMessage('');
+    try{
+      await reviewOpenBookingRequest(session,id,status);
+      await loadOpenRequests();
+      setMessage(status==='contacted'
+        ?'Contato registrado. Crie a consulta na agenda somente depois de confirmar com o paciente.'
+        :'Solicitação dispensada e preservada no histórico.');
+    }catch(e){setError(e instanceof Error?e.message:'Não foi possível revisar o pedido.');}
+    finally{setRequestsBusy(false);}
+  }
   async function generate(){
     setBusy(true);setError('');setMessage('');setConfirmRevoke(false);setLink(null);
     try{
@@ -100,5 +138,35 @@ export function BookingInvitesPage() {
           </div>}
       </section>}
     </div>
+    <section className="card data-form" aria-label="Solicitações públicas de agendamento" style={{marginTop:16}}>
+      <h2>Pedidos públicos para análise</h2>
+      <p className="muted">Solicitações não reservam horários nem criam pacientes. Use os dados apenas para retornar o contato;
+        confirme a disponibilidade antes de criar uma consulta na agenda interna.</p>
+      {mayToggle&&<div className="row-actions">
+        <span>Recebimento público: <strong>{acceptOpen?'Habilitado':'Desabilitado'}</strong></span>
+        <button type="button" className="btn secondary" disabled={requestsBusy}
+          onClick={()=>void toggleOpenRequests()}>
+          {acceptOpen?'Desativar solicitações públicas':'Habilitar solicitações públicas'}
+        </button>
+      </div>}
+      <div className="row-actions"><button type="button" className="btn secondary" disabled={requestsBusy||session.isDemo}
+        onClick={()=>void loadOpenRequests()}>{requestsBusy?'Atualizando…':'Atualizar pedidos'}</button></div>
+      {openRequests.length===0?<p className="muted">Nenhuma solicitação pública nesta clínica.</p>:
+        <div className="table-card"><table className="table">
+          <caption className="sr-only">Solicitações recebidas, sem horários reservados</caption>
+          <thead><tr><th>Contato</th><th>Preferência</th><th>Situação</th><th>Ação</th></tr></thead>
+          <tbody>{openRequests.map(item=><tr key={item.id}>
+            <td><strong>{item.name}</strong><p>{item.phone}{item.email?' · '+item.email:''}</p></td>
+            <td>{new Date(item.preferredAt).toLocaleString('pt-BR')}</td>
+            <td>{item.status==='pending_review'?'Aguardando análise':item.status==='contacted'?'Contatado':'Dispensado'}</td>
+            <td>{item.status==='pending_review'?<div className="row-actions">
+              <button type="button" className="btn secondary" disabled={requestsBusy}
+                onClick={()=>void markRequest(item.id,'contacted')}>Contato realizado</button>
+              <button type="button" className="btn secondary" disabled={requestsBusy}
+                onClick={()=>void markRequest(item.id,'dismissed')}>Dispensar</button>
+            </div>:'—'}</td>
+          </tr>)}</tbody>
+        </table></div>}
+    </section>
   </section>;
 }
