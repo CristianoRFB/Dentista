@@ -6,7 +6,7 @@ import { trustedClientIp, validateOpenBookingRequest, verifyOpenBookingTurnstile
 import { validatePhotoReview, photoTransition } from './mediaLifecycle';
 import { comparePatientMediaInventory, collectMediaInventoryPages, MEDIA_METADATA_PAGE_SIZE, MEDIA_R2_PAGE_SIZE, MAX_MEDIA_INVENTORY_ITEMS } from './mediaIntegrity';
 import { MEDIA_USAGE_PAGE_SIZE, summarizeMediaUsagePage } from './mediaUsage';
-import { backupKeyFor, boundedImageBytes, expectedMediaPrefix, sha256Hex, validateBackupInput, verifiedBackupBytes, type BackupInput } from './mediaBackup';
+import { backupKeyFor, boundedImageBytes, expectedMediaPrefix, sha256Hex, validateBackupInput, validateBackupBatchInput, verifiedBackupBytes, type BackupInput } from './mediaBackup';
 import { canCreateCommercialCapacity, canUse, getLimit } from '../../../src/commercial/entitlementService';
 import {
   findScheduleConflict, isValidAppointmentWindow, MAX_CONFLICT_LOOKBACK_MS,
@@ -1095,6 +1095,43 @@ async function manualBackupClinicalPhoto(env:Env,uid:string,payload:unknown) {
 }
 
 
+
+/**
+ * D5 — bounded, clinician-triggered backup queue for a single patient.
+ * Preflight each item BEFORE any R2 writes to fail closed across invalid scopes.
+ * A failed snapshot remains an explicit failure; no silent skip or delete.
+ */
+async function batchBackupClinicalPhotos(env:Env,uid:string,payload:unknown) {
+  let input:ReturnType<typeof validateBackupBatchInput>;
+  try{input=validateBackupBatchInput(payload);}catch{throw new HttpError(400,'invalid_backup_batch');}
+  requireBackupBucket(env);
+  const token=await serviceAccountToken(env);
+  for(const photoId of input.photoIds) {
+    await validateClinicalBackupScope(env,token,uid,{
+      tenantId:input.tenantId,patientId:input.patientId,photoId,reason:input.reason,
+    });
+  }
+  const items:Array<{photoId:string;status:'verified'|'failed';digest?:string;
+    alreadyBackedUp?:boolean;sizeBytes?:number;error?:string}>=[];
+  for(const photoId of input.photoIds){
+    try{
+      const result=await manualBackupClinicalPhoto(env,uid,{
+        tenantId:input.tenantId,patientId:input.patientId,photoId,reason:input.reason,
+      });
+      items.push({photoId,status:'verified',digest:result.digest,
+        alreadyBackedUp:result.alreadyBackedUp,sizeBytes:result.sizeBytes});
+    }catch(error){
+      // No raw exception, metadata, object keys or service-account errors in the response.
+      const status=error instanceof HttpError?error.status:503;
+      items.push({photoId,status:'failed',error:status===409?'source_unavailable_or_changed':
+        status===404?'photo_unavailable':'backup_verification_failed'});
+    }
+  }
+  const succeeded=items.filter(item=>item.status==='verified').length;
+  return {succeeded,failed:items.length-succeeded,complete:succeeded===items.length,
+    items,private:true,automatic:false,noOriginalsModified:true};
+}
+
 /** Authorized, bounded listing of backup manifests; never returns bucket keys or image data. */
 async function listClinicalPhotoBackups(env:Env,uid:string,payload:unknown) {
   if(!payload||typeof payload!=='object'||Array.isArray(payload))throw new HttpError(400,'invalid_backup_listing');
@@ -1570,6 +1607,18 @@ async function handle(request: Request, env: Env) {
     return json(request, env, 200, result);
   }
 
+
+  if(request.method==='POST' && url.pathname==='/v1/media/backups/batch') {
+    const length=Number(request.headers.get('Content-Length')??'0');
+    if(length>4096)throw new HttpError(413,'request_too_large');
+    let payload:unknown;
+    try{
+      const raw=await request.text();
+      if(raw.length>4096)throw new HttpError(413,'request_too_large');
+      payload=JSON.parse(raw);
+    }catch(error){if(error instanceof HttpError)throw error;throw new HttpError(400,'invalid_json');}
+    return json(request,env,200,await batchBackupClinicalPhotos(env,user.uid,payload));
+  }
   if(request.method==='POST' && url.pathname==='/v1/media/backups/list') {
     let payload:unknown;
     try{

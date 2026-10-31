@@ -78,3 +78,19 @@ export async function verifiedBackupBytes(bucket:R2Bucket,key:string,digest:stri
   if(await sha256Hex(bytes)!==digest)throw Error('backup_checksum_mismatch');
   return bytes;
 }
+
+/** Maximum five independent originals per request, to bound CPU, memory and R2 cost. */
+export const MAX_BACKUP_BATCH_PHOTOS=5;
+export function validateBackupBatchInput(raw:unknown):{
+  tenantId:string;patientId:string;photoIds:string[];reason:string;
+}{
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('invalid_backup_batch');
+  const r=raw as Record<string,unknown>;
+  if(Object.keys(r).some(key=>!['tenantId','patientId','photoIds','reason'].includes(key)))
+    throw Error('invalid_backup_batch');
+  if(!Array.isArray(r.photoIds)||r.photoIds.length<1||r.photoIds.length>MAX_BACKUP_BATCH_PHOTOS||
+    r.photoIds.some(id=>typeof id!=='string'||!ID.test(id))||
+    new Set(r.photoIds).size!==r.photoIds.length)throw Error('invalid_backup_batch');
+  const input=validateBackupInput({tenantId:r.tenantId,patientId:r.patientId,photoId:r.photoIds[0],reason:r.reason});
+  return {tenantId:input.tenantId,patientId:input.patientId,photoIds:[...r.photoIds],reason:input.reason};
+}

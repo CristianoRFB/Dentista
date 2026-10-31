@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {backupKeyFor,boundedImageBytes,MAX_BACKUP_PHOTO_BYTES,sha256Hex,validateBackupInput} from '../workers/media-api/src/mediaBackup';
+import {backupKeyFor,boundedImageBytes,MAX_BACKUP_PHOTO_BYTES,MAX_BACKUP_BATCH_PHOTOS,sha256Hex,validateBackupInput,validateBackupBatchInput} from '../workers/media-api/src/mediaBackup';
 
 const good={tenantId:'A',patientId:'p1',photoId:'photo_1',
   reason:'Solicitação de recuperação autorizada'};
@@ -52,5 +52,19 @@ describe('D5 — bounded streaming verification of R2 originals',()=>{
   });
   it('rejects zero-byte objects rather than backing up empty files',async()=>{
     await expect(boundedImageBytes({body:new Blob([]).stream(),size:0})).rejects.toThrow(/size/);
+  });
+});
+
+describe('D5 — backup em lote de fotos do mesmo paciente',()=>{
+  const payload={tenantId:'A',patientId:'p1',photoIds:['a','b'],reason:'Contingência autorizada com auditoria individual'};
+  it('rejeita lotes duplicados, vazios, maiores do que o limite e com escopo extra',()=>{
+    expect(validateBackupBatchInput(payload)).toEqual(payload);
+    expect(MAX_BACKUP_BATCH_PHOTOS).toBe(5);
+    for(const input of [
+      {...payload,photoIds:[]},{...payload,photoIds:['a','a']},
+      {...payload,photoIds:['a','b','c','d','e','f']},
+      {...payload,tenantId:'../B'},{...payload,reason:'curto'},
+      {...payload,allowDelete:true},
+    ])expect(()=>validateBackupBatchInput(input)).toThrow(/invalid_backup/);
   });
 });
