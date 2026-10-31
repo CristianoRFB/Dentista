@@ -1058,7 +1058,7 @@ async function manualBackupClinicalPhoto(env:Env,uid:string,payload:unknown) {
         httpMetadata:{contentType:typeof scope.photo.contentType==='string'?scope.photo.contentType:'application/octet-stream',
           cacheControl:'private, no-store'},
         customMetadata:{tenantId:input.tenantId,patientId:input.patientId,
-          photoId:input.photoId,sha256:digest},
+          photoId:input.photoId,sha256:digest,originalObjectKey:scope.photo.objectKey},
       });
       // An identical snapshot may have been created concurrently. Verify it below.
       if(!copied && !await backupBucket.head(backupKey))throw Error('backup_put_unavailable');

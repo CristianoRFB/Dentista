@@ -628,6 +628,11 @@ describe('D5 — cópias privadas verificadas e restauração manual sem sobresc
     expect(result.backupKey).toBeUndefined();
     expect(copied.size).toBe(1);
     expect(backup.put).toHaveBeenCalledOnce();
+    const putOptions=backup.put.mock.calls[0][2] as {customMetadata?:Record<string,string>};
+    expect(putOptions.customMetadata).toMatchObject({
+      tenantId:'A',patientId:'patient-a',photoId:'photo-a',sha256:result.digest,
+      originalObjectKey:originalKey,
+    });
     expect(backup.get).toHaveBeenCalledOnce();
     expect(JSON.stringify(writes)).toContain('clinical_photo.backup');
     expect(JSON.stringify(writes)).toContain(result.digest);

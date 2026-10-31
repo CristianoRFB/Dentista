@@ -36,6 +36,7 @@ export function ClinicalPhotosPage() {
   const [backupBusy,setBackupBusy]=useState(false);
   const [batchReason,setBatchReason]=useState('');
   const [batchBusy,setBatchBusy]=useState(false);
+  const [batchOffset,setBatchOffset]=useState(0);
   const [batchReport,setBatchReport]=useState<import('./r2Client').BatchBackupReport|null>(null);
   const [reason,setReason] = useState('');
   const [selectedTags,setSelectedTags] = useState<string[]>([]);
@@ -59,6 +60,7 @@ export function ClinicalPhotosPage() {
   }
   useEffect(() => { void refresh(); }, [session, patientId]);
   useEffect(()=>{setBackupPhotoId('');setBackupRecords([]);setBackupNext(null);},[patientId]);
+  useEffect(()=>{setBatchOffset(0);setBatchReport(null);},[q,visibility,patientId]);
 
   // Keep browser object URLs out of clinical metadata, and release them on every refresh/unmount.
   useEffect(() => {
@@ -160,7 +162,7 @@ export function ClinicalPhotosPage() {
 
   async function backupVisibleBatch(){
     if(session.status!=='ready'||session.isDemo||session.membership?.role!=='dentist')return;
-    const ids=displayed.slice(0,5).map(photo=>photo.id);
+    const ids=displayed.slice(batchOffset,batchOffset+5).map(photo=>photo.id);
     if(!ids.length||batchReason.trim().length<12)return;
     if(!window.confirm('Criar ou verificar backups privados para '+ids.length+
       ' imagem(ns)? Nenhum original será apagado.'))return;
@@ -223,11 +225,17 @@ export function ClinicalPhotosPage() {
 
     {backupAllowed&&<section className="card data-form" aria-label="Backup de imagens em lote">
       <h2>Backup de até cinco imagens</h2>
-      <p className="muted">Verifica as primeiras {Math.min(displayed.length,5)} imagens da seleção atual, na ordem exibida. Nenhuma exclusão é realizada.</p>
+      <p className="muted">Lote {Math.floor(batchOffset/5)+1}: imagens {displayed.length?batchOffset+1:0} a {Math.min(displayed.length,batchOffset+5)} de {displayed.length} da seleção atual. Nenhum original é excluído.</p>
+      <div className="row-actions">
+        <button type="button" className="btn secondary" disabled={batchBusy||batchOffset===0}
+          onClick={()=>{setBatchOffset(old=>Math.max(0,old-5));setBatchReport(null);}}>Cinco anteriores</button>
+        <button type="button" className="btn secondary" disabled={batchBusy||batchOffset+5>=displayed.length}
+          onClick={()=>{setBatchOffset(old=>old+5);setBatchReport(null);}}>Próximas cinco</button>
+      </div>
       <label>Motivo administrativo do lote<textarea value={batchReason} minLength={12} maxLength={500} rows={2}
         onChange={e=>setBatchReason(e.target.value)} placeholder="Justificativa sem dados de saúde"/></label>
-      <button className="btn secondary" type="button" disabled={batchBusy||backupBusy||busy||displayed.length===0||batchReason.trim().length<12}
-        onClick={()=>void backupVisibleBatch()}>{batchBusy?'Verificando cópias…':'Criar/verificar backup das primeiras cinco fotos'}</button>
+      <button className="btn secondary" type="button" disabled={batchBusy||backupBusy||busy||batchOffset>=displayed.length||batchReason.trim().length<12}
+        onClick={()=>void backupVisibleBatch()}>{batchBusy?'Verificando cópias…':'Criar/verificar este lote de até cinco fotos'}</button>
       {batchReport&&<div role="status">
         <p><strong>{batchReport.succeeded} verificada(s), {batchReport.failed} falha(s).</strong>
           {batchReport.complete?' Lote completo.':' Lote incompleto; confira as falhas.'}</p>
