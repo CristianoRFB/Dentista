@@ -904,6 +904,11 @@ describe('D4 — Firestore Rules para pedidos públicos não confirmados',()=>{
     await assertFails(deleteDoc(entry));
   });
   it('somente o tenant owner altera publicProfile com flag opt-in auditada',async()=>{
+    // Legacy fixture bypasses Rules and has no prior audit; real public profiles have one.
+    await env.withSecurityRulesDisabled(async context=>{
+      const db=context.firestore();
+      await updateDoc(doc(db,'tenants/A/publicProfile/public'),{lastAuditLogId:'seed'});
+    });
     const owner=env.authenticatedContext('tenant-owner-a').firestore();
     const dentist=env.authenticatedContext('dentist-a').firestore();
     const profile=doc(owner,'tenants/A/publicProfile/public');
