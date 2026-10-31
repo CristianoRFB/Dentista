@@ -11,7 +11,7 @@ type TurnstileApi={
     sitekey:string;action:string;callback:(token:string)=>void;
     'expired-callback':()=>void;'error-callback':()=>void;
   })=>string;
-  remove:(id:string)=>void;reset:(id:string)=>void;
+  remove:(id:string)=>void;reset:(id?:string)=>void;
 };
 const clientKey=import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim()??'';
 const w=()=>window as Window & {turnstile?:TurnstileApi};
