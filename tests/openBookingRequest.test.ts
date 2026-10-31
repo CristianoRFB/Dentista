@@ -2,7 +2,7 @@ import {describe,it,expect,vi} from 'vitest';
 import {validateOpenBookingRequest,trustedClientIp,verifyOpenBookingTurnstile} from '../workers/media-api/src/openBookingRequest';
 const now=Date.parse('2026-10-31T12:00:00.000Z');
 const input={tenantSlug:'clinica-a',name:'Paciente Exemplo',phone:'11988887777',
-  email:'paciente@example.test',preferredAt:'2026-11-01T14:00:00.000Z',turnstileToken:'a'.repeat(50)};
+  email:'paciente@example.test',preferredAt:'2026-11-01T14:00:00.000Z',turnstileToken:'a'.repeat(50),contactAcknowledged:true};
 describe('D4 — pedido público sem reserva de horário',()=>{
   it('normaliza contato e valida janela UTC',()=>{
     expect(validateOpenBookingRequest({...input,name:' Ana Maria ',email:'ANA@EXAMPLE.TEST'},now))
@@ -16,6 +16,7 @@ describe('D4 — pedido público sem reserva de horário',()=>{
     {...input,preferredAt:'2026-01-01T00:00:00.000Z'},
     {...input,preferredAt:'2026-11-32T14:00:00.000Z'},
     {...input,turnstileToken:'tiny'},
+    {...input,contactAcknowledged:false},
     {...input,clinicalNote:'dados sensíveis'},
   ])('rejeita formulário inválido e campos clínicos adicionais',payload=>{
     expect(()=>validateOpenBookingRequest(payload,now)).toThrow();

@@ -6,27 +6,28 @@ export const OPEN_BOOKING_ACTION='open_booking_request';
 const SLUG=/^[a-z0-9](?:[a-z0-9-]{0,60}[a-z0-9])?$/;
 const UTC=/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/;
 export interface OpenBookingRequest {
-  tenantSlug:string;name:string;phone:string;email:string;preferredAt:string;turnstileToken:string;
+  tenantSlug:string;name:string;phone:string;email:string;preferredAt:string;turnstileToken:string;contactAcknowledged:true;
 }
 export function validateOpenBookingRequest(body:unknown, now=Date.now()):OpenBookingRequest {
   if(!body||typeof body!=='object'||Array.isArray(body))throw Error('invalid_open_booking');
   const v=body as Record<string,unknown>;
-  if(Object.keys(v).some(x=>!['tenantSlug','name','phone','email','preferredAt','turnstileToken'].includes(x)))
+  if(Object.keys(v).some(x=>!['tenantSlug','name','phone','email','preferredAt','turnstileToken','contactAcknowledged'].includes(x)))
     throw Error('invalid_open_booking');
-  const {tenantSlug,name,phone,email,preferredAt,turnstileToken}=v;
+  const {tenantSlug,name,phone,email,preferredAt,turnstileToken,contactAcknowledged}=v;
   if(typeof tenantSlug!=='string'||!SLUG.test(tenantSlug)||
     typeof name!=='string'||name.trim().length<2||name.length>160||
     typeof phone!=='string'||phone.length>24||!(phone.replace(/\D/g,'').length>=10 && phone.replace(/\D/g,'').length<=13)||
     typeof email!=='string'||email.length>254||Boolean(email)&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||
     typeof preferredAt!=='string'||!UTC.test(preferredAt)||
-    typeof turnstileToken!=='string'||turnstileToken.length<20||turnstileToken.length>2048)
+    typeof turnstileToken!=='string'||turnstileToken.length<20||turnstileToken.length>2048||
+    contactAcknowledged!==true)
     throw Error('invalid_open_booking');
   const time=Date.parse(preferredAt);
   if(!Number.isFinite(time)||new Date(time).toISOString()!==preferredAt ||
     time<now+5*60*1000||time>now+60*24*60*60*1000)
     throw Error('invalid_open_booking');
   return {tenantSlug,name:name.trim(),phone:phone.trim(),email:email.trim().toLowerCase(),
-    preferredAt,turnstileToken};
+    preferredAt,turnstileToken,contactAcknowledged:true};
 }
 export interface RateLimitBinding {limit(args:{key:string}):Promise<{success:boolean}>}
 export function trustedClientIp(request:Request){

@@ -1456,7 +1456,7 @@ async function submitOpenBookingRequest(request:Request,env:Env,raw:unknown) {
     await commitTransaction(env,token,transaction,[
       documentWrite(env,requestPath,{
         id:submissionId,tenantId,status:'pending_review',name:data.name,phone:data.phone,
-        email:data.email,preferredAt:data.preferredAt,submittedAt:now,
+        email:data.email,preferredAt:data.preferredAt,contactAcknowledged:true,submittedAt:now,
         createdBy:'anonymous_turnstile',lastAuditLogId:auditId,
       },true),
       documentWrite(env,'tenants/'+tenantId+'/auditLogs/'+auditId,{

@@ -562,7 +562,7 @@ describe('D4 — agendamento público protegido por convite de uso único', () =
 describe('D4 — solicitação aberta de agendamento com Turnstile e recepção',()=>{
   const requestPath='/v1/public/booking-requests';
   const good={tenantSlug:'clinica-a',name:'Pessoa de Teste',phone:'11988776655',email:'anon@example.test',
-    preferredAt:new Date(Date.now()+60*60*1000).toISOString(),turnstileToken:'t'.repeat(48)};
+    preferredAt:new Date(Date.now()+60*60*1000).toISOString(),turnstileToken:'t'.repeat(48),contactAcknowledged:true};
   function setup(){
     documents.set('tenants/A',{...documents.get('tenants/A')!,slug:'clinica-a'});
     documents.set('tenants/B',{...documents.get('tenants/B')!,slug:'clinica-b'});
@@ -623,6 +623,7 @@ describe('D4 — solicitação aberta de agendamento com Turnstile e recepção'
   it('rejeita contato inválido, tenant B, demo e origem externa sem criar registros',async()=>{
     setup();
     expect((await send({...good,name:'X'})).status).toBe(400);
+    expect((await send({...good,contactAcknowledged:false})).status).toBe(400);
     expect((await send({...good,tenantSlug:'clinica-b'})).status).toBe(404);
     documents.set('tenants/A',{...documents.get('tenants/A')!,planId:'premium_demo',subscriptionStatus:'demo'});
     expect((await send()).status).toBe(404);

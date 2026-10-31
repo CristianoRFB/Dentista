@@ -22,6 +22,7 @@ export function OpenBookingRequestPage(){
   const [name,setName]=useState('');
   const [phone,setPhone]=useState('');
   const [email,setEmail]=useState('');
+  const [contactAcknowledged,setContactAcknowledged]=useState(false);
   const [dateTime,setDateTime]=useState('');
   const [bounds]=useState(()=>bookingLocalBounds());
   const [captcha,setCaptcha]=useState('');
@@ -78,7 +79,7 @@ export function OpenBookingRequestPage(){
     setBusy(true);setError('');
     try{
       const preferredAt=parseBookingLocalInput(dateTime);
-      await submitOpenBookingRequest({tenantSlug,name,phone,email,preferredAt,turnstileToken:captcha});
+      await submitOpenBookingRequest({tenantSlug,name,phone,email,preferredAt,turnstileToken:captcha,contactAcknowledged});
       setCompleted(true);setCaptcha('');
     }catch(e){
       setError(e instanceof Error?e.message:'Não foi possível enviar esta solicitação.');
@@ -107,6 +108,10 @@ export function OpenBookingRequestPage(){
           value={email} onChange={e=>setEmail(e.target.value)}/></label>
         <label>Data e horário desejados<input required type="datetime-local" step="60"
           min={bounds.min} max={bounds.max} value={dateTime} onChange={e=>setDateTime(e.target.value)}/></label>
+        <label><input required type="checkbox" checked={contactAcknowledged}
+          onChange={e=>setContactAcknowledged(e.target.checked)}/>
+          Estou ciente de que a clínica utilizará meus dados de contato para responder a esta solicitação.
+        </label>
         <p className="muted">Não envie informações médicas. Seus dados serão usados pela clínica para avaliar o pedido.
           A preferência não representa disponibilidade confirmada.</p>
         <div ref={widgetContainer} aria-label="Verificação humana Cloudflare Turnstile"/>

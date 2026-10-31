@@ -68,7 +68,7 @@ export async function revokeBookingLink(session:TenantAccessState,url:string) {
 
 /** No anonymous reservation: this sends contact interest to a protected review queue. */
 export async function submitOpenBookingRequest(data:{
-  tenantSlug:string;name:string;phone:string;email:string;preferredAt:string;turnstileToken:string;
+  tenantSlug:string;name:string;phone:string;email:string;preferredAt:string;turnstileToken:string;contactAcknowledged:boolean;
 }){
   if(!BASE)throw new Error('API pública de solicitações ainda não configurada.');
   const r=await fetch(BASE.replace(/\/$/,'')+'/v1/public/booking-requests',{

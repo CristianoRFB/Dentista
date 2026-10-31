@@ -43,3 +43,6 @@ period = 60
 - Não verifica titularidade de e-mail/telefone, não notifica WhatsApp, não implementa retenção de dados pessoais nem rastreio antifraude sofisticado. Limitar informações e definir política LGPD/retention antes de produção.
 - IP é usado somente para limitação operacional na borda; não é persistido com a solicitação. Captcha também não é salvo.
 - Sem provisionamento e validação externa real, nenhuma alegação de uso em produção.
+
+## Ciência do uso de contato
+O formulário contém confirmação obrigatória de que a pessoa está ciente do uso dos contatos para responder ao pedido. O Worker rejeita explicitamente `contactAcknowledged !== true` e grava o sinalizador sem incluir texto clínico. **Isto não substitui aviso de privacidade institucional, revisão de base legal, retenção/eliminação e controles LGPD operacionais.**
