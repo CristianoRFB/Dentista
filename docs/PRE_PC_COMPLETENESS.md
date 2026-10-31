@@ -40,11 +40,11 @@ Essencial R$79,90; Pro R$129,90; Premium R$189,90 — contrato preservado.
 | D3 Retornos | 10 | 10 | Sem pendência P0 codificável constatada |
 | D4 Intake/booking | 18 | 16 | Agendamento aberto sem convite + proteção antiabuso continuam pendentes |
 | D5 Mídia/documentos | 18 | 17 | Backup e recuperação manuais por foto com SHA-256, auditoria e bucket R2 secundário opcional; automação/retention, DR integral e validação hospedada pendentes |
-| D6 UX/acessibilidade | 16 | 14 | Leitor de tela, cobertura das demais rotas e dispositivos físicos |
-| D7 CI/evidências | 10 | 7 | Persistência visual canônica, runtime hospedado, sessão PC |
-| **Total implementação** | **100** | **92** | **~92% estimado de implementação interna** |
+| D6 UX/acessibilidade | 16 | 15 | Auditoria automatizada de 26 visualizações demo integrada ao navegador; ainda faltam leitor de tela, outras rotas e testes em dispositivos físicos |
+| D7 CI/evidências | 10 | 8 | Manifesto SHA-256, auditoria exportada e artefatos QA com retenção de 30 dias; persistência canônica, runtime hospedado e sessão PC ainda pendentes |
+| **Total implementação** | **100** | **94** | **~94% estimado de implementação interna** |
 
-**Avanço geral até produção: ~64%** (92% × 70% = 64,4%, arredondado), considerando peso 70% da implementação e 30% de infraestrutura, testes hospedados, backup, segurança operacional, LGPD e deploy ainda não demonstrados. É uma régua de planejamento conservadora, não um levantamento independente de todos os requisitos legais/clínicos.
+**Avanço geral até produção: ~66%** (94% × 70% = 65,8%, arredondado), considerando peso 70% da implementação e 30% de infraestrutura, testes hospedados, backup, segurança operacional, LGPD e deploy ainda não demonstrados. É uma régua de planejamento conservadora, não um levantamento independente de todos os requisitos legais/clínicos.
 
 **Evidência específica do D5:** `GET /v1/media/integrity` pagina Firestore em lotes de 100 e R2 em lotes de 500, com teto de 3.000 registros por origem, cursores verificados e nenhum DELETE. Falha sem resposta parcial acima do limite; não se trata de snapshot atômico. Os testes `tests/mediaIntegrity.test.ts` e `tests/mediaWorker.test.ts` abrangem paginação, falta de objeto, órfãos candidatos, tenant A × B e cap. Não há reparo/backup automático.
 
@@ -84,3 +84,13 @@ Essencial R$79,90; Pro R$129,90; Premium R$189,90 — contrato preservado.
 - **O binding `CLINICAL_MEDIA_BACKUP` não está provisionado nem ativado neste repositório.** Rota falha fechado (503) sem bucket separado. Não há backup automático, retenção, replicação independente de Firestore, restauração integral de tenant nem prova de operação hospedada.
 - Testes automáticos de negativas, perda de mídia, concorrência, checksum e isolamento. Runbook em `docs/CLINICAL_MEDIA_BACKUP_RUNBOOK.md`.
 - **Nova régua conservadora:** D5 17/18, código 92/100; avanço geral ~64%. Não equivale à homologação ou à prontidão de produção.
+
+## Checkpoint D5/D6/D7 — 31/10/2026 (auditoria de acessibilidade e R2 bounded reads)
+
+**SHA do código validado:** `e0201f3d0d615cb321a9acd19adf59d1b4686435`; [CI push #41232980730](https://github.com/CristianoRFB/Dentista/actions/runs/41232980730), [CI PR #41232984608](https://github.com/CristianoRFB/Dentista/actions/runs/41232984608) e [Visual QA #41232980843](https://github.com/CristianoRFB/Dentista/actions/runs/41232980843) concluídos com **success**.
+
+- **D5 hardening:** `boundedImageBytes` bloqueia objetos R2 cujo tamanho declarado excede 15 MiB *antes* de criar um leitor; em streams sem tamanho confiável, aborta a leitura assim que os bytes recebidos ultrapassam o limite, cancela o leitor e exige contagem exata. Testes em `tests/mediaBackup.test.ts`. Esta melhoria não vale ponto extra de D5: faltam retenção, backups periódicos, DR operacional e validação hospedada.
+- **D6 audit:** `scripts/a11y-smoke-audit.mjs` é executado após cada uma das 26 capturas do aplicativo demo em Chromium, mobile e desktop. Verifica nomes acessíveis essenciais em botões, links e formulários; atributos ARIA referenciando IDs existentes; IDs duplicados e `alt` de imagens visíveis. Achados fazem a pipeline falhar e um relatório `ACCESSIBILITY_AUDIT.json` é incluído no artefato.
+- **D7 evidência:** capturas são geradas por aplicativo real **em modo demo com dados fictícios**; `SCREENSHOTS_MANIFEST.json` contém SHA-256 por PNG, referência de commit de origem e contagem exata, com retenção configurada para 30 dias. **Não** é arquivamento canônico permanente, imagem de produção, teste assistivo real ou certificação WCAG.
+- **Heurística:** D1 14/14; D2 14/14; D3 10/10; D4 16/18; D5 17/18; **D6 15/16; D7 8/10; total 94/100**. Preparo geral estimado **~66%**. Nenhum ajuste de preço, billing, merge na main ou deploy.
+- **Próximo bloco realmente pendente:** agendamento aberto sem convite somente com proteção antiabuso e opt-in seguro (não liberado); QA com leitor de tela e dispositivos físicos; verificação do runtime hospedado; backups e retenção reais; evidência visual canônica com controle de privacidade.

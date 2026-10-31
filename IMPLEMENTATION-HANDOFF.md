@@ -117,3 +117,14 @@ A próxima execução deve ler apenas o delta desde este SHA, não reanalisar D1
 A partir do SHA de código `5b1a5f2e0bf032ba1881ebbe7714a6e9fe9fe0d5`, a branch possui endpoints manuais de backup, catálogo e recuperação de mídia clínica com checksum SHA-256, dupla trilha de auditoria para recuperação, segundo bucket **opcional e não configurado**, CAS atômico no R2, e UI restrita a dentistas. Testes cobrem escopo A×B, sem autorização, paciente inativo, hash adulterado, original existente e concorrência. Valide o HEAD e CI antes de afirmar implementação aprovada.
 
 Leia `docs/CLINICAL_MEDIA_BACKUP_RUNBOOK.md` antes de configurar bucket, jamais disponibilize dados reais em preview, nunca execute produção sem DR/retention e validação operacional. Não confundir arquivamento lógico do prontuário com backup/restore de arquivo. Métrica ajustada a 92% implementação, ~64% geral; nada na main/deploy.
+
+## Continuação verificada — 31/10/2026 (R2 / Chromium / acessibilidade)
+
+Começar de `e0201f3d0d615cb321a9acd19adf59d1b4686435` ou do SHA mais recente da mesma branch. CI push [#41232980730](https://github.com/CristianoRFB/Dentista/actions/runs/41232980730), CI PR [#41232984608](https://github.com/CristianoRFB/Dentista/actions/runs/41232984608) e QA visual [#41232980843](https://github.com/CristianoRFB/Dentista/actions/runs/41232980843) aprovaram o código.
+
+1. D5: stream R2 bounded/cancelado com leitura limitada a 15 MiB e bytes conferidos; testes negativos acrescentados, sem mudar retenção.
+2. D6: auditoria automatizada de elementos visíveis nas 13 rotas demo × 2 viewports; **não é WCAG nem leitor de tela**.
+3. D7: 26 screenshots reais de demo com SHA-256 por arquivo; `ACCESSIBILITY_AUDIT.json`; artefato Actions por 30 dias (não canônico permanente).
+4. Estimativas internas por peso: **94/100** código; **~66% geral**. Permanecem D4 open booking antiabuso, D5 DR e backup periódico, D6 testes assistivos físicos, D7 hosted/canonical. No merge/deploy.
+
+A próxima sessão deve ler somente alterações posteriores ao HEAD, preservar D1–D3, preços e regras de segurança.
