@@ -60,3 +60,12 @@ Todas as rotas exigem `Authorization: Bearer <Firebase ID token>`, corpo JSON, l
 - [ ] Procedimento de recuperação supervisionado e executado em staging
 - [ ] Validação de produção separada, sem usar pacientes reais nos testes
 
+
+## Extensão D5 — lote paginado e verificação não destrutiva (31/10/2026)
+
+- `POST /v1/media/backups/batch`: JSON `{tenantId,patientId,photoIds,reason}`. De 1 a 5 IDs únicos, mesmo paciente/tenant, motivo 12–500 caracteres. Autorização clínica de dentista para **todas** as fotos antes do primeiro PUT. Serializa cada item, retorna `{succeeded,failed,complete,items,private:true,automatic:false,noOriginalsModified:true}`. Cada item possui `photoId,status` e, se passou, `digest,alreadyBackedUp,sizeBytes`; falhas são explícitas, nenhuma chave R2 exposta. Em lote parcialmente concluído, reexecutar somente após investigar itens falhos. Não tratar `HTTP 200` como garantia de `complete:true`.
+- Tela de fotos: navegação manual entre lotes de até cinco conforme filtros atuais; confirmação e justificativa por lote; não executa em background, não reserva capacidade nem altera fotos originais.
+- `POST /v1/media/backups/verify`: JSON `{tenantId,patientId,photoId,digest,reason}`; valida manifesto Firestore existente, objeto R2 privado, tamanho e digest, mesmo que original esteja **ausente**. Retorna `{verified:true,originalPresent,readOnly:true,noFilesModified:true}` sem criar/restaurar/excluir bytes. Não confundir com exercício de restauração.
+- Os novos objetos R2 carregam `customMetadata.originalObjectKey` privado junto a tenant/patient/photo/digest. Um operador autorizado de recuperação pode reconstruir a referência ao objeto original ao inspecionar o backup R2, ainda exigindo processo de recuperação independente se Firestore tiver sido perdido.
+- Firestore Rules negam explicitamente leitura/escrita browser de `clinicalPhotos/{photo}/backups/{sha256}`. A escrita administrativa dos manifestos continua exclusiva da credencial do Worker.
+- **Continua faltando:** R2 secundário efetivamente provisionado, execução automática periódica autorizada com controle de custo/cobertura, política de retenção e expurgo de dados auditada, export independente da base Firestore, RPO/RTO, validação com infraestrutura hospedada e restauração completa em staging. **Não habilitar exclusão automática de imagens clínicas.**

@@ -136,3 +136,13 @@ A próxima sessão deve ler somente alterações posteriores ao HEAD, preservar 
 Novo `src/modules/public/OpenBookingRequestPage.tsx`, alterações em `TenantPublicSite`, `BookingInvitesPage`, `publicBookingClient`, `openBookingRequest.ts`, `Worker index.ts`, `firestore.rules` com proteção Turnstile/rate-limit/opt-in e transação; **solicitação de contato, sem confirmar horário**. Ciência para contato obrigatória. `docs/OPEN_BOOKING_REQUESTS_RUNBOOK.md` explica dependências de staging e riscos. Código interno estimado **95/100**, geral **~67%**.
 
 Últimos pontos de código: política segura para reserva pública anônima (não ativar sem disponibilidade comprovada, contato verificado e antifraude robusta), automação de backups/retention/DR, QA assistiva/hosted e evidência visual canônica. Não repetir D1–D3. Não merge/deploy; preços inalterados.
+
+## Continuação D5 incremental — 31/10/2026 (batch + verify)
+
+A partir do SHA testado `85cc2b909fe264e80a22fe6932e7254e05a78e69`, alterações na branch de PR #1:
+
+- `mediaBackup.ts`: `validateBackupBatchInput` com 1–5 fotos únicas e escopo estrito; `index.ts`: `/v1/media/backups/batch` com preflight e resultado por foto e `/v1/media/backups/verify` somente leitura mesmo com original faltante.
+- Frontend `ClinicalPhotosPage` / `r2Client`: seleção paginada de lote e conferência sem restauração.
+- R2: metadados privados `originalObjectKey` em novos backups; Firestore Rules: deny explícito no subcaminho `/backups/{sha256Digest}`.
+- Testes adicionados em `mediaBackup.test.ts`, `mediaWorker.test.ts`, `firestoreRules.test.ts`. Consultar CI e visual QA mais recentes para confirmar; não repetir análises antigas.
+- Métrica heurística revisada **95,5% interno (~96%), 67% geral**. Nenhuma automação destrutiva, billing, ajuste de preço, merge ou deploy. Resta automação/retention/DR de D5 e infraestrutura/QA.

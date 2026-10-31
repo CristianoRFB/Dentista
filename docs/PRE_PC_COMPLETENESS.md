@@ -39,12 +39,12 @@ Essencial R$79,90; Pro R$129,90; Premium R$189,90 — contrato preservado.
 | D2 Tratamento/orçamento | 14 | 14 | Sem pendência P0 codificável constatada |
 | D3 Retornos | 10 | 10 | Sem pendência P0 codificável constatada |
 | D4 Intake/booking | 18 | 17 | Solicitação aberta auditada com Turnstile/Rate Limit e fila de recepção; reserva anônima automaticamente confirmada continua intencionalmente bloqueada |
-| D5 Mídia/documentos | 18 | 17 | Backup e recuperação manuais por foto com SHA-256, auditoria e bucket R2 secundário opcional; automação/retention, DR integral e validação hospedada pendentes |
+| D5 Mídia/documentos | 18 | 17,5 | Backup individual e em lotes de até 5 fotos com pré-validação, SHA-256, auditoria por foto, conferência read-only de snapshot mesmo sem original e metadados independentes no R2; agendamento periódico, retenção, DR integral e homologação hospedada pendentes |
 | D6 UX/acessibilidade | 16 | 15 | Auditoria automatizada de 26 visualizações demo integrada ao navegador; ainda faltam leitor de tela, outras rotas e testes em dispositivos físicos |
 | D7 CI/evidências | 10 | 8 | Manifesto SHA-256, auditoria exportada e artefatos QA com retenção de 30 dias; persistência canônica, runtime hospedado e sessão PC ainda pendentes |
-| **Total implementação** | **100** | **95** | **~95% estimado de implementação interna** |
+| **Total implementação** | **100** | **95,5** | **~95,5% (aproximadamente 96%) de implementação interna** |
 
-**Avanço geral até produção: ~67%** (95% × 70% = 66,5%, arredondado), considerando peso 70% da implementação e 30% de infraestrutura, testes hospedados, backup, segurança operacional, LGPD e deploy ainda não demonstrados. É uma régua de planejamento conservadora, não um levantamento independente de todos os requisitos legais/clínicos.
+**Avanço geral até produção: ~67%** (95,5% × 70% = 66,85%, arredondado), considerando peso 70% da implementação e 30% de infraestrutura, testes hospedados, backup, segurança operacional, LGPD e deploy ainda não demonstrados. É uma régua de planejamento conservadora, não um levantamento independente de todos os requisitos legais/clínicos.
 
 **Evidência específica do D5:** `GET /v1/media/integrity` pagina Firestore em lotes de 100 e R2 em lotes de 500, com teto de 3.000 registros por origem, cursores verificados e nenhum DELETE. Falha sem resposta parcial acima do limite; não se trata de snapshot atômico. Os testes `tests/mediaIntegrity.test.ts` e `tests/mediaWorker.test.ts` abrangem paginação, falta de objeto, órfãos candidatos, tenant A × B e cap. Não há reparo/backup automático.
 
@@ -105,3 +105,14 @@ Essencial R$79,90; Pro R$129,90; Premium R$189,90 — contrato preservado.
 - **Privacidade mínima:** ciência obrigatória do uso de dados para contato, sem campo clínico nem dados de saúde textual, sem alegação de conformidade LGPD automática. Requer política de retenção antes de produção.
 - **Configuração deliberadamente pendente e fail-closed:** sitekey frontend `VITE_TURNSTILE_SITE_KEY`, secret Worker `TURNSTILE_SECRET_KEY`, rate limiting binding `OPEN_BOOKING_RATE_LIMITER`, `APP_ORIGIN` hospedado. Instruções em `docs/OPEN_BOOKING_REQUESTS_RUNBOOK.md`; nenhuma chave ou binding de produção provisionado.
 - **Régua de planejamento:** D4 17/18 (+1), demais D1 14, D2 14, D3 10, D5 17, D6 15, D7 8; **95/100 código**, **~67% preparo geral**. 1 ponto D4 remanescente exige decisão de produto e operacional para auto-reserva anônima segura e verificada; não tratar interesse de contato como booking finalizado.
+
+## Checkpoint D5 — 31/10/2026: lote limitado, segurança do manifesto e verificação sem restauração
+
+**SHA de implementação:** `85cc2b909fe264e80a22fe6932e7254e05a78e69`. Este documento deve permanecer sujeito à confirmação dos workflows do commit documental final.
+
+- **Novo endpoint** `POST /v1/media/backups/batch`: dentista com `clinical.read` e `clinical.write`, até **cinco** IDs únicos do mesmo paciente/tenant, motivo explícito, pré-validação de **todas** as fotos antes do primeiro PUT, cópia/verificação serial com status individual `verified/failed`, `complete` verdadeiro somente quando todas passarem. Falha parcial **não é anunciada como backup completo**. Sem DELETE, quota comercial ou cobrança.
+- **Nova UX** em `ClinicalPhotosPage.tsx`: justificativa e confirmação humana, navegação entre lotes de cinco da seleção corrente, relatório de sucesso/falha por foto. Operação sempre manual, não cron.
+- **Novo endpoint** `POST /v1/media/backups/verify`: exige manifesto existente com referências corretas, SHA-256 e tamanho verificados no bucket de backup, funciona se o objeto original estiver ausente e retorna `readOnly:true, noFilesModified:true`. UI disponibiliza `Verificar cópia sem restaurar`, separado da ação de recuperação; nenhuma alteração R2/Firestore durante verificação.
+- **R2**: novas cópias carregam `originalObjectKey` em `customMetadata` privado do snapshot, junto aos IDs e SHA-256; isso ajuda a reconciliação operacional independente da consulta habitual ao Firestore, mas **não substitui export integral da base nem permite DR autônomo**.
+- **Firestore Rules**: `clinicalPhotos/{photoId}/backups/{digest}` explicitamente `allow read, write: if false` para navegador, inclusive dono da clínica, dentista e Platform Owner; serviço autorizado usa Admin API. Teste de negativa no Firestore Emulator.
+- **Critério de pontuação:** D5 **17,5/18** (antes 17/18), refletindo lote seguro e diagnóstico independente; ponto residual é automação/retention/DR, que **não foram implementados**. D1 14, D2 14, D3 10, D4 17, D6 15, D7 8. Total heurístico **95,5/100** (aprox. 96%), avanço geral ~**67%** (70% multiplicado pela pontuação interna), não certificação.
