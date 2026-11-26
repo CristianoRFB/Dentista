@@ -1,10 +1,19 @@
 {
   "date": "2026-11-26",
-  "status": "BEFORE_WRITE",
+  "status": "SLICE_COMMITTED_CI_PENDING",
   "baseline": "4863fc59fd9e03c1aea5c98d671bc52a3ad393a7",
   "slice": "S001",
-  "goal": "Fail closed on missing clinical R2 binding for storage-dependent operations; preserve agenda and metadata review.",
-  "baselineCI": "https://github.com/CristianoRFB/Dentista/actions/runs/41248021315",
-  "production": "No changes authorized in this round",
-  "next_action": "Patch storage routes and add negative regression tests"
+  "code_sha": "38ba46c14c598592789e65167da98f21f2673c7c",
+  "pr": 4,
+  "baseline_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/41248021315",
+  "slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45899830791",
+  "qa_hosted": "NOT_RUN",
+  "production": "UNCHANGED",
+  "blockers": [
+    "R2 not enabled (Cloudflare API 403 code 10042); primary/backup bindings absent",
+    "Pages and Worker deployments from 2026-10-13; deployed frontend SHA differs from main",
+    "Firebase hosted readiness not verified",
+    "No operational authorization to enable billing/storage or release"
+  ],
+  "next_action": "Confirm CI on current PR head; fix any regression; separately authorize staging provisioning and clinical media backup/restore tests with synthetic data."
 }
