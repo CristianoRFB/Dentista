@@ -4,3 +4,6 @@ Repository CristianoRFB/Dentista (public). Baseline main `4863fc59fd9e03c1aea5c9
 
 ## S002 re-entry
 0 open issues; existing draft PR #4 retained (no duplicate). main unchanged; S001 checks success. S002 code `b00ce2069eef677a45439b25c4910973d5b5bf07` awaiting CI. Release and hosted acceptance not established. No issue closures, merge or production changes.
+
+## S003 re-entry
+0 open issues; existing draft PR #4 retained. Main unchanged; S002 final checks success. S003 code `2751b415c91be21de4ed50713755ac81481f9150` awaits CI. No merge, production changes or issue closure.

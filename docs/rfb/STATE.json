@@ -1,12 +1,12 @@
 {
   "date": "2026-11-26",
-  "status": "BEFORE_WRITE",
+  "status": "SLICE_COMMITTED_CI_PENDING",
   "baseline": "4863fc59fd9e03c1aea5c98d671bc52a3ad393a7",
   "slice": "S003",
-  "code_sha": "b00ce2069eef677a45439b25c4910973d5b5bf07",
+  "code_sha": "2751b415c91be21de4ed50713755ac81481f9150",
   "pr": 4,
   "baseline_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/41248021315",
-  "slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45911109949",
+  "slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45912457720",
   "qa_hosted": "NOT_RUN",
   "production": "UNCHANGED",
   "blockers": [
@@ -15,7 +15,7 @@
     "Firebase hosted readiness not verified",
     "No operational authorization to enable billing/storage or release"
   ],
-  "next_action": "Patch restore preconditions; add regression cases; CI; no hosted mutation.",
+  "next_action": "Verify final PR CI; resolve failures before next slice. R2 hosted provisioning requires operational approval; proceed with agenda/patient hardening only after CI.",
   "previous_slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45911153148",
   "previous_validated_head": "36cd60fa1a7716b6d635ff1f96c7a28413a6cf79",
   "goal": "Reject restoration when backup manifest verification marker, byte count or transactional scope is inconsistent; no overwrite or deletion."
