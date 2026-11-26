@@ -1,8 +1,8 @@
 {
   "date": "2026-11-26",
-  "status": "SLICE_COMMITTED_CI_PENDING",
+  "status": "BEFORE_WRITE",
   "baseline": "4863fc59fd9e03c1aea5c98d671bc52a3ad393a7",
-  "slice": "S001",
+  "slice": "S002",
   "code_sha": "38ba46c14c598592789e65167da98f21f2673c7c",
   "pr": 4,
   "baseline_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/41248021315",
@@ -15,5 +15,8 @@
     "Firebase hosted readiness not verified",
     "No operational authorization to enable billing/storage or release"
   ],
-  "next_action": "Confirm CI on current PR head; fix any regression; separately authorize staging provisioning and clinical media backup/restore tests with synthetic data."
+  "next_action": "Patch verifier and signed-token regression cases; CI; no production mutations",
+  "previous_slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45899913225",
+  "previous_validated_head": "cb2eb1419bfca192f0e6c953a07e084f8c7e1c68",
+  "goal": "Enforce Firebase ID token header and temporal claim requirements in Worker; maintain tenant authorization and existing routes"
 }
