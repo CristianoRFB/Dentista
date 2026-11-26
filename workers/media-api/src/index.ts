@@ -1586,6 +1586,15 @@ async function handle(request: Request, env: Env) {
   }
 
   const user = await authenticate(request, env);
+  // R2 may be absent in an already deployed Worker. Fail closed before any
+  // clinical object operation or Firestore mutation; leave non-media routes
+  // and metadata-only review/list operations independently available.
+  const requiresClinicalBucket =
+    (request.method === 'GET' && (url.pathname === '/v1/media/usage' ||
+      url.pathname === '/v1/media/integrity' || /^\/v1\/media\/[A-Za-z0-9_-]{1,128}$/.test(url.pathname))) ||
+    (request.method === 'POST' && ['/v1/media', '/v1/media/backups', '/v1/media/backups/batch',
+      '/v1/media/backups/verify', '/v1/media/backups/restore'].includes(url.pathname));
+  if (requiresClinicalBucket && !env.CLINICAL_MEDIA) throw new HttpError(503, 'clinical_media_storage_not_configured');
   if(request.method==='POST' && url.pathname==='/v1/booking/tokens/revoke') {
     let body:unknown;
     try{const raw=await request.text();if(raw.length>4096)throw new HttpError(413,'request_too_large');body=JSON.parse(raw);}

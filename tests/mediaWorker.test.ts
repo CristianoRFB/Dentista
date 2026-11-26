@@ -165,6 +165,28 @@ async function upload(token: string, file = new File([new Uint8Array([0xff, 0xd8
 }
 
 describe('Worker de mídia clínica', () => {
+  it('mantém liveness e preflight sem R2, mas recusa operações de objetos sem escrita', async () => {
+    const missing = { ...env, CLINICAL_MEDIA: undefined } as unknown as typeof env;
+    const headers = { Authorization: 'Bearer verified-test-token', Origin: 'https://app.test' };
+    expect((await mediaWorker.fetch(new Request('https://worker.test/health'), missing)).status).toBe(200);
+    expect((await mediaWorker.fetch(new Request('https://worker.test/v1/media', { method:'OPTIONS', headers }), missing)).status).toBe(204);
+    for (const [method, path] of [
+      ['POST','/v1/media'], ['GET','/v1/media/photo-a'], ['GET','/v1/media/usage'],
+      ['GET','/v1/media/integrity'], ['POST','/v1/media/backups'],
+      ['POST','/v1/media/backups/batch'], ['POST','/v1/media/backups/verify'],
+      ['POST','/v1/media/backups/restore'],
+    ]) {
+      const result = await mediaWorker.fetch(new Request('https://worker.test' + path, { method, headers }), missing);
+      expect(result.status, method + ' ' + path).toBe(503);
+      expect(await result.json()).toEqual({ error: 'clinical_media_storage_not_configured' });
+      expect(result.headers.get('Cache-Control')).toContain('no-store');
+    }
+    expect((await mediaWorker.fetch(new Request('https://worker.test/v1/media', { method:'POST' }), missing)).status).toBe(401);
+    expect(fetchCalls).toHaveLength(0);
+    expect(writes).toHaveLength(0);
+    expect(env.CLINICAL_MEDIA.put).not.toHaveBeenCalled();
+  });
+
   it('compensa upload R2 se Firestore falhar antes de iniciar a transação', async () => {
     failNextMediaTransactionStart=true;
     const result=await upload('verified-test-token');
