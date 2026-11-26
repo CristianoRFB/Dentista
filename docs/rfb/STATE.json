@@ -1,8 +1,8 @@
 {
   "date": "2026-11-26",
-  "status": "SLICE_COMMITTED_CI_PENDING",
+  "status": "BEFORE_WRITE",
   "baseline": "4863fc59fd9e03c1aea5c98d671bc52a3ad393a7",
-  "slice": "S002",
+  "slice": "S003",
   "code_sha": "b00ce2069eef677a45439b25c4910973d5b5bf07",
   "pr": 4,
   "baseline_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/41248021315",
@@ -15,8 +15,8 @@
     "Firebase hosted readiness not verified",
     "No operational authorization to enable billing/storage or release"
   ],
-  "next_action": "Verify CI on final branch HEAD; fix regressions if any. Validate Firebase hosted login and A/B isolation with authorized synthetic staging accounts; confirm R2 activation approval before storage provisioning. No release until gates pass.",
-  "previous_slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45899913225",
-  "previous_validated_head": "cb2eb1419bfca192f0e6c953a07e084f8c7e1c68",
-  "goal": "Enforce Firebase ID token header and temporal claim requirements in Worker; maintain tenant authorization and existing routes"
+  "next_action": "Patch restore preconditions; add regression cases; CI; no hosted mutation.",
+  "previous_slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45911153148",
+  "previous_validated_head": "36cd60fa1a7716b6d635ff1f96c7a28413a6cf79",
+  "goal": "Reject restoration when backup manifest verification marker, byte count or transactional scope is inconsistent; no overwrite or deletion."
 }
