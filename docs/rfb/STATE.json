@@ -1,8 +1,8 @@
 {
   "date": "2026-11-26",
-  "status": "SLICE_COMMITTED_CI_PENDING",
+  "status": "BEFORE_WRITE",
   "baseline": "4863fc59fd9e03c1aea5c98d671bc52a3ad393a7",
-  "slice": "S004",
+  "slice": "S005",
   "code_sha": "0307d95dde3ee2c16e1d7d93e920bc29ff2f0d36",
   "pr": 4,
   "baseline_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/41248021315",
@@ -22,9 +22,9 @@
     "Firebase hosted readiness not verified",
     "No operational authorization to enable billing/storage or release"
   ],
-  "next_action": "Confirm S004 unit/Rules/build and Chromium CI at final branch HEAD; inspect screenshot artifacts before visual approval; continue safe independent release preparation.",
-  "previous_slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45912483269",
-  "previous_validated_head": "bdd33296b2dc0a3f3abc2ff33dbe50706e8514f5",
-  "goal": "Correct patient phone search and demo day selection; preserve real tenant writes and existing scheduling contract.",
+  "next_action": "Implement scoped CSS and pt-BR status helper; verify new Chromium screenshots and full CI.",
+  "previous_slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45927669336",
+  "previous_validated_head": "90270cd9e72522e5001274962f5e32d316e5b632",
+  "goal": "Fix baseline visual defects in app shell and clinical list controls, localize appointment status; add DOM regression checks.",
   "method_sha": "5f73ee2b48507234431706e4c6313773bae72a5a"
 }
