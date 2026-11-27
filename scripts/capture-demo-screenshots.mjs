@@ -162,6 +162,16 @@ try{
           await page.getByRole('button',{name:'Hoje',exact:true}).click();
           await table.getByText('Marina Souza',{exact:true}).waitFor({state:'visible'});
         }
+        if(route.id==='clinical-photos'){
+          const search=page.getByRole('searchbox',{name:'Buscar tags de classificação'});
+          await search.fill('lat dir');
+          await page.getByRole('list',{name:'Classificações encontradas'}).getByText('Lateral direita',{exact:true}).waitFor({state:'visible'});
+          if(await page.getByRole('list',{name:'Classificações encontradas'}).getByText('Lateral esquerda',{exact:true}).count())throw new Error('Clinical classification filter returned wrong side');
+          await search.fill('sem-classificacao-qa');
+          await page.getByText('Nenhuma classificação corresponde à busca.',{exact:false}).waitFor({state:'visible'});
+          await search.fill('');
+          await page.getByRole('list',{name:'Classificações encontradas'}).getByText('Frontal',{exact:true}).waitFor({state:'visible'});
+        }
         if(route.id==='patients'){
           const search=page.locator('input[type="search"][aria-label="Buscar paciente pelo nome ou contato"]');
           await search.fill('marina');

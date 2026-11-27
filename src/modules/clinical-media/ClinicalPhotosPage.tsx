@@ -2,7 +2,7 @@ import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { ClinicalPhoto } from '../../domain/types';
 import { createPatientBackupBatch, createPhotoBackup, fetchClinicalPhoto, inspectClinicalPhotoIntegrity, listPhotoBackups, verifyPhotoBackup, recoverMissingPhoto, reviewClinicalPhoto, uploadClinicalPhoto, type ClinicalBackupManifest, type MediaIntegrityReport } from './r2Client';
-import { searchPhotoTags } from './catalog';
+import { filterClinicalPhotos, searchPhotoTags, type PhotoVisibility } from './catalog';
 import { listPatientRecords } from '../../lib/tenantData';
 import { useTenantAccess } from '../tenant/TenantContext';
 
@@ -27,7 +27,7 @@ export function ClinicalPhotosPage() {
   const [visibleLimit,setVisibleLimit] = useState(8);
   const [integrity,setIntegrity] = useState<MediaIntegrityReport|null>(null);
   const [checkingIntegrity,setCheckingIntegrity] = useState(false);
-  const [visibility,setVisibility] = useState<'active'|'archived'|'all'>('active');
+  const [visibility,setVisibility] = useState<PhotoVisibility>('active');
   const [reviewId,setReviewId] = useState('');
   const [backupPhotoId,setBackupPhotoId]=useState('');
   const [backupReason,setBackupReason]=useState('');
@@ -45,6 +45,8 @@ export function ClinicalPhotosPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const tags = useMemo(() => searchPhotoTags(q), [q]);
+  const displayed=useMemo(()=>filterClinicalPhotos(photos,q,visibility),[photos,q,visibility]);
+  const visiblePhotos=useMemo(()=>displayed.slice(0,visibleLimit),[displayed,visibleLimit]);
 
   async function refresh() {
     if(session.status !== 'ready') return;
@@ -67,10 +69,7 @@ export function ClinicalPhotosPage() {
     if (session.status !== 'ready' || session.isDemo || !session.permissions.includes('clinical.read')) return;
     let disposed = false;
     const urls: string[] = [];
-    const pending = photos.filter(photo => (visibility === 'all' ||
-      (visibility === 'archived' ? photo.lifecycleStatus === 'archived' : photo.lifecycleStatus !== 'archived'))
-      && (!q.trim() || (photo.originalName+' '+(photo.tags??[]).join(' ')).toLowerCase().includes(q.trim().toLowerCase())))
-      .slice(0,visibleLimit);
+    const pending = visiblePhotos;
     setPreviews({});
     void Promise.all(pending.map(async photo => {
       try {
@@ -87,7 +86,7 @@ export function ClinicalPhotosPage() {
       disposed=true;
       urls.forEach(url=>URL.revokeObjectURL(url));
     };
-  }, [session, patientId, photos, visibility, q, visibleLimit]);
+  }, [session, patientId, visiblePhotos]);
 
   async function uploadSelected() {
     if (!files.length || session.status !== 'ready' || session.isDemo) return;
@@ -191,10 +190,6 @@ export function ClinicalPhotosPage() {
 
   const writable = session.status === 'ready' && !session.isDemo && session.permissions.includes('clinical.write');
   const backupAllowed=writable&&session.status==='ready'&&session.membership?.role==='dentist';
-  const displayed=photos.filter(photo=>(visibility==='all' ||
-    (visibility==='archived'?photo.lifecycleStatus==='archived':photo.lifecycleStatus!=='archived'))
-    && (!q.trim() || (photo.originalName+' '+(photo.tags??[]).join(' ')).toLowerCase().includes(q.trim().toLowerCase())));
-  const visiblePhotos=displayed.slice(0,visibleLimit);
   const selected=photos.find(photo=>photo.id===reviewId);
 
   if(session.status !== 'ready' || !session.permissions.includes('clinical.read')) {
@@ -214,9 +209,13 @@ export function ClinicalPhotosPage() {
         {busy?'Enviando…':'Enviar com autorização clínica'}</button>
     </section>}
     <div className="grid cols-2 media-layout">
-      <section className="card"><h2>Referência de classificação</h2><input value={q} onChange={event=>setQ(event.target.value)}
-        placeholder="fr, lat dir, ocl sup..." aria-label="Buscar tags de classificação"/>
-        <ul>{tags.map(tag=><li key={tag.code}>{tag.label}</li>)}</ul>
+      <section className="card"><h2>Referência de classificação</h2>
+        <label className="clinical-list-toolbar"><span>Buscar fotos por nome ou classificação</span>
+          <input type="search" autoComplete="off" value={q} onChange={event=>setQ(event.target.value)}
+            placeholder="fr, lat dir, ocl sup..." aria-label="Buscar tags de classificação"/>
+        </label>
+        {tags.length?<ul aria-label="Classificações encontradas">{tags.map(tag=><li key={tag.code}>{tag.label}</li>)}</ul>:
+          <p className="muted" role="status">Nenhuma classificação corresponde à busca. A galeria também busca pelo nome do arquivo.</p>}
       </section>
       <section className="card"><h2>Integridade e privacidade</h2>
         <p>Armazenamento privado R2. Metadados e auditoria no Firestore. Sem link público permanente.</p>
