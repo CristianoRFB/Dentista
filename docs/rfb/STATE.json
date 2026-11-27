@@ -1,12 +1,19 @@
 {
   "date": "2026-11-26",
-  "status": "BEFORE_WRITE",
+  "status": "SLICE_COMMITTED_CI_PENDING",
   "baseline": "4863fc59fd9e03c1aea5c98d671bc52a3ad393a7",
   "slice": "S004",
-  "code_sha": "2751b415c91be21de4ed50713755ac81481f9150",
+  "code_sha": "0307d95dde3ee2c16e1d7d93e920bc29ff2f0d36",
   "pr": 4,
   "baseline_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/41248021315",
-  "slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45912457720",
+  "slice_ci": [
+    {
+      "name": "OdontoFlow CI",
+      "url": "https://github.com/CristianoRFB/Dentista/actions/runs/45927639165",
+      "status": "pending",
+      "result": null
+    }
+  ],
   "qa_hosted": "NOT_RUN",
   "production": "UNCHANGED",
   "blockers": [
@@ -15,7 +22,7 @@
     "Firebase hosted readiness not verified",
     "No operational authorization to enable billing/storage or release"
   ],
-  "next_action": "Implement patient filter and demo agenda day selection; unit and browser regression; verify CI before dependent promotions.",
+  "next_action": "Confirm S004 unit/Rules/build and Chromium CI at final branch HEAD; inspect screenshot artifacts before visual approval; continue safe independent release preparation.",
   "previous_slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45912483269",
   "previous_validated_head": "bdd33296b2dc0a3f3abc2ff33dbe50706e8514f5",
   "goal": "Correct patient phone search and demo day selection; preserve real tenant writes and existing scheduling contract.",
