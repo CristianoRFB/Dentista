@@ -1,16 +1,24 @@
 {
   "date": "2026-11-26",
-  "status": "BEFORE_WRITE",
+  "status": "SLICE_COMMITTED_CI_PENDING",
   "baseline": "4863fc59fd9e03c1aea5c98d671bc52a3ad393a7",
   "slice": "S005",
-  "code_sha": "0307d95dde3ee2c16e1d7d93e920bc29ff2f0d36",
+  "code_sha": "99f519dcf636151ff180456c32276a6e0b7cd213",
   "pr": 4,
   "baseline_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/41248021315",
   "slice_ci": [
     {
+      "sha": "99f519dcf636151ff180456c32276a6e0b7cd213",
+      "name": "OdontoFlow visual QA — real demo screenshots",
+      "url": "https://github.com/CristianoRFB/Dentista/actions/runs/45927856414",
+      "status": "queued",
+      "result": null
+    },
+    {
+      "sha": "99f519dcf636151ff180456c32276a6e0b7cd213",
       "name": "OdontoFlow CI",
-      "url": "https://github.com/CristianoRFB/Dentista/actions/runs/45927639165",
-      "status": "pending",
+      "url": "https://github.com/CristianoRFB/Dentista/actions/runs/45927850744",
+      "status": "in_progress",
       "result": null
     }
   ],
@@ -22,7 +30,7 @@
     "Firebase hosted readiness not verified",
     "No operational authorization to enable billing/storage or release"
   ],
-  "next_action": "Implement scoped CSS and pt-BR status helper; verify new Chromium screenshots and full CI.",
+  "next_action": "Review final CI/Chromium artifact; compare real screenshots, fix confirmed visual regressions; QA hosted and release gates remain pending.",
   "previous_slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45927669336",
   "previous_validated_head": "90270cd9e72522e5001274962f5e32d316e5b632",
   "goal": "Fix baseline visual defects in app shell and clinical list controls, localize appointment status; add DOM regression checks.",
