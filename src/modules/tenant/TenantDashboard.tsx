@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { appointmentStatusLabel } from '../../lib/appointmentStatus';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { Link, useParams } from 'react-router-dom';
 import type { Appointment, Patient, Recall, ScheduleResource } from '../../domain/types';
@@ -114,7 +115,7 @@ export function TenantDashboard() {
       <div className="card"><div className="card-title"><h2>Atendimentos de hoje</h2><Link to={base + '/agenda'}>ver agenda →</Link></div>
         {appointments.length === 0 ? <p className="muted">Nenhum atendimento encontrado para hoje. Confira outros dias na agenda.</p> : appointments.map(appointment => <div className="dash-row" key={appointment.id}>
           <span>{new Date(appointment.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-          <b>{patientName(appointment.patientId)}</b><small>{appointment.status}</small>
+          <b>{patientName(appointment.patientId)}</b><small>{appointmentStatusLabel(appointment.status)}</small>
         </div>)}
       </div>
       <div className="card"><div className="card-title"><h2>Outras áreas</h2></div><div className="shortcut-grid">

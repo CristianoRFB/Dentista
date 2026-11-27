@@ -1206,13 +1206,19 @@ async function manualRestoreClinicalPhoto(env:Env,uid:string,payload:unknown) {
   const scope=await validateClinicalBackupScope(env,token,uid,input);
   const manifest=await getDocument(env,token,manifestPath);
   const correctKey=backupKeyFor(input,input.digest!);
-  if(!manifest || manifest.tenantId!==input.tenantId || manifest.patientId!==input.patientId ||
-    manifest.photoId!==input.photoId || manifest.sha256!==input.digest ||
-    manifest.objectKey!==scope.photo.objectKey || manifest.backupKey!==correctKey)
+  const matchesManifest = (record: Record<string, unknown> | null, objectKey: string) =>
+    !!record && record.tenantId===input.tenantId && record.patientId===input.patientId &&
+    record.photoId===input.photoId && record.sha256===input.digest &&
+    record.objectKey===objectKey && record.backupKey===correctKey &&
+    record.verification==='sha256_readback' && typeof record.sizeBytes==='number' &&
+    Number.isSafeInteger(record.sizeBytes) && record.sizeBytes>0 && record.sizeBytes<=MAX_MEDIA_BYTES;
+  if(!matchesManifest(manifest,scope.photo.objectKey))
     throw new HttpError(404,'verified_backup_manifest_unavailable');
   let bytes:ArrayBuffer;
   try{bytes=await verifiedBackupBytes(backupBucket,correctKey,input.digest!);}
   catch{throw new HttpError(409,'backup_checksum_verification_failed');}
+  if(bytes.byteLength!==manifest!.sizeBytes)
+    throw new HttpError(409,'backup_size_verification_failed');
   if(await env.CLINICAL_MEDIA.head(scope.photo.objectKey))
     throw new HttpError(409,'original_media_still_exists');
 
@@ -1221,8 +1227,8 @@ async function manualRestoreClinicalPhoto(env:Env,uid:string,payload:unknown) {
   try{
     const verified=await validateClinicalBackupScope(env,token,uid,input,transaction);
     const current=await getDocument(env,token,manifestPath,transaction);
-    if(verified.photo.objectKey!==manifest.objectKey || !current ||
-      current.sha256!==input.digest || current.backupKey!==correctKey)
+    if(verified.photo.objectKey!==scope.photo.objectKey ||
+      !matchesManifest(current,scope.photo.objectKey) || current!.sizeBytes!==bytes.byteLength)
       throw new HttpError(409,'recovery_preconditions_changed');
     await commitTransaction(env,token,transaction,[
       documentWrite(env,'tenants/'+input.tenantId+'/auditLogs/'+crypto.randomUUID(),{
@@ -1586,6 +1592,15 @@ async function handle(request: Request, env: Env) {
   }
 
   const user = await authenticate(request, env);
+  // R2 may be absent in an already deployed Worker. Fail closed before any
+  // clinical object operation or Firestore mutation; leave non-media routes
+  // and metadata-only review/list operations independently available.
+  const requiresClinicalBucket =
+    (request.method === 'GET' && (url.pathname === '/v1/media/usage' ||
+      url.pathname === '/v1/media/integrity' || /^\/v1\/media\/[A-Za-z0-9_-]{1,128}$/.test(url.pathname))) ||
+    (request.method === 'POST' && ['/v1/media', '/v1/media/backups', '/v1/media/backups/batch',
+      '/v1/media/backups/verify', '/v1/media/backups/restore'].includes(url.pathname));
+  if (requiresClinicalBucket && !env.CLINICAL_MEDIA) throw new HttpError(503, 'clinical_media_storage_not_configured');
   if(request.method==='POST' && url.pathname==='/v1/booking/tokens/revoke') {
     let body:unknown;
     try{const raw=await request.text();if(raw.length>4096)throw new HttpError(413,'request_too_large');body=JSON.parse(raw);}

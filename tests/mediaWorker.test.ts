@@ -165,6 +165,28 @@ async function upload(token: string, file = new File([new Uint8Array([0xff, 0xd8
 }
 
 describe('Worker de mídia clínica', () => {
+  it('mantém liveness e preflight sem R2, mas recusa operações de objetos sem escrita', async () => {
+    const missing = { ...env, CLINICAL_MEDIA: undefined } as unknown as typeof env;
+    const headers = { Authorization: 'Bearer verified-test-token', Origin: 'https://app.test' };
+    expect((await mediaWorker.fetch(new Request('https://worker.test/health'), missing)).status).toBe(200);
+    expect((await mediaWorker.fetch(new Request('https://worker.test/v1/media', { method:'OPTIONS', headers }), missing)).status).toBe(204);
+    for (const [method, path] of [
+      ['POST','/v1/media'], ['GET','/v1/media/photo-a'], ['GET','/v1/media/usage'],
+      ['GET','/v1/media/integrity'], ['POST','/v1/media/backups'],
+      ['POST','/v1/media/backups/batch'], ['POST','/v1/media/backups/verify'],
+      ['POST','/v1/media/backups/restore'],
+    ]) {
+      const result = await mediaWorker.fetch(new Request('https://worker.test' + path, { method, headers }), missing);
+      expect(result.status, method + ' ' + path).toBe(503);
+      expect(await result.json()).toEqual({ error: 'clinical_media_storage_not_configured' });
+      expect(result.headers.get('Cache-Control')).toContain('no-store');
+    }
+    expect((await mediaWorker.fetch(new Request('https://worker.test/v1/media', { method:'POST' }), missing)).status).toBe(401);
+    expect(fetchCalls).toHaveLength(0);
+    expect(writes).toHaveLength(0);
+    expect(env.CLINICAL_MEDIA.put).not.toHaveBeenCalled();
+  });
+
   it('compensa upload R2 se Firestore falhar antes de iniciar a transação', async () => {
     failNextMediaTransactionStart=true;
     const result=await upload('verified-test-token');
@@ -595,7 +617,7 @@ describe('D5 — cópias privadas verificadas e restauração manual sem sobresc
     const {digest}=await copy.json() as {digest:string};
     documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a/backups/'+digest,{
       tenantId:'A',patientId:'patient-a',photoId:'photo-a',sha256:digest,
-      objectKey:originalKey,backupKey:[...copied.keys()][0],
+      objectKey:originalKey,backupKey:[...copied.keys()][0],verification:'sha256_readback',sizeBytes:bytes.length,
     });
     storedObjects.delete(originalKey);writes.length=0;
     const recovered=await request('/v1/media/backups/restore',{...payload,digest});
@@ -646,7 +668,7 @@ describe('D5 — cópias privadas verificadas e restauração manual sem sobresc
     const key=[...copied.keys()][0];
     documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a/backups/'+result.digest,{
       id:result.digest,tenantId:'A',patientId:'patient-a',photoId:'photo-a',
-      sha256:result.digest,objectKey:originalKey,backupKey:key,
+      sha256:result.digest,objectKey:originalKey,backupKey:key,verification:'sha256_readback',sizeBytes:bytes.length,
     });
     writes.length=0;backup.put.mockClear();
     const second=await request('/v1/media/backups',payload);
@@ -674,7 +696,7 @@ describe('D5 — cópias privadas verificadas e restauração manual sem sobresc
     const backupKey=[...copied.keys()][0];
     documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a/backups/'+digest,{
       tenantId:'A',patientId:'patient-a',photoId:'photo-a',sha256:digest,
-      objectKey:originalKey,backupKey,
+      objectKey:originalKey,backupKey,verification:'sha256_readback',sizeBytes:bytes.length,
     });
     storedObjects.delete(originalKey);
     writes.length=0;vi.mocked(env.CLINICAL_MEDIA.put).mockClear();
@@ -696,7 +718,7 @@ describe('D5 — cópias privadas verificadas e restauração manual sem sobresc
     const backupKey=[...copied.keys()][0];
     documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a/backups/'+digest,{
       tenantId:'A',patientId:'patient-a',photoId:'photo-a',sha256:digest,
-      objectKey:originalKey,backupKey,
+      objectKey:originalKey,backupKey,verification:'sha256_readback',sizeBytes:bytes.length,
     });
     storedObjects.delete(originalKey);
     let calls=0;
@@ -729,7 +751,7 @@ describe('D5 — cópias privadas verificadas e restauração manual sem sobresc
     const key=[...copied.keys()][0];
     documents.set('tenants/A/patients/patient-a/clinicalPhotos/photo-a/backups/'+digest,{
       tenantId:'A',patientId:'patient-a',photoId:'photo-a',sha256:digest,
-      objectKey:originalKey,backupKey:key,
+      objectKey:originalKey,backupKey:key,verification:'sha256_readback',sizeBytes:bytes.length,
     });
     writes.length=0;vi.mocked(env.CLINICAL_MEDIA.put).mockClear();
     expect((await request('/v1/media/backups/restore',{...payload,digest})).status).toBe(409);
@@ -738,6 +760,35 @@ describe('D5 — cópias privadas verificadas e restauração manual sem sobresc
     expect((await request('/v1/media/backups/restore',{...payload,digest})).status).toBe(409);
     expect(env.CLINICAL_MEDIA.put).not.toHaveBeenCalled();
     expect(writes).toHaveLength(0);
+  });
+  it('recusa restauração com manifesto não verificado ou tamanho inconsistente antes de qualquer escrita',async()=>{
+    fixture();
+    const result=await request('/v1/media/backups',payload);
+    expect(result.status).toBe(200);
+    const {digest}=await result.json() as {digest:string};
+    const path='tenants/A/patients/patient-a/clinicalPhotos/photo-a/backups/'+digest;
+    const manifest={tenantId:'A',patientId:'patient-a',photoId:'photo-a',sha256:digest,
+      objectKey:originalKey,backupKey:[...copied.keys()][0],
+      verification:'sha256_readback',sizeBytes:bytes.length};
+    storedObjects.delete(originalKey);writes.length=0;
+    vi.mocked(env.CLINICAL_MEDIA.put).mockClear();
+    for(const invalid of [
+      {...manifest,verification:undefined},{...manifest,verification:'pending'},
+      {...manifest,sizeBytes:undefined},{...manifest,sizeBytes:0},
+      {...manifest,sizeBytes:1.5},{...manifest,patientId:'patient-b'},
+    ]){
+      // Remove undefined properties: the Firestore mock encodes only actual values.
+      documents.set(path,Object.fromEntries(Object.entries(invalid).filter(([,value])=>value!==undefined)));
+      expect((await request('/v1/media/backups/restore',{...payload,digest})).status).toBe(404);
+    }
+    documents.set(path,{...manifest,sizeBytes:bytes.length+1});
+    const mismatch=await request('/v1/media/backups/restore',{...payload,digest});
+    expect(mismatch.status).toBe(409);
+    expect(await mismatch.json()).toEqual({error:'backup_size_verification_failed'});
+    expect(writes).toHaveLength(0);
+    expect(env.CLINICAL_MEDIA.put).not.toHaveBeenCalled();
+    expect(env.CLINICAL_MEDIA.delete).not.toHaveBeenCalled();
+    expect(storedObjects.has(originalKey)).toBe(false);
   });
   it('faz backup de duas fotos do mesmo paciente e audita ambas sem exclusão',async()=>{
     fixture();

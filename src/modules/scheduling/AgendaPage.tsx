@@ -1,11 +1,12 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { appointmentStatusLabel } from '../../lib/appointmentStatus';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { demoAppointments, demoPatients, demoResources } from '../../sample/demoData';
 import type { Appointment, Patient, Procedure, Professional, ScheduleBlock, ScheduleResource } from '../../domain/types';
 import { db } from '../../lib/firebase';
 import { listTenantRecords } from '../../lib/tenantData';
 import { cancelAppointment, saveAppointment } from '../../lib/appointmentClient';
-import { adjacentAgendaDay, agendaDayWindow, localDateString } from '../../lib/agendaDate';
+import { adjacentAgendaDay, agendaDayWindow, localDateString, appointmentsStartingOnDay } from '../../lib/agendaDate';
 import { useReadyTenantAccess } from '../tenant/TenantContext';
 
 function toLocalInput(date: Date) {
@@ -48,7 +49,7 @@ export function AgendaPage() {
   async function refresh() {
     setLoading(true); setError('');
     if (session.isDemo) {
-      setAppointments(demoAppointments); setPatients(demoPatients); setResources(demoResources);
+      setAppointments(appointmentsStartingOnDay(demoAppointments,selectedDay)); setPatients(demoPatients); setResources(demoResources);
       setProfessionals([]); setProcedures([]); setBlocks([]); setLoading(false); return;
     }
     try {
@@ -162,7 +163,7 @@ export function AgendaPage() {
       {loading ? <tr><td colSpan={6}>Carregando agenda…</td></tr> : appointments.length === 0 ? <tr><td colSpan={6}>Nenhum atendimento para o dia selecionado.</td></tr> : appointments.map(appointment => <tr key={appointment.id}>
         <td data-label="Horário"><b>{new Date(appointment.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}–{new Date(appointment.endsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</b></td>
         <td data-label="Paciente">{nameForPatient(appointment.patientId)}</td><td data-label="Profissional">{professionals.find(person => person.id === appointment.professionalId)?.displayName ?? '—'}</td>
-        <td data-label="Recurso">{nameForResource(appointment.resourceId)}</td><td data-label="Status"><span className={'status-pill ' + appointment.status}>{appointment.status}</span></td>
+        <td data-label="Recurso">{nameForResource(appointment.resourceId)}</td><td data-label="Status"><span className={'status-pill ' + appointment.status}>{appointmentStatusLabel(appointment.status)}</span></td>
         <td data-label="Ações" className="row-actions">{session.permissions.includes('appointments.manage') && !session.isDemo && !['completed', 'cancelled', 'no_show'].includes(appointment.status) &&
           <><button className="text-button" type="button" onClick={() => beginReschedule(appointment)}>Remarcar</button>
           {cancelPendingId===appointment.id?<span>

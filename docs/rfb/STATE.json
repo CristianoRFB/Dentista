@@ -1,0 +1,50 @@
+{
+  "date": "2026-11-26",
+  "status": "S008_COMMITTED_CI_PENDING_RELEASE_BLOCKED",
+  "baseline": "4863fc59fd9e03c1aea5c98d671bc52a3ad393a7",
+  "slice": "S008",
+  "code_sha": "2293d23784521532895895146d0effffc4b2d783",
+  "pr": 4,
+  "baseline_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/41248021315",
+  "slice_ci": [
+    {
+      "sha": "99f519dcf636151ff180456c32276a6e0b7cd213",
+      "name": "OdontoFlow visual QA — real demo screenshots",
+      "url": "https://github.com/CristianoRFB/Dentista/actions/runs/45927856414",
+      "status": "queued",
+      "result": null
+    },
+    {
+      "sha": "99f519dcf636151ff180456c32276a6e0b7cd213",
+      "name": "OdontoFlow CI",
+      "url": "https://github.com/CristianoRFB/Dentista/actions/runs/45927850744",
+      "status": "in_progress",
+      "result": null
+    }
+  ],
+  "qa_hosted": "NOT_RUN",
+  "production": "UNCHANGED",
+  "blockers": [
+    "R2 not enabled (Cloudflare API 403 code 10042); primary/backup bindings absent",
+    "Pages and Worker deployments from 2026-10-13; deployed frontend SHA differs from main",
+    "Firebase hosted readiness not verified",
+    "No operational authorization to enable billing/storage or release"
+  ],
+  "next_action": "Confirmar CI e Chromium do novo HEAD, inspecionar captura da galeria com novo controle; completar Triple Verification em ambiente sintético isolado. Sem release até R2 e Firebase homologados e aprovação.",
+  "previous_slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45927669336",
+  "previous_validated_head": "3dc43456807af84d3bbaaf251b9da637eb2b8de0",
+  "goal": "Unify photo catalog alias search, gallery preview and batch selection without altering storage, scope, permissions or clinical metadata; correct visible native search control.",
+  "method_sha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+  "qa_ci": {
+    "run": "https://github.com/CristianoRFB/Dentista/actions/runs/45928048065",
+    "push": "https://github.com/CristianoRFB/Dentista/actions/runs/45928042885",
+    "visual": "https://github.com/CristianoRFB/Dentista/actions/runs/45928048033",
+    "result": "PASS",
+    "artifact": 15166848476,
+    "sourceMergeSha": "f96dbfcccf19c5952daf7212b91074204d5aaa7f",
+    "treeMatchesHead": true,
+    "screenshots": 30,
+    "hashesVerified": 30,
+    "controlsChecked": 423
+  }
+}

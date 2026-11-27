@@ -206,3 +206,25 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible 
 @media(prefers-reduced-motion:reduce){
   .workspace-action-grid a,.platform-jump-nav a{transition:none}
 }
+
+/* EVOLVE 05 — clinical workspace: top-aligned content and consistent filters.
+   Keep marketing and booking styles unchanged; preserve intentional table overflow. */
+.app-shell > .content { margin:0 auto; align-self:start; }
+.app-shell :is(.clinical-list-toolbar,.agenda-toolbar) { flex-wrap:wrap; gap:12px; }
+.app-shell .agenda-toolbar label { display:grid; gap:6px; flex:1 1 220px; min-width:0; }
+.app-shell .clinical-list-toolbar label { min-width:min(100%,220px); }
+.app-shell :is(.clinical-list-toolbar,.agenda-toolbar) :is(input,select),
+.app-shell .card input[type="search"] {
+  width:100%; min-width:0; max-width:100%; min-height:44px; padding:10px 12px;
+  border:1px solid #b9d0c9; border-radius:12px; background:#fff; color:var(--ink);
+}
+.app-shell :is(.clinical-list-toolbar,.agenda-toolbar) label { font-size:13px; font-weight:650; color:var(--brand); }
+.app-shell .agenda-toolbar > .muted { flex:1 1 160px; min-width:0; overflow-wrap:anywhere; }
+@media(max-width:760px){
+  .app-shell { grid-template-rows:auto 1fr; align-content:start; }
+  .app-shell > .app-mobile-header { align-self:start; }
+  .app-shell .agenda-toolbar label { flex:1 1 100%; }
+  .app-shell .clinical-list-toolbar { grid-template-columns:minmax(0,1fr); }
+  .app-shell .clinical-list-toolbar label { min-width:0; }
+  .app-shell .agenda-toolbar > .muted { flex-basis:100%; }
+}

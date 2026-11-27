@@ -1,3 +1,5 @@
+import type { ClinicalPhoto } from '../../domain/types';
+
 export interface PhotoTag { code: string; label: string; aliases: string[]; }
 export const clinicalPhotoCatalog: PhotoTag[] = [
   { code:'frontal', label:'Frontal', aliases:['fr','frontal'] },
@@ -12,4 +14,17 @@ const norm=(v:string)=>v.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLower
 export function searchPhotoTags(query:string){
   const q=norm(query); if(!q) return clinicalPhotoCatalog;
   return clinicalPhotoCatalog.filter(x=>[x.code,x.label,...x.aliases].some(v=>norm(v).includes(q)));
+}
+
+export type PhotoVisibility = 'active'|'archived'|'all';
+/** Shared presentation-only selection for gallery, previews and batch backup. */
+export function filterClinicalPhotos<T extends Pick<ClinicalPhoto,'originalName'|'tags'|'lifecycleStatus'>>(photos:readonly T[],query:string,visibility:PhotoVisibility):T[]{
+  const needle=norm(query);
+  const matchingCodes=new Set(needle?searchPhotoTags(needle).map(tag=>tag.code):[]);
+  return photos.filter(photo=>{
+    const archived=photo.lifecycleStatus==='archived';
+    if(visibility!=='all'&&(visibility==='archived')!==archived)return false;
+    if(!needle)return true;
+    return norm(photo.originalName??'').includes(needle)||(photo.tags??[]).some(tag=>norm(tag).includes(needle)||matchingCodes.has(norm(tag)));
+  });
 }

@@ -4,7 +4,7 @@ Fundação técnica e de produto para o repositório `CristianoRFB/Dentista`.
 
 ## Estado deste pacote
 
-O repositório GitHub estava vazio quando a fundação foi iniciada. Portanto, este ZIP é uma **base inicial executável e documentada**, não uma migração de código legado.
+O projeto começou como base inicial executável e evoluiu para um núcleo clínico e administrativo versionado. Esta branch é candidata de desenvolvimento, não uma versão comercial homologada.
 
 Esta revisão também incorpora uma decisão de produto importante: a landing deve **apresentar o software como produto**, usando benefícios + demonstrações de UI, em vez de uma página institucional genérica.
 
@@ -12,7 +12,7 @@ Esta revisão também incorpora uma decisão de produto importante: a landing de
 
 O Core Multi-Tenant e Clínico P0 agora inclui login/logout, guards, tenant resolver, memberships/RBAC, Platform Owner, CRUD tenant-scoped de pacientes/profissionais/procedimentos/recursos, agenda transacional pelo Worker, prontuário append-only/adendos, fotos privadas em R2 e audit logs essenciais.
 
-O modo demo é fictício, somente leitura e restrito a `npm run dev` com `VITE_USE_DEMO_DATA=true`. Não representa cliente real. Booking/intake públicos reais, retorno persistido, odontograma, planos de tratamento, billing e entitlement runtime continuam fora deste estágio.
+O modo demo é fictício, somente leitura e restrito a `npm run dev` com `VITE_USE_DEMO_DATA=true`. Não representa cliente real. Há implementação de agendamento por convite, solicitação de contato opt-in, pré-cadastro, retorno persistido, odontograma, planos de tratamento e entitlements; homologação hospedada continua pendente. Billing automático permanece fora do escopo.
 
 A arquitetura segue os padrões `GLOBAL-v01` + `APPOINTMENT-v01` + `DENTIST-v01`, alinhados ao Project Core `v01`.
 
@@ -27,8 +27,8 @@ A arquitetura segue:
 - Cloudflare Worker para agenda e R2 privado para mídia clínica;
 - cache local/IndexedDB para fotos clínicas;
 - agenda com profissionais e recursos físicos validada fora do frontend;
-- Central de Retorno e pré-cadastro público ainda não persistidos;
-- `tenant.features`, `tenant.limits` e medição de uso preparados para estratégia comercial;
+- Central de Retorno e pré-cadastro por convite persistidos no código, com auditoria;
+- PlanCatalog, entitlements, quotas transacionais e medição de uso R2 sob demanda, sem quota comercial de bytes;
 - documentação versionada com `docs/CURRENT.md` como fonte da verdade;
 - diagramas editáveis + PNG/SVG;
 - testes de domínio, autorização Worker e Firestore Rules via Emulator.
@@ -100,3 +100,7 @@ Os planos e preços aprovados têm catálogo canônico de runtime, entitlements,
 - `docs/versions/v01-multitenant-whitelabel/COMMERCIAL_DEMO.md`
 
 Preços preservados: **Essencial R$ 79,90 / Pro R$ 129,90 / Premium R$ 189,90 por mês**; totais anuais: **R$ 862,92 / R$ 1.402,92 / R$ 2.050,92**. Não existe cobrança automática. Storage de 10/50/200 GB não é anunciado ou aplicado enquanto não houver medição confiável.
+
+## Continuidade RFB — novembro de 2026
+
+Acompanhe [roadmap EVOLVE](docs/rfb/EVOLVE-ROADMAP.md), [progresso e evidências](docs/rfb/PROGRESS.md), [QA por jornada](docs/rfb/QA-MATRIX.md) e [gates de release](docs/rfb/RELEASE-READINESS.md). O código possui testes no GitHub Actions; a produção não está no SHA candidato. Não confundir imagens conceituais ou capturas históricas da demo com aceitação da aplicação atual. R2 não habilitado na última consulta; upload/backup/restore hospedados bloqueados. Nenhuma cobrança ou produção alterada.
