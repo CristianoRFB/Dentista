@@ -163,7 +163,7 @@ try{
           await table.getByText('Marina Souza',{exact:true}).waitFor({state:'visible'});
         }
         if(route.id==='clinical-photos'){
-          const search=page.getByRole('searchbox',{name:'Buscar tags de classificação'});
+          const search=page.getByRole('searchbox',{name:'Buscar fotos por nome ou classificação'});
           await search.fill('lat dir');
           await page.getByRole('list',{name:'Classificações encontradas'}).getByText('Lateral direita',{exact:true}).waitFor({state:'visible'});
           if(await page.getByRole('list',{name:'Classificações encontradas'}).getByText('Lateral esquerda',{exact:true}).count())throw new Error('Clinical classification filter returned wrong side');

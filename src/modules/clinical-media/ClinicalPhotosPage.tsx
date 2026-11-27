@@ -210,10 +210,10 @@ export function ClinicalPhotosPage() {
     </section>}
     <div className="grid cols-2 media-layout">
       <section className="card"><h2>Referência de classificação</h2>
-        <label className="clinical-list-toolbar"><span>Buscar fotos por nome ou classificação</span>
+        <div className="clinical-list-toolbar"><label>Buscar fotos por nome ou classificação
           <input type="search" autoComplete="off" value={q} onChange={event=>setQ(event.target.value)}
-            placeholder="fr, lat dir, ocl sup..." aria-label="Buscar tags de classificação"/>
-        </label>
+            placeholder="fr, lat dir, ocl sup..."/>
+        </label></div>
         {tags.length?<ul aria-label="Classificações encontradas">{tags.map(tag=><li key={tag.code}>{tag.label}</li>)}</ul>:
           <p className="muted" role="status">Nenhuma classificação corresponde à busca. A galeria também busca pelo nome do arquivo.</p>}
       </section>
