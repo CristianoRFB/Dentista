@@ -31,3 +31,10 @@ Método 5f73ee2b48507234431706e4c6313773bae72a5a; alvo a3a47c8ed84677d21f05ac47d
 Condicionais N/A: DEMOS (sem lead/demo comercial solicitada), HUMAN (sem negociação), MYOWN (alvo não é método), PORTFOLIO (sem revisão do catálogo de 14 produtos; README revisado), STARTER/INITIAL_DEVELOPMENT (produto existente), CODEX_PC (não solicitado), PAYMENTS (deferred, sem integração/cobrança).
 
 Limitações: nenhuma homologação hospedada, revisão de pixels pós-patch, TV integral, benchmark ou auditoria independente. Não atribuir percentual novo. Gate final INCOMPLETE.
+
+## S008 — atualização de evidências
+- CORE/GITHUB/ORCHESTRATOR: HEAD reconciliado, PR #4 draft, checkpoint pré-write cbed71e e código 2293d23784521532895895146d0effffc4b2d783. Produção intocada.
+- ANTI_LOOP/ANTI_VIBE/AP: uma hipótese de inconsistência de seleção, consumidores galeria/prévia/lote unidos, regressões escritas. Testes finais pendentes.
+- PRV/CR/BEYOND: melhoria adjacente elegível; compartilhamento de filtro canônico em vez de replicação de aliases; correção visual localizada (CR-SKIP redesign), inspeção real dos pixels; sem novas dependências/mídias.
+- ANTI_AI/DESIGN/QA: evidência anterior CI/Chromium 45928048033, 30 capturas observadas e hashes conferidos, nova busca e label acessível ainda sem recaptura.
+- COMPLIANCE/FULL_SYSTEM_LIFECYCLE/TRIPLE_VERIFICATION/COMMERCIAL_STRICT: parcial; método main reconsultado; sem promoção de nível, CLI/TV integral NOT_RUN, release bloqueado. Relatório anterior mantém justificativas de condicionais N/A. Sem nova API, cobrança ou alteração de integração.

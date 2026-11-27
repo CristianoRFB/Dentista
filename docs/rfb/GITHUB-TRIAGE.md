@@ -10,3 +10,6 @@ Repository CristianoRFB/Dentista (public). Baseline main `4863fc59fd9e03c1aea5c9
 
 ## S004 entry
 0 open issues, one draft PR #4; S003 success, S004 code 0307d95dde3ee2c16e1d7d93e920bc29ff2f0d36, CI not yet verified. No merge/deploy.
+
+## S008 — retomada
+Entrada: 0 Issues, 1 PR draft #4; main 4863fc5, baseline PR 3dc4345. CI push/PR/Chromium anteriores PASS. Novo candidato 2293d23784521532895895146d0effffc4b2d783; manter PR aberto, sem merge; gates hosted/release pendentes.

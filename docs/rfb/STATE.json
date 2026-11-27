@@ -1,9 +1,9 @@
 {
   "date": "2026-11-26",
-  "status": "BEFORE_WRITE",
+  "status": "S008_COMMITTED_CI_PENDING_RELEASE_BLOCKED",
   "baseline": "4863fc59fd9e03c1aea5c98d671bc52a3ad393a7",
   "slice": "S008",
-  "code_sha": "99f519dcf636151ff180456c32276a6e0b7cd213",
+  "code_sha": "2293d23784521532895895146d0effffc4b2d783",
   "pr": 4,
   "baseline_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/41248021315",
   "slice_ci": [
@@ -30,7 +30,7 @@
     "Firebase hosted readiness not verified",
     "No operational authorization to enable billing/storage or release"
   ],
-  "next_action": "Implement narrow catalog helper, regression tests and browser label/filter test. Recheck CI and actual screenshots; no hosted promotion.",
+  "next_action": "Confirmar CI e Chromium do novo HEAD, inspecionar captura da galeria com novo controle; completar Triple Verification em ambiente sintético isolado. Sem release até R2 e Firebase homologados e aprovação.",
   "previous_slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45927669336",
   "previous_validated_head": "3dc43456807af84d3bbaaf251b9da637eb2b8de0",
   "goal": "Unify photo catalog alias search, gallery preview and batch selection without altering storage, scope, permissions or clinical metadata; correct visible native search control.",
