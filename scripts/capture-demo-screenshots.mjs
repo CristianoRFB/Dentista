@@ -90,6 +90,15 @@ try{
             await page.getByRole('textbox',{name:'Nome completo'}).waitFor({state:'visible'});
           }
         }
+        if(['agenda','patients','recalls','clinical-photos','clinical-demo-notice','treatment','dashboard'].includes(route.id)){
+          const layout=await page.evaluate(()=>{
+            const header=document.querySelector('.app-mobile-header');
+            const fields=[...document.querySelectorAll('.clinical-list-toolbar input,.clinical-list-toolbar select,.agenda-toolbar input,.agenda-toolbar select,.content .card input[type="search"]')].filter(el=>el.getClientRects().length>0);
+            return {headerHeight:header?.getBoundingClientRect().height??0,fields:fields.map(el=>{const b=el.getBoundingClientRect(),card=el.closest('.card')?.getBoundingClientRect();return {height:b.height,contained:!card||(b.left>=card.left-1&&b.right<=card.right+1)};})};
+          });
+          if(viewport.isMobile&&(layout.headerHeight<44||layout.headerHeight>100))throw new Error('Mobile header stretched: '+route.id+' '+layout.headerHeight);
+          if(layout.fields.some(field=>field.height<44||!field.contained))throw new Error('Clinical filter geometry regression: '+route.id+' '+JSON.stringify(layout.fields));
+        }
         await page.screenshot({path:path.join(OUT,route.id+'-'+viewport.name+'.png'),fullPage:true,animations:'disabled'});
         const accessibilityScan=await auditRenderedAccessibility(page);
         accessibility.push({route:route.displayUrl??route.url,viewport:viewport.name,

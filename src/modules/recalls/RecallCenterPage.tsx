@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { appointmentStatusLabel } from '../../lib/appointmentStatus';
 import { demoPatients, demoRecalls } from '../../sample/demoData';
 import type { Appointment, Patient, Recall, RecallStatus } from '../../domain/types';
 import { createRecall, updateRecall } from '../../lib/recallData';
@@ -149,7 +150,7 @@ export function RecallCenterPage() {
       {editStatus === 'scheduled' && <label>Agendamento do paciente<select required value={appointmentId} onChange={e => setAppointmentId(e.target.value)}>
         <option value="">Selecione o agendamento</option>
         {appointments.filter(a => a.patientId === editing.patientId && !['cancelled','no_show'].includes(a.status)).map(a =>
-          <option value={a.id} key={a.id}>{new Date(a.startsAt).toLocaleString('pt-BR')} · {a.status}</option>)}
+          <option value={a.id} key={a.id}>{new Date(a.startsAt).toLocaleString('pt-BR')} · {appointmentStatusLabel(a.status)}</option>)}
       </select></label>}
       <div className="row-actions"><button className="btn primary" disabled={saving} type="submit">{saving ? 'Salvando…' : 'Salvar atualização'}</button>
         <button className="btn secondary" type="button" onClick={() => setEditing(null)}>Cancelar</button></div>
