@@ -1,0 +1,285 @@
+{
+  "profile": "product",
+  "scope": "OdontoFlow vertical odontológica; alvo RC/production/commercial apenas com gates e autorização; preservar itens deferred.",
+  "targetSha": "a3a47c8ed84677d21f05ac47dca541744dd9983a",
+  "targetLevel": "L13",
+  "nextStep": "Confirmar CI e captura final, executar TV e homologação autorizada; resolver R2 antes de release.",
+  "areas": [
+    {
+      "id": "A01",
+      "status": "NOT_RUN",
+      "reason": "Produto e catálogo definidos; aceite integral pendente"
+    },
+    {
+      "id": "A02",
+      "status": "NOT_RUN",
+      "reason": "Correções CSS versionadas; captura final pendente"
+    },
+    {
+      "id": "A03",
+      "status": "NOT_RUN",
+      "reason": "CI S004 aprovada e S005 parcial"
+    },
+    {
+      "id": "A04",
+      "status": "NOT_RUN",
+      "reason": "Modelo e Rules existentes; hosted/DR pendentes"
+    },
+    {
+      "id": "A05",
+      "status": "NOT_RUN",
+      "reason": "JWT e isolamento testados em CI anterior; revogação/hosted pendentes"
+    },
+    {
+      "id": "A06",
+      "status": "BLOCKED",
+      "reason": "R2 403/10042; Pages antigo"
+    },
+    {
+      "id": "A07",
+      "status": "NOT_RUN",
+      "reason": "Benchmarks e carga não executados"
+    },
+    {
+      "id": "A08",
+      "status": "NOT_RUN",
+      "reason": "Matriz TV registrada; cobertura incompleta"
+    },
+    {
+      "id": "A09",
+      "status": "NOT_RUN",
+      "reason": "Alertas e telemetria operacional não comprovados"
+    },
+    {
+      "id": "A10",
+      "status": "NOT_RUN",
+      "reason": "Platform Owner no código; jornada hospedada não executada"
+    },
+    {
+      "id": "A11",
+      "status": "NOT_RUN",
+      "reason": "PlanCatalog conferido; release bloqueado"
+    },
+    {
+      "id": "A12",
+      "status": "BLOCKED",
+      "reason": "DR e operação real bloqueados"
+    },
+    {
+      "id": "A13",
+      "status": "NOT_RUN",
+      "reason": "Roadmap EVOLVE/checkpoints em uso; promoção pendente"
+    }
+  ],
+  "stages": [
+    {
+      "id": "L01",
+      "status": "NOT_RUN",
+      "reason": "Existência de código/histórico não promove nível sem prova completa dos requisitos no SHA."
+    },
+    {
+      "id": "L02",
+      "status": "NOT_RUN",
+      "reason": "Existência de código/histórico não promove nível sem prova completa dos requisitos no SHA."
+    },
+    {
+      "id": "L03",
+      "status": "NOT_RUN",
+      "reason": "Existência de código/histórico não promove nível sem prova completa dos requisitos no SHA."
+    },
+    {
+      "id": "L04",
+      "status": "NOT_RUN",
+      "reason": "Existência de código/histórico não promove nível sem prova completa dos requisitos no SHA."
+    },
+    {
+      "id": "L05",
+      "status": "NOT_RUN",
+      "reason": "Existência de código/histórico não promove nível sem prova completa dos requisitos no SHA."
+    },
+    {
+      "id": "L06",
+      "status": "NOT_RUN",
+      "reason": "Existência de código/histórico não promove nível sem prova completa dos requisitos no SHA."
+    },
+    {
+      "id": "L07",
+      "status": "NOT_RUN",
+      "reason": "Existência de código/histórico não promove nível sem prova completa dos requisitos no SHA."
+    },
+    {
+      "id": "L08",
+      "status": "NOT_RUN",
+      "reason": "Existência de código/histórico não promove nível sem prova completa dos requisitos no SHA."
+    },
+    {
+      "id": "L09",
+      "status": "NOT_RUN",
+      "reason": "Existência de código/histórico não promove nível sem prova completa dos requisitos no SHA."
+    },
+    {
+      "id": "L10",
+      "status": "NOT_RUN",
+      "reason": "Existência de código/histórico não promove nível sem prova completa dos requisitos no SHA."
+    },
+    {
+      "id": "L11",
+      "status": "BLOCKED",
+      "reason": "R2 desabilitado, gates de produção e comercial não completos."
+    },
+    {
+      "id": "L12",
+      "status": "BLOCKED",
+      "reason": "R2 desabilitado, gates de produção e comercial não completos."
+    },
+    {
+      "id": "L13",
+      "status": "BLOCKED",
+      "reason": "R2 desabilitado, gates de produção e comercial não completos."
+    },
+    {
+      "id": "L14",
+      "status": "NOT_RUN",
+      "reason": "Existência de código/histórico não promove nível sem prova completa dos requisitos no SHA."
+    },
+    {
+      "id": "L15",
+      "status": "NOT_RUN",
+      "reason": "Existência de código/histórico não promove nível sem prova completa dos requisitos no SHA."
+    }
+  ],
+  "requirements": [
+    {
+      "id": "TV-01",
+      "area": "A01",
+      "level": "L10",
+      "acceptance": "Público: /, /precos, /recursos/:feature; visitante: preços/CTA/rota; negativas link inválido, contraste, viewport; TV1–3",
+      "essential": true,
+      "status": "NOT_RUN",
+      "reason": "Jornada integral não verificada no candidato final."
+    },
+    {
+      "id": "TV-02",
+      "area": "A05",
+      "level": "L10",
+      "acceptance": "Login /login; usuário e sessão ausente: login/logout e releitura; negativas token expirado, issuer/audience, A×B; TV1–3",
+      "essential": true,
+      "status": "NOT_RUN",
+      "reason": "Jornada integral não verificada no candidato final."
+    },
+    {
+      "id": "TV-03",
+      "area": "A10",
+      "level": "L10",
+      "acceptance": "/platform; platform_owner: tenant, plano, suspensão, suporte; negativas perfil comum, acesso clínico sem suporte; TV1–3",
+      "essential": true,
+      "status": "NOT_RUN",
+      "reason": "Jornada integral não verificada no candidato final."
+    },
+    {
+      "id": "TV-04",
+      "area": "A02",
+      "level": "L10",
+      "acceptance": "/:slug/app e /ajuda; membro: menu, métricas, links; negativas sem permissão, teclado, mobile; TV1–3",
+      "essential": true,
+      "status": "NOT_RUN",
+      "reason": "Jornada integral não verificada no candidato final."
+    },
+    {
+      "id": "TV-05",
+      "area": "A03",
+      "level": "L10",
+      "acceptance": "/agenda; equipe autorizada: consulta, remarcação, cancelamento, dia; negativas conflito, locks, horário inválido, data demo; TV1–3",
+      "essential": true,
+      "status": "NOT_RUN",
+      "reason": "Jornada integral não verificada no candidato final."
+    },
+    {
+      "id": "TV-06",
+      "area": "A04",
+      "level": "L10",
+      "acceptance": "/pacientes; equipe: cadastro, busca, inativação, histórico; negativas telefone formatado, inativo, tenant B; TV1–3",
+      "essential": true,
+      "status": "NOT_RUN",
+      "reason": "Jornada integral não verificada no candidato final."
+    },
+    {
+      "id": "TV-07",
+      "area": "A03",
+      "level": "L10",
+      "acceptance": "/recursos e /cadastros; equipe: cadastro e capacidade; negativas quota, bypass, desativação; TV1–3",
+      "essential": true,
+      "status": "NOT_RUN",
+      "reason": "Jornada integral não verificada no candidato final."
+    },
+    {
+      "id": "TV-08",
+      "area": "A03",
+      "level": "L10",
+      "acceptance": "/retornos; equipe Pro/Premium: criar/atualizar/filtrar; negativas estado inválido e papel sem acesso; TV1–3",
+      "essential": true,
+      "status": "NOT_RUN",
+      "reason": "Jornada integral não verificada no candidato final."
+    },
+    {
+      "id": "TV-09",
+      "area": "A04",
+      "level": "L10",
+      "acceptance": "/clinico, /odontograma, /tratamento; clínico: prontuário, adendo, evento FDI, versão tratamento; negativas imutabilidade, A×B, downgrade; TV1–3",
+      "essential": true,
+      "status": "NOT_RUN",
+      "reason": "Jornada integral não verificada no candidato final."
+    },
+    {
+      "id": "TV-10",
+      "area": "A05",
+      "level": "L10",
+      "acceptance": "/fotos; clínico: upload, leitura, revisão, backup, restauração; negativas R2 ausente, hash, manifesto, escopo, CAS; TV1–3",
+      "essential": true,
+      "status": "NOT_RUN",
+      "reason": "Jornada integral não verificada no candidato final."
+    },
+    {
+      "id": "TV-11",
+      "area": "A05",
+      "level": "L10",
+      "acceptance": "/convites-agenda, /agendar, /solicitar-agendamento: convite, revogação, solicitação opt-in; negativas replay, expirado, antiabuso, sem confirmação automática; TV1–3",
+      "essential": true,
+      "status": "NOT_RUN",
+      "reason": "Jornada integral não verificada no candidato final."
+    },
+    {
+      "id": "TV-12",
+      "area": "A04",
+      "level": "L10",
+      "acceptance": "/pre-cadastros, /cadastro; equipe e convidado: convite, submissão, revisão; negativas replay, expiração, plano, tenant; TV1–3",
+      "essential": true,
+      "status": "NOT_RUN",
+      "reason": "Jornada integral não verificada no candidato final."
+    },
+    {
+      "id": "TV-13",
+      "area": "A02",
+      "level": "L10",
+      "acceptance": "/:slug mini-site; visitante: branding, CTA e navegação; negativas slug inválido, tenant suspenso; TV1–3",
+      "essential": true,
+      "status": "NOT_RUN",
+      "reason": "Jornada integral não verificada no candidato final."
+    },
+    {
+      "id": "TV-14",
+      "area": "A06",
+      "level": "L10",
+      "acceptance": "Infraestrutura / worker, suporte e rollback: health, autenticação hospedada, storage privado; negativas falha do provedor, DR, isolamento; TV1–3",
+      "essential": true,
+      "status": "NOT_RUN",
+      "reason": "Jornada integral não verificada no candidato final."
+    }
+  ],
+  "blockers": [
+    "R2 403/10042",
+    "Firebase hospedado não comprovado",
+    "QA visual e TV pendentes",
+    "Autorização de release ausente"
+  ]
+}

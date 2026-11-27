@@ -1,0 +1,24 @@
+# EVOLVE 06 — Triple Verification / matriz de homologação
+
+Candidato de código 99f519dcf636151ff180456c32276a6e0b7cd213; checkpoint a3a47c8ed84677d21f05ac47dca541744dd9983a. CI https://github.com/CristianoRFB/Dentista/actions/runs/45927883476; Chromium https://github.com/CristianoRFB/Dentista/actions/runs/45927883448. Typecheck frontend/Worker e testes unitários/Worker confirmados PASS nas etapas do run; Rules/build e Chromium ainda não concluídos na última consulta. Não usar essa evidência como aprovação de jornada completa.
+
+| Jornada e papel | Funcional nominal | Adversarial | Evidência de testes existentes | TV1/TV2/TV3 |
+|---|---|---|---|---|
+| TV-01 — Público: /, /precos, /recursos/:feature; visitante | preços/CTA/rota | link inválido, contraste, viewport | planProposal.test.ts | NOT_RUN integral / NOT_RUN integral / NOT_RUN integral |
+| TV-02 — Login /login; usuário e sessão ausente | login/logout e releitura | token expirado, issuer/audience, A×B | firebaseAuth.test.ts; authTenantAccess.test.ts | NOT_RUN integral / NOT_RUN integral / NOT_RUN integral |
+| TV-03 — /platform; platform_owner | tenant, plano, suspensão, suporte | perfil comum, acesso clínico sem suporte | platformClinicSearch.test.ts; firestoreRules.test.ts | NOT_RUN integral / NOT_RUN integral / NOT_RUN integral |
+| TV-04 — /:slug/app e /ajuda; membro | menu, métricas, links | sem permissão, teclado, mobile | workspaceNavigation.test.ts | NOT_RUN integral / NOT_RUN integral / NOT_RUN integral |
+| TV-05 — /agenda; equipe autorizada | consulta, remarcação, cancelamento, dia | conflito, locks, horário inválido, data demo | appointmentWorker.test.ts; agendaDate.test.ts; availability.test.ts | NOT_RUN integral / NOT_RUN integral / NOT_RUN integral |
+| TV-06 — /pacientes; equipe | cadastro, busca, inativação, histórico | telefone formatado, inativo, tenant B | patientList.test.ts; firestoreRules.test.ts | NOT_RUN integral / NOT_RUN integral / NOT_RUN integral |
+| TV-07 — /recursos e /cadastros; equipe | cadastro e capacidade | quota, bypass, desativação | schedulingWorker.test.ts; entitlementService.test.ts | NOT_RUN integral / NOT_RUN integral / NOT_RUN integral |
+| TV-08 — /retornos; equipe Pro/Premium | criar/atualizar/filtrar | estado inválido e papel sem acesso | recallValidation.test.ts; firestoreRules.test.ts | NOT_RUN integral / NOT_RUN integral / NOT_RUN integral |
+| TV-09 — /clinico, /odontograma, /tratamento; clínico | prontuário, adendo, evento FDI, versão tratamento | imutabilidade, A×B, downgrade | odontogram.test.ts; treatmentPlan.test.ts; firestoreRules.test.ts | NOT_RUN integral / NOT_RUN integral / NOT_RUN integral |
+| TV-10 — /fotos; clínico | upload, leitura, revisão, backup, restauração | R2 ausente, hash, manifesto, escopo, CAS | mediaWorker.test.ts; mediaBackup.test.ts; mediaIntegrity.test.ts | NOT_RUN integral / NOT_RUN integral / NOT_RUN integral |
+| TV-11 — /convites-agenda, /agendar, /solicitar-agendamento | convite, revogação, solicitação opt-in | replay, expirado, antiabuso, sem confirmação automática | openBookingRequest.test.ts; personalInviteUrl.test.ts; appointmentWorker.test.ts | NOT_RUN integral / NOT_RUN integral / NOT_RUN integral |
+| TV-12 — /pre-cadastros, /cadastro; equipe e convidado | convite, submissão, revisão | replay, expiração, plano, tenant | firestoreRules.test.ts; personalInviteUrl.test.ts | NOT_RUN integral / NOT_RUN integral / NOT_RUN integral |
+| TV-13 — /:slug mini-site; visitante | branding, CTA e navegação | slug inválido, tenant suspenso | authTenantAccess.test.ts | NOT_RUN integral / NOT_RUN integral / NOT_RUN integral |
+| TV-14 — Infraestrutura / worker, suporte e rollback | health, autenticação hospedada, storage privado | falha do provedor, DR, isolamento | mediaWorker.test.ts; mediaUsage.test.ts | NOT_RUN integral / NOT_RUN integral / NOT_RUN integral |
+
+- Rodada 1: executar fluxos nominais completos com persistência e releitura em emulador/staging, desktop/mobile; dados fictícios. Rodada 2: sessão ausente/expirada, papel incorreto, isolamento A×B, dados inválidos, concorrência, falha de rede e acessibilidade. Rodada 3: sessão limpa, replay no mesmo SHA, SAME_EXECUTOR_REPLAY quando aplicável. Capturas reais antes/depois e logs sanitizados, sem dados clínicos reais.
+- O CI de S004 aprovou https://github.com/CristianoRFB/Dentista/actions/runs/45927669336; S005 tem correções de layout e testes DOM ainda a concluir. Capturas históricas: run 41247876024, artifact 13060001987, 30 PNG com hashes conferidos, manifesto source 6ae561e9a6e3fcd352611e8ceb59dd4b223c1843. Evidência histórica somente. Novo visual não aprovado sem inspeção.
+- Hosted BLOCKED: Cloudflare R2 403/10042; Firebase hospedado não comprovado; nenhum staging clínico autorizado. Não testar dados reais, publicar credenciais, remover registros ou simular resultados.
