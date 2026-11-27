@@ -1,8 +1,8 @@
 {
   "date": "2026-11-26",
-  "status": "PARTIAL_BLOCKED_RELEASE",
+  "status": "BEFORE_WRITE",
   "baseline": "4863fc59fd9e03c1aea5c98d671bc52a3ad393a7",
-  "slice": "S006_S007_PREPARATION",
+  "slice": "S008",
   "code_sha": "99f519dcf636151ff180456c32276a6e0b7cd213",
   "pr": 4,
   "baseline_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/41248021315",
@@ -30,17 +30,21 @@
     "Firebase hosted readiness not verified",
     "No operational authorization to enable billing/storage or release"
   ],
-  "next_action": "Confirmar CI/Chromium no HEAD, baixar e inspecionar PNGs novos; corrigir se houver falha; executar TV em staging autorizado e resolver R2 antes do release.",
+  "next_action": "Implement narrow catalog helper, regression tests and browser label/filter test. Recheck CI and actual screenshots; no hosted promotion.",
   "previous_slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45927669336",
-  "previous_validated_head": "90270cd9e72522e5001274962f5e32d316e5b632",
-  "goal": "Fix baseline visual defects in app shell and clinical list controls, localize appointment status; add DOM regression checks.",
+  "previous_validated_head": "3dc43456807af84d3bbaaf251b9da637eb2b8de0",
+  "goal": "Unify photo catalog alias search, gallery preview and batch selection without altering storage, scope, permissions or clinical metadata; correct visible native search control.",
   "method_sha": "5f73ee2b48507234431706e4c6313773bae72a5a",
   "qa_ci": {
-    "run": "https://github.com/CristianoRFB/Dentista/actions/runs/45927883476",
-    "unit_worker": "PASS",
-    "typecheck": "PASS",
-    "rules_build": "PENDING_AT_INSPECTION",
-    "visual_run": "https://github.com/CristianoRFB/Dentista/actions/runs/45927883448",
-    "visual": "PENDING_AT_INSPECTION"
+    "run": "https://github.com/CristianoRFB/Dentista/actions/runs/45928048065",
+    "push": "https://github.com/CristianoRFB/Dentista/actions/runs/45928042885",
+    "visual": "https://github.com/CristianoRFB/Dentista/actions/runs/45928048033",
+    "result": "PASS",
+    "artifact": 15166848476,
+    "sourceMergeSha": "f96dbfcccf19c5952daf7212b91074204d5aaa7f",
+    "treeMatchesHead": true,
+    "screenshots": 30,
+    "hashesVerified": 30,
+    "controlsChecked": 423
   }
 }
