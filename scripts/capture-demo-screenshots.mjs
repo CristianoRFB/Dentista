@@ -145,12 +145,22 @@ try{
           if(await page.evaluate(()=>document.body.style.overflow==='hidden'))
             throw new Error('Mobile background scroll remained locked after closing the drawer');
         }
+        if(route.id==='agenda'){
+          const table=page.locator('.clinical-stack-table tbody');
+          await table.getByText('Marina Souza',{exact:true}).waitFor({state:'visible'});
+          await page.getByRole('button',{name:'Próximo dia',exact:true}).click();
+          await table.getByText('Nenhum atendimento para o dia selecionado.',{exact:true}).waitFor({state:'visible'});
+          await page.getByRole('button',{name:'Hoje',exact:true}).click();
+          await table.getByText('Marina Souza',{exact:true}).waitFor({state:'visible'});
+        }
         if(route.id==='patients'){
           const search=page.locator('input[type="search"][aria-label="Buscar paciente pelo nome ou contato"]');
           await search.fill('marina');
           await page.waitForFunction(()=>document.querySelectorAll('.clinical-stack-table tbody tr').length===1);
           const names=(await page.locator('.clinical-stack-table tbody').textContent())??'';
           if(!names.includes('Marina')||names.includes('Carlos'))throw new Error('Patient filter did not limit visible rows');
+          await search.fill('17999991001');
+          await page.waitForFunction(()=>{const t=document.querySelector('.clinical-stack-table tbody');return t?.textContent?.includes('Marina')&&!t?.textContent?.includes('Carlos');});
           await search.fill('');
           await page.waitForFunction(()=>document.querySelectorAll('.clinical-stack-table tbody tr').length===3);
         }

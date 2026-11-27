@@ -15,3 +15,9 @@ export function adjacentAgendaDay(value:string,offset:-1|1){
   const {start}=agendaDayWindow(value);
   return localDateString(new Date(start.getFullYear(),start.getMonth(),start.getDate()+offset));
 }
+
+/** Mirror the hosted startsAt half-open day query in local read-only fixtures. */
+export function appointmentsStartingOnDay<T extends {startsAt:string}>(rows:readonly T[],value:string):T[]{
+  const {start,end}=agendaDayWindow(value);
+  return rows.filter(row=>{const time=new Date(row.startsAt).getTime();return time>=start.getTime()&&time<end.getTime();});
+}

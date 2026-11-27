@@ -12,6 +12,14 @@ describe('D6 busca e paginação clínica',()=>{
     expect(filterPatients(patients,'1199988','all').map(p=>p.id)).toEqual(['2']);
     expect(filterPatients(patients,'CARLOS@EXAMPLE.TEST','all').map(p=>p.id)).toEqual(['3']);
   });
+  it('encontra telefones com e sem formatação sem ignorar estado ou texto',()=>{
+    expect(filterPatients(patients,'17999998888','active').map(p=>p.id)).toEqual(['1']);
+    expect(filterPatients(patients,'+55 (17) 99876-5432','active').map(p=>p.id)).toEqual(['3']);
+    expect(filterPatients(patients,'(11) 99988-7766','active')).toEqual([]);
+    expect(filterPatients(patients,'(11) 99988-7766','inactive').map(p=>p.id)).toEqual(['2']);
+    expect(filterPatients(patients,'---','all')).toEqual([]);
+    expect(filterPatients(patients,'alvaro 1799','all')).toEqual([]);
+  });
   it('mantém pacientes inativos fora da lista padrão, mas localizáveis',()=>{
     expect(filterPatients(patients,'','active')).toHaveLength(2);
     expect(filterPatients(patients,'','inactive').map(p=>p.id)).toEqual(['2']);

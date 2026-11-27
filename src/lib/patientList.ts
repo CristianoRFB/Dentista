@@ -7,9 +7,11 @@ function normalize(value:string){
 }
 export function filterPatients(patients:readonly Patient[],query:string,state:PatientStateFilter):Patient[]{
   const needle=normalize(query);
+  const phoneNeedle=/^[+\d().\s-]+$/.test(needle)?needle.replace(/\D/g,''):'';
   return patients.filter(patient=>(state==='all'||patient.status===state)
     && (!needle || [patient.name,patient.phone,patient.email]
-      .some(value=>normalize(String(value??'')).includes(needle))))
+      .some(value=>normalize(String(value??'')).includes(needle))
+      || (phoneNeedle.length>0 && String(patient.phone??'').replace(/\D/g,'').includes(phoneNeedle))))
     .sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
 }
 export function pagePatients(patients:readonly Patient[],page:number,pageSize=PATIENTS_PER_PAGE){

@@ -5,7 +5,7 @@ import type { Appointment, Patient, Procedure, Professional, ScheduleBlock, Sche
 import { db } from '../../lib/firebase';
 import { listTenantRecords } from '../../lib/tenantData';
 import { cancelAppointment, saveAppointment } from '../../lib/appointmentClient';
-import { adjacentAgendaDay, agendaDayWindow, localDateString } from '../../lib/agendaDate';
+import { adjacentAgendaDay, agendaDayWindow, localDateString, appointmentsStartingOnDay } from '../../lib/agendaDate';
 import { useReadyTenantAccess } from '../tenant/TenantContext';
 
 function toLocalInput(date: Date) {
@@ -48,7 +48,7 @@ export function AgendaPage() {
   async function refresh() {
     setLoading(true); setError('');
     if (session.isDemo) {
-      setAppointments(demoAppointments); setPatients(demoPatients); setResources(demoResources);
+      setAppointments(appointmentsStartingOnDay(demoAppointments,selectedDay)); setPatients(demoPatients); setResources(demoResources);
       setProfessionals([]); setProcedures([]); setBlocks([]); setLoading(false); return;
     }
     try {
