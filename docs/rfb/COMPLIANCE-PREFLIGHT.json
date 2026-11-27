@@ -1,0 +1,1142 @@
+{
+  "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+  "targetSha": "bdd33296b2dc0a3f3abc2ff33dbe50706e8514f5",
+  "activation": {
+    "request": "Executar todos os EVOLVEs restantes conforme RFB Method",
+    "objective": "Agenda/pacientes, visual, QA integral e preparo comercial; sem produção ou billing",
+    "targetRepo": "CristianoRFB/Dentista",
+    "methodRef": "main",
+    "facets": [
+      "github",
+      "implementation",
+      "ui",
+      "evolve",
+      "commercial",
+      "audit",
+      "integrations",
+      "api",
+      "cloudflare",
+      "alternatives"
+    ],
+    "scopeEvidence": "PR #4 e pedido de continuidade do SaaS; S003 CI sucesso",
+    "targetContext": "OdontoFlow V2; React/TS, Firebase, Worker R2; branch draft existente",
+    "entryOrder": [
+      "AGENTS.md",
+      "compliance/BOOTSTRAP.md",
+      "compliance/catalog.json",
+      "compliance/README.md"
+    ],
+    "discoveryComplete": true
+  },
+  "modules": [
+    {
+      "id": "CORE",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "AGENTS.md",
+          "blobSha": "f0717e75eb24b474853e7926949329a379ad6559",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:AGENTS.md; conferência independente da árvore Git",
+          "summary": "Preservar isolamento tenant, escopo e custo; distinguir código de homologação."
+        },
+        {
+          "path": "METHOD.md",
+          "blobSha": "f9a7d5769e1cc7ee7bdd54094432786b01344573",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:METHOD.md; conferência independente da árvore Git",
+          "summary": "Preservar isolamento tenant, escopo e custo; distinguir código de homologação."
+        },
+        {
+          "path": "README.md",
+          "blobSha": "77db50ee17c9a8c518742535b611a8210f09abb3",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:README.md; conferência independente da árvore Git",
+          "summary": "Preservar isolamento tenant, escopo e custo; distinguir código de homologação."
+        },
+        {
+          "path": "stack.md",
+          "blobSha": "d4afca4b95e365d2b60c2dd6cdcc0bdb5694da0a",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:stack.md; conferência independente da árvore Git",
+          "summary": "Preservar isolamento tenant, escopo e custo; distinguir código de homologação."
+        },
+        {
+          "path": "docs/AGENT-MANUAL.md",
+          "blobSha": "c2539de5ffc68f0dc45964bc920022b8f3c19526",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:docs/AGENT-MANUAL.md; conferência independente da árvore Git",
+          "summary": "Preservar isolamento tenant, escopo e custo; distinguir código de homologação."
+        },
+        {
+          "path": "docs/CHAT-NORMAL.md",
+          "blobSha": "7d4bcd28c53a075782463c972aa5c2589c360112",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:docs/CHAT-NORMAL.md; conferência independente da árvore Git",
+          "summary": "Preservar isolamento tenant, escopo e custo; distinguir código de homologação."
+        },
+        {
+          "path": "docs/SECURITY.md",
+          "blobSha": "c303127d404e5d40b87fd3aa60acf695b5f64495",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:docs/SECURITY.md; conferência independente da árvore Git",
+          "summary": "Preservar isolamento tenant, escopo e custo; distinguir código de homologação."
+        },
+        {
+          "path": "docs/CONTEXT.md",
+          "blobSha": "5740fd8005ed5ed244f420e1484efa96dd21da9f",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:docs/CONTEXT.md; conferência independente da árvore Git",
+          "summary": "Preservar isolamento tenant, escopo e custo; distinguir código de homologação."
+        },
+        {
+          "path": "docs/QUALITY.md",
+          "blobSha": "55adb77ed7a39eb5338be6c91ac3df43d4eb9764",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:docs/QUALITY.md; conferência independente da árvore Git",
+          "summary": "Preservar isolamento tenant, escopo e custo; distinguir código de homologação."
+        },
+        {
+          "path": "docs/INTEGRATION-MAP.md",
+          "blobSha": "96cd158096bd0dd652e392b2cb3f2b8a51e92c05",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:docs/INTEGRATION-MAP.md; conferência independente da árvore Git",
+          "summary": "Preservar isolamento tenant, escopo e custo; distinguir código de homologação."
+        }
+      ],
+      "gates": [
+        {
+          "id": "objective",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "scope",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "safety",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "GITHUB",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "github/README.md",
+          "blobSha": "e0d964870b2282a666efd001c85bddbe48904589",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:github/README.md; conferência independente da árvore Git",
+          "summary": "Triagem de issues/PR e não fazer merge sem gate."
+        },
+        {
+          "path": "github/TRIAGE.md",
+          "blobSha": "d6f9dba0e73b43c2721a0ed16bb6bc6de614acd3",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:github/TRIAGE.md; conferência independente da árvore Git",
+          "summary": "Triagem de issues/PR e não fazer merge sem gate."
+        },
+        {
+          "path": "github/CLOSURE-GATES.md",
+          "blobSha": "bdd2799b83a86148330b9a402b60c7eaa8ab6c77",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:github/CLOSURE-GATES.md; conferência independente da árvore Git",
+          "summary": "Triagem de issues/PR e não fazer merge sem gate."
+        },
+        {
+          "path": "skills/github-governance/SKILL.md",
+          "blobSha": "4cb921d4bf6f9d762fe568be5250b62fc7828b8e",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:skills/github-governance/SKILL.md; conferência independente da árvore Git",
+          "summary": "Triagem de issues/PR e não fazer merge sem gate."
+        }
+      ],
+      "gates": [
+        {
+          "id": "intake",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "reconcile",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "ORCHESTRATOR",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "orchestrator/SESSION-ORCHESTRATOR.md",
+          "blobSha": "2dcf1301854b8235906801db459be4e2f2a81682",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:orchestrator/SESSION-ORCHESTRATOR.md; conferência independente da árvore Git",
+          "summary": "Checkpoint pré-write e retomada por SHA."
+        },
+        {
+          "path": "checkpoint/README.md",
+          "blobSha": "4aebbefd3260687bf5cdc76baf32d0bf73e9e50b",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:checkpoint/README.md; conferência independente da árvore Git",
+          "summary": "Checkpoint pré-write e retomada por SHA."
+        },
+        {
+          "path": "checkpoint/RESUME.md",
+          "blobSha": "16fb0a787d21114a216870cbb196e2136a888eb9",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:checkpoint/RESUME.md; conferência independente da árvore Git",
+          "summary": "Checkpoint pré-write e retomada por SHA."
+        },
+        {
+          "path": "checkpoint/WHEN-TO-SAVE.md",
+          "blobSha": "11e2e243685e71f4f3ceefb02d36e19f0a7d877f",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:checkpoint/WHEN-TO-SAVE.md; conferência independente da árvore Git",
+          "summary": "Checkpoint pré-write e retomada por SHA."
+        },
+        {
+          "path": "skills/orchestrator/SKILL.md",
+          "blobSha": "157c12ed2ec2c3083d8840d3530b89755c9bacf0",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:skills/orchestrator/SKILL.md; conferência independente da árvore Git",
+          "summary": "Checkpoint pré-write e retomada por SHA."
+        },
+        {
+          "path": "skills/checkpoint/SKILL.md",
+          "blobSha": "1c72b77703caa9a20862f214ab8a3b99b49d9c1e",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:skills/checkpoint/SKILL.md; conferência independente da árvore Git",
+          "summary": "Checkpoint pré-write e retomada por SHA."
+        }
+      ],
+      "gates": [
+        {
+          "id": "baseline",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "checkpoint",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "ANTI_LOOP",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "anti-loop/README.md",
+          "blobSha": "0dd9ee1a05f99c4728b6e8b8cacbfe18a556ecc7",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:anti-loop/README.md; conferência independente da árvore Git",
+          "summary": "Fatias limitadas e hipótese verificável."
+        },
+        {
+          "path": "anti-loop/STOP-RULES.md",
+          "blobSha": "8edf1e9d4fb33bd8ebea22995c7c8bf700a048e0",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:anti-loop/STOP-RULES.md; conferência independente da árvore Git",
+          "summary": "Fatias limitadas e hipótese verificável."
+        },
+        {
+          "path": "anti-loop/TEST-BUDGET.md",
+          "blobSha": "6ec609a9d6b21e888a4d798bc2cfea311cd90905",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:anti-loop/TEST-BUDGET.md; conferência independente da árvore Git",
+          "summary": "Fatias limitadas e hipótese verificável."
+        },
+        {
+          "path": "anti-loop/REGRESSION-LEDGER.md",
+          "blobSha": "55b9034b208c176b27a907cb42ef335f060a5696",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:anti-loop/REGRESSION-LEDGER.md; conferência independente da árvore Git",
+          "summary": "Fatias limitadas e hipótese verificável."
+        }
+      ],
+      "gates": [
+        {
+          "id": "stop_budget",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "ANTI_VIBE",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "antivibecoding/README.md",
+          "blobSha": "99499dc55ac219383352302e12482412af65e34e",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:antivibecoding/README.md; conferência independente da árvore Git",
+          "summary": "Revisão e testes negativos; evitar alegação sem evidência."
+        },
+        {
+          "path": "antivibecoding/PROTOCOLS.md",
+          "blobSha": "7fdf1273925b7b7823ca06637467d3165ec58304",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:antivibecoding/PROTOCOLS.md; conferência independente da árvore Git",
+          "summary": "Revisão e testes negativos; evitar alegação sem evidência."
+        },
+        {
+          "path": "antivibecoding/GATES.md",
+          "blobSha": "8deedf196ff5790e1aebacf3d8c2ab8815467bc9",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:antivibecoding/GATES.md; conferência independente da árvore Git",
+          "summary": "Revisão e testes negativos; evitar alegação sem evidência."
+        },
+        {
+          "path": "antivibecoding/RESEARCH-CADENCE.md",
+          "blobSha": "e4945e10872a7e876da108f19fc622cb83af4ead",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:antivibecoding/RESEARCH-CADENCE.md; conferência independente da árvore Git",
+          "summary": "Revisão e testes negativos; evitar alegação sem evidência."
+        },
+        {
+          "path": "antivibecoding/THREAT-MODEL.md",
+          "blobSha": "acfe8c2c66e963b697d7e2f48859730f0e08e7dd",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:antivibecoding/THREAT-MODEL.md; conferência independente da árvore Git",
+          "summary": "Revisão e testes negativos; evitar alegação sem evidência."
+        },
+        {
+          "path": "antivibecoding/AUDIT-TEMPLATE.md",
+          "blobSha": "6542ae4b8b06b17daa335a9d6f03a3a55f873083",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:antivibecoding/AUDIT-TEMPLATE.md; conferência independente da árvore Git",
+          "summary": "Revisão e testes negativos; evitar alegação sem evidência."
+        },
+        {
+          "path": "antivibecoding/SOURCES.md",
+          "blobSha": "86de068885951b5064dcc582a5aeca9a2fba3b74",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:antivibecoding/SOURCES.md; conferência independente da árvore Git",
+          "summary": "Revisão e testes negativos; evitar alegação sem evidência."
+        }
+      ],
+      "gates": [
+        {
+          "id": "risk",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "verification",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "AP",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "anti-preguica/README.md",
+          "blobSha": "ac7e8865b352fbfe1e7ebbf83275467473d85445",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:anti-preguica/README.md; conferência independente da árvore Git",
+          "summary": "Corrigir defeitos concretos e testar bordas."
+        },
+        {
+          "path": "anti-preguica/RESEARCH.md",
+          "blobSha": "bc6efc08c4c0e2e5cf3af3580be27d5a44a13e7e",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:anti-preguica/RESEARCH.md; conferência independente da árvore Git",
+          "summary": "Corrigir defeitos concretos e testar bordas."
+        }
+      ],
+      "gates": [
+        {
+          "id": "AP-G0",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "AP-G1",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "AP-G2",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "PRV",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "proatividade/README.md",
+          "blobSha": "9b77fbcae7e05a1e6a3ab697d599d4ec7ef82f8e",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:proatividade/README.md; conferência independente da árvore Git",
+          "summary": "Diagnosticar lacunas e avançar sem confirmação intermediária."
+        },
+        {
+          "path": "proatividade/RESEARCH.md",
+          "blobSha": "8a93709027467ca6c560c55f546a1f2b3c633586",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:proatividade/RESEARCH.md; conferência independente da árvore Git",
+          "summary": "Diagnosticar lacunas e avançar sem confirmação intermediária."
+        }
+      ],
+      "gates": [
+        {
+          "id": "PRV-G0",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "PRV-G1",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "PRV-G2",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "CR",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "criatividade/README.md",
+          "blobSha": "d2bd822f0b22636c9a008db6b872ed0ea873cf58",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:criatividade/README.md; conferência independente da árvore Git",
+          "summary": "Escolhas proporcionais ao problema; evitar redesign cosmético."
+        },
+        {
+          "path": "criatividade/RESEARCH.md",
+          "blobSha": "fafe89a7cd17fe6f1c65f3c1b5b820d805972119",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:criatividade/RESEARCH.md; conferência independente da árvore Git",
+          "summary": "Escolhas proporcionais ao problema; evitar redesign cosmético."
+        }
+      ],
+      "gates": [
+        {
+          "id": "CR-G0",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "CR-G1",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "CR-G2",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "BEYOND",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "beyond/README.md",
+          "blobSha": "6fc1a985cc47c169a4220368c9761973150aa13f",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:beyond/README.md; conferência independente da árvore Git",
+          "summary": "Consistência, acessibilidade, evidência e operação segura."
+        },
+        {
+          "path": "beyond/MEDIA-SVG.md",
+          "blobSha": "2dc3442b5ad36cf953c250187d1057a7e6236567",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:beyond/MEDIA-SVG.md; conferência independente da árvore Git",
+          "summary": "Consistência, acessibilidade, evidência e operação segura."
+        },
+        {
+          "path": "beyond/RESEARCH.md",
+          "blobSha": "5c55576fee1f79ef49aa36cbd188cbbac22bb3c7",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:beyond/RESEARCH.md; conferência independente da árvore Git",
+          "summary": "Consistência, acessibilidade, evidência e operação segura."
+        }
+      ],
+      "gates": [
+        {
+          "id": "B-G0",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "B-G1",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "B-G2",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "B-G3",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "COMPLIANCE",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "compliance/README.md",
+          "blobSha": "32276d97b38a14f5117d9bb69b737dcc35ad287e",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:compliance/README.md; conferência independente da árvore Git",
+          "summary": "Ativação e recibo por documento; gate manual quando CLI indisponível."
+        },
+        {
+          "path": "compliance/catalog.json",
+          "blobSha": "57599d8df8abcf9d09cfefffde47dd074587aa3b",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:compliance/catalog.json; conferência independente da árvore Git",
+          "summary": "Ativação e recibo por documento; gate manual quando CLI indisponível."
+        },
+        {
+          "path": "compliance/BOOTSTRAP.md",
+          "blobSha": "1dc765f8d86897523c10d4a8c68ef0024df66066",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:compliance/BOOTSTRAP.md; conferência independente da árvore Git",
+          "summary": "Ativação e recibo por documento; gate manual quando CLI indisponível."
+        }
+      ],
+      "gates": [
+        {
+          "id": "CG0",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "CG1",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "CG2",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "CG3",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "activation",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "ANTI_AI",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "anti-ai/README.md",
+          "blobSha": "846ead1dc85f9b1612169495579f99a173b981d1",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:anti-ai/README.md; conferência independente da árvore Git",
+          "summary": "Evitar evidência fabricada, UI genérica e promessas vazias."
+        },
+        {
+          "path": "anti-ai/GATES.md",
+          "blobSha": "17fb048d32b8b8630d538f74a6a291b2a311af7e",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:anti-ai/GATES.md; conferência independente da árvore Git",
+          "summary": "Evitar evidência fabricada, UI genérica e promessas vazias."
+        },
+        {
+          "path": "anti-ai/ANTI-PATTERNS.md",
+          "blobSha": "7e45e6a447689fd77e9759ad991bf4dfc413e529",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:anti-ai/ANTI-PATTERNS.md; conferência independente da árvore Git",
+          "summary": "Evitar evidência fabricada, UI genérica e promessas vazias."
+        },
+        {
+          "path": "skills/anti-ai/SKILL.md",
+          "blobSha": "67506884444ff9b00573c58cfdb633f6a99f0b9d",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:skills/anti-ai/SKILL.md; conferência independente da árvore Git",
+          "summary": "Evitar evidência fabricada, UI genérica e promessas vazias."
+        },
+        {
+          "path": "anti-ai/REVIEW-TEMPLATE.md",
+          "blobSha": "a5d3ed668ef3142dc236506d3be44b69f3c1562e",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:anti-ai/REVIEW-TEMPLATE.md; conferência independente da árvore Git",
+          "summary": "Evitar evidência fabricada, UI genérica e promessas vazias."
+        }
+      ],
+      "gates": [
+        {
+          "id": "quality_review",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "QA",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "qa/README.md",
+          "blobSha": "2670872c7f3a06ead626076a1336aef720022d9c",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:qa/README.md; conferência independente da árvore Git",
+          "summary": "Testes runtime e provas por SHA; screenshots reais sanitizados."
+        },
+        {
+          "path": "qa/TEST-CATALOG.md",
+          "blobSha": "bd856a6187821be1cfe447260beaa96795b1cd21",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:qa/TEST-CATALOG.md; conferência independente da árvore Git",
+          "summary": "Testes runtime e provas por SHA; screenshots reais sanitizados."
+        },
+        {
+          "path": "qa/ORGANIZATION.md",
+          "blobSha": "d8199677a7304a088e05a8a49b949dd117a78072",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:qa/ORGANIZATION.md; conferência independente da árvore Git",
+          "summary": "Testes runtime e provas por SHA; screenshots reais sanitizados."
+        },
+        {
+          "path": "qa/RUNBOOK.md",
+          "blobSha": "80142ed587e777f1c0f01e1c008498300547ab94",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:qa/RUNBOOK.md; conferência independente da árvore Git",
+          "summary": "Testes runtime e provas por SHA; screenshots reais sanitizados."
+        },
+        {
+          "path": "qa/EVIDENCE.md",
+          "blobSha": "9ea8ab77d411d10b3b1fbbe51d41874c1f0c367e",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:qa/EVIDENCE.md; conferência independente da árvore Git",
+          "summary": "Testes runtime e provas por SHA; screenshots reais sanitizados."
+        },
+        {
+          "path": "qa/EXECUTORS.md",
+          "blobSha": "dcbcd98e2bfdde5e69d621d8c327d7952dc51b43",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:qa/EXECUTORS.md; conferência independente da árvore Git",
+          "summary": "Testes runtime e provas por SHA; screenshots reais sanitizados."
+        },
+        {
+          "path": "qa/VISUAL-QA.md",
+          "blobSha": "5829d8b13e09253701869a60cf3c9b91562b285f",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:qa/VISUAL-QA.md; conferência independente da árvore Git",
+          "summary": "Testes runtime e provas por SHA; screenshots reais sanitizados."
+        }
+      ],
+      "gates": [
+        {
+          "id": "runtime",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "evidence",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "DESIGN",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "skills/design/SKILL.md",
+          "blobSha": "4b4ac599b82c69866af91a00c5556b7ec574ab02",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:skills/design/SKILL.md; conferência independente da árvore Git",
+          "summary": "Preservar identidade existente, validar composição e screenshots antes de aprovação."
+        },
+        {
+          "path": "docs/DESIGN-QUALITY.md",
+          "blobSha": "38b56938bd34386707b947d1a14936e0c7b4e361",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:docs/DESIGN-QUALITY.md; conferência independente da árvore Git",
+          "summary": "Preservar identidade existente, validar composição e screenshots antes de aprovação."
+        },
+        {
+          "path": "brand/README.md",
+          "blobSha": "8be02e5e449a267a4e8fd7e5e86e789906de5fc5",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:brand/README.md; conferência independente da árvore Git",
+          "summary": "Preservar identidade existente, validar composição e screenshots antes de aprovação."
+        },
+        {
+          "path": "brand/assinatura-rfb.svg",
+          "blobSha": "7238d443c37e57ba4dfb3db4bf333e1a929a309f",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:brand/assinatura-rfb.svg; conferência independente da árvore Git",
+          "summary": "Preservar identidade existente, validar composição e screenshots antes de aprovação."
+        },
+        {
+          "path": "beyond/MEDIA-SVG.md",
+          "blobSha": "2dc3442b5ad36cf953c250187d1057a7e6236567",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:beyond/MEDIA-SVG.md; conferência independente da árvore Git",
+          "summary": "Preservar identidade existente, validar composição e screenshots antes de aprovação."
+        },
+        {
+          "path": "qa/VISUAL-QA.md",
+          "blobSha": "5829d8b13e09253701869a60cf3c9b91562b285f",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:qa/VISUAL-QA.md; conferência independente da árvore Git",
+          "summary": "Preservar identidade existente, validar composição e screenshots antes de aprovação."
+        },
+        {
+          "path": "qa/VISUAL-SELF-CORRECTION.md",
+          "blobSha": "cd3a5e10f05c092c9b91734a24c9ef3c45d26ad1",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:qa/VISUAL-SELF-CORRECTION.md; conferência independente da árvore Git",
+          "summary": "Preservar identidade existente, validar composição e screenshots antes de aprovação."
+        }
+      ],
+      "gates": [
+        {
+          "id": "assets",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "svg",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "visual",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "visual_quality",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "visual_self_correction",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "DEMOS",
+      "applicable": false,
+      "reason": "Produto existente; nenhuma demo comercial de lead solicitada.",
+      "reads": [],
+      "gates": []
+    },
+    {
+      "id": "HUMAN",
+      "applicable": false,
+      "reason": "Sem negociação ou contato.",
+      "reads": [],
+      "gates": []
+    },
+    {
+      "id": "MYOWN",
+      "applicable": false,
+      "reason": "Alvo Dentista, não o método.",
+      "reads": [],
+      "gates": []
+    },
+    {
+      "id": "PORTFOLIO",
+      "applicable": false,
+      "reason": "Não é revisão do catálogo RFB Labs; protocolo README consultado complementarmente.",
+      "reads": [],
+      "gates": []
+    },
+    {
+      "id": "STARTER",
+      "applicable": false,
+      "reason": "Produto existente.",
+      "reads": [],
+      "gates": []
+    },
+    {
+      "id": "CODEX_PC",
+      "applicable": false,
+      "reason": "Nenhum prompt Codex solicitado.",
+      "reads": [],
+      "gates": []
+    },
+    {
+      "id": "INITIAL_DEVELOPMENT",
+      "applicable": false,
+      "reason": "Não é fundação inicial.",
+      "reads": [],
+      "gates": []
+    },
+    {
+      "id": "DEVELOPMENT",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "skills/development/SKILL.md",
+          "blobSha": "05b75d4fd38c6dae93095f461eb878ce3cb44f80",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:skills/development/SKILL.md; conferência independente da árvore Git",
+          "summary": "Mudança mínima verificável e testes."
+        }
+      ],
+      "gates": [
+        {
+          "id": "skill_acceptance",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "AUDIT",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "skills/audit/SKILL.md",
+          "blobSha": "4a36cc13b90ae9a3baea8acb29b694a79b654b8c",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:skills/audit/SKILL.md; conferência independente da árvore Git",
+          "summary": "Registrar riscos e evidências."
+        }
+      ],
+      "gates": [
+        {
+          "id": "skill_acceptance",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "PAYMENTS",
+      "applicable": false,
+      "reason": "Billing/gateway explicitamente deferred.",
+      "reads": [],
+      "gates": []
+    },
+    {
+      "id": "INTEGRATIONS",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "skills/integrations/SKILL.md",
+          "blobSha": "a164c580bd7c3871813d90f195fb9f0bbb4838bb",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:skills/integrations/SKILL.md; conferência independente da árvore Git",
+          "summary": "Isolar APIs e credenciais; não ativar infraestrutura."
+        }
+      ],
+      "gates": [
+        {
+          "id": "skill_acceptance",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "API_DEVELOPMENT",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "skills/api-development/SKILL.md",
+          "blobSha": "8904579aec25f9c42e5b25ca756ff213b6803e05",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:skills/api-development/SKILL.md; conferência independente da árvore Git",
+          "summary": "Preservar contrato, validação e autorização."
+        }
+      ],
+      "gates": [
+        {
+          "id": "skill_acceptance",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "API_CONTRACTS",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "skills/api-contracts/SKILL.md",
+          "blobSha": "c25e53ea08b373f7a0f86ec28e2db45d265c0b7d",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:skills/api-contracts/SKILL.md; conferência independente da árvore Git",
+          "summary": "Contrato e compatibilidade."
+        }
+      ],
+      "gates": [
+        {
+          "id": "skill_acceptance",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "ALTERNATIVES",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "skills/alternatives/SKILL.md",
+          "blobSha": "d9be056b1a4d618526669e7992fa94fead3207af",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:skills/alternatives/SKILL.md; conferência independente da árvore Git",
+          "summary": "Executor CI; sem substituir por mock."
+        },
+        {
+          "path": "alternatives/README.md",
+          "blobSha": "48252b819a1ddd1dd7dfa93aff8f779eeed80f85",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:alternatives/README.md; conferência independente da árvore Git",
+          "summary": "Executor CI; sem substituir por mock."
+        }
+      ],
+      "gates": [
+        {
+          "id": "skill_acceptance",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "CLOUDFLARE_INTEGRATION",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "skills/cloudflare-integration/SKILL.md",
+          "blobSha": "4d497c94348243e658c2b7675f5d86892e97aa7e",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:skills/cloudflare-integration/SKILL.md; conferência independente da árvore Git",
+          "summary": "Não publicar ou habilitar cobrança sem autorização."
+        }
+      ],
+      "gates": [
+        {
+          "id": "skill_acceptance",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "FULL_SYSTEM_LIFECYCLE",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "lifecycle/README.md",
+          "blobSha": "79d86ed5a02d17d0531db4cde9bce3ab417c0cb1",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:lifecycle/README.md; conferência independente da árvore Git",
+          "summary": "Inventariar 13 áreas/15 níveis, sem promoção sem gates."
+        },
+        {
+          "path": "lifecycle/catalog.json",
+          "blobSha": "c146c2913bbcc718f645e7b9eb8767151c59f948",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:lifecycle/catalog.json; conferência independente da árvore Git",
+          "summary": "Inventariar 13 áreas/15 níveis, sem promoção sem gates."
+        },
+        {
+          "path": "lifecycle/RFB-INTEGRATION.md",
+          "blobSha": "a9c6a63ffe8bae2701f8b2bcbb224fee080dd861",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:lifecycle/RFB-INTEGRATION.md; conferência independente da árvore Git",
+          "summary": "Inventariar 13 áreas/15 níveis, sem promoção sem gates."
+        }
+      ],
+      "gates": [
+        {
+          "id": "inventory",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "execution",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "promotion",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "final",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "TRIPLE_VERIFICATION",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "qa/TRIPLE-VERIFICATION.md",
+          "blobSha": "33549352b7cc2a90265bf41daaeb929e2805875d",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:qa/TRIPLE-VERIFICATION.md; conferência independente da árvore Git",
+          "summary": "Separar prova funcional, adversarial e regressão."
+        }
+      ],
+      "gates": [
+        {
+          "id": "TV-G0",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "TV-G1",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "TV-G2",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        },
+        {
+          "id": "TV-G3",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    },
+    {
+      "id": "COMMERCIAL_STRICT",
+      "applicable": true,
+      "reads": [
+        {
+          "path": "docs/COMMERCIAL-DEMO-AND-EVOLVE.md",
+          "blobSha": "3a2f15d8486e5e79442aee1d483940594e5e4773",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:docs/COMMERCIAL-DEMO-AND-EVOLVE.md; conferência independente da árvore Git",
+          "summary": "EVOLVEs numerados, status e critérios; sem aceite falso."
+        },
+        {
+          "path": "commercial/README.md",
+          "blobSha": "185980b5ce37283ad60b4e979f9604cd09be97db",
+          "methodSha": "5f73ee2b48507234431706e4c6313773bae72a5a",
+          "full": true,
+          "evidence": "GitHub fetch_file em 5f73ee2b48507234431706e4c6313773bae72a5a:commercial/README.md; conferência independente da árvore Git",
+          "summary": "EVOLVEs numerados, status e critérios; sem aceite falso."
+        }
+      ],
+      "gates": [
+        {
+          "id": "scope_acceptance",
+          "status": "NOT_RUN",
+          "reason": "Preflight antes da implementação; gates de execução/revisão ainda não concluídos."
+        }
+      ]
+    }
+  ],
+  "manualCheck": "Leituras por GitHub; CLI estrutural NOT_RUN, sem alegação de conformidade final."
+}

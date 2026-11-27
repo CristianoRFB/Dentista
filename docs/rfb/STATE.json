@@ -1,8 +1,8 @@
 {
   "date": "2026-11-26",
-  "status": "SLICE_COMMITTED_CI_PENDING",
+  "status": "BEFORE_WRITE",
   "baseline": "4863fc59fd9e03c1aea5c98d671bc52a3ad393a7",
-  "slice": "S003",
+  "slice": "S004",
   "code_sha": "2751b415c91be21de4ed50713755ac81481f9150",
   "pr": 4,
   "baseline_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/41248021315",
@@ -15,8 +15,9 @@
     "Firebase hosted readiness not verified",
     "No operational authorization to enable billing/storage or release"
   ],
-  "next_action": "Verify final PR CI; resolve failures before next slice. R2 hosted provisioning requires operational approval; proceed with agenda/patient hardening only after CI.",
-  "previous_slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45911153148",
-  "previous_validated_head": "36cd60fa1a7716b6d635ff1f96c7a28413a6cf79",
-  "goal": "Reject restoration when backup manifest verification marker, byte count or transactional scope is inconsistent; no overwrite or deletion."
+  "next_action": "Implement patient filter and demo agenda day selection; unit and browser regression; verify CI before dependent promotions.",
+  "previous_slice_ci": "https://github.com/CristianoRFB/Dentista/actions/runs/45912483269",
+  "previous_validated_head": "bdd33296b2dc0a3f3abc2ff33dbe50706e8514f5",
+  "goal": "Correct patient phone search and demo day selection; preserve real tenant writes and existing scheduling contract.",
+  "method_sha": "5f73ee2b48507234431706e4c6313773bae72a5a"
 }
